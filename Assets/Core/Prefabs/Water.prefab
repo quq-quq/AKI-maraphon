@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 4854588425626752570}
   - component: {fileID: 7895889988339174946}
   - component: {fileID: 26049283550431448}
+  - component: {fileID: 7356382274535037087}
   m_Layer: 0
   m_Name: Water
   m_TagString: Untagged
@@ -118,3 +119,18 @@ MonoBehaviour:
   onUnderwaterChanged:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &7356382274535037087
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6302377064929433891}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 23c95529e19c38847ba6e275336c639c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Water.WaterWeather
+  calm: {fileID: 2100000, guid: 0b2896c7213090348a4e23725d4db455, type: 2}
+  storm: {fileID: 2100000, guid: 0bcc7a235f407d14ca66e9edac485a3c, type: 2}
+  storminess: 0

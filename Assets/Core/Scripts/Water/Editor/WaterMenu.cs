@@ -34,6 +34,7 @@ namespace AKI.Water.Editor
             surface.fallbackMaterial = mobile;
             surface.underwaterShader = Shader.Find("AKI/WaterUnderwater");
             surface.heightCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>(HeightComputePath);
+            AddWeather(surface.gameObject, pc);
             surface.Refresh();
             Selection.activeGameObject = go;
             return go;
@@ -50,6 +51,7 @@ namespace AKI.Water.Editor
             surface.fallbackMaterial = mobile;
             surface.underwaterShader = Shader.Find("AKI/WaterUnderwater");
             surface.heightCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>(HeightComputePath);
+            AddWeather(surface.gameObject, pc);
             surface.enabled = false;   // OnDisable removes the runtime-only mesh / underwater child before saving
             Directory.CreateDirectory(Path.GetDirectoryName(PrefabPath));
             PrefabUtility.SaveAsPrefabAsset(go, PrefabPath);
@@ -112,6 +114,16 @@ namespace AKI.Water.Editor
             EnsureMaterials(out Material pc, out _);
             ConfigureStorm(EnsureStormPreset(pc), pc);
             AssetDatabase.SaveAssets();
+        }
+
+        // calm <-> storm blending, calm by default
+        static void AddWeather(GameObject water, Material pc)
+        {
+            var weather = water.GetComponent<WaterWeather>();
+            if (weather == null) weather = water.AddComponent<WaterWeather>();
+            weather.calm = pc;
+            weather.storm = EnsureStormPreset(pc);
+            weather.storminess = 0f;
         }
 
         static Material EnsureStormPreset(Material pc)
@@ -262,6 +274,7 @@ namespace AKI.Water.Editor
             surface.fallbackMaterial = mobile;
             surface.underwaterShader = Shader.Find("AKI/WaterUnderwater");
             surface.heightCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>(HeightComputePath);
+            AddWeather(surface.gameObject, pc);
             surface.Refresh();
 
             Directory.CreateDirectory(Path.GetDirectoryName(DemoScenePath));

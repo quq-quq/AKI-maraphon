@@ -85,6 +85,13 @@ namespace AKI.Water
             applied = storminess;
             if (surface == null || calm == null || storm == null) return;
 
+            // fully calm: draw with the calm asset itself (keeps the scene/prefab referencing a real material)
+            if (storminess <= 0.0001f)
+            {
+                surface.SetMaterialOverride(calm == surface.material ? null : calm);
+                return;
+            }
+
             if (blended == null)
             {
                 blended = new Material(calm) { name = "Water (weather blend)", hideFlags = HideFlags.HideAndDontSave };
