@@ -16,6 +16,7 @@ namespace AKI.Water.Editor
         const string MaterialDir = "Assets/Core/Visual/Materials/Water";
         const string PcMaterialPath = MaterialDir + "/M_Water_PC.mat";
         const string MobileMaterialPath = MaterialDir + "/M_Water_Mobile.mat";
+        const string StormMaterialPath = MaterialDir + "/M_Water_Storm.mat";
         const string PrefabPath = "Assets/Core/Prefabs/Water.prefab";
         const string DemoScenePath = "Assets/Core/Scenes/TestScenes/WaterTest.unity";
         const string HeightComputePath = "Assets/Core/Visual/Shaders/Water/WaterHeight.compute";
@@ -100,7 +101,63 @@ namespace AKI.Water.Editor
                 if (m == mobile) ConfigureMobile(m); else ConfigurePc(m);
                 EditorUtility.SetDirty(m);
             }
+            ConfigureStorm(EnsureStormPreset(pc), pc);
             AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>The "storm" weather preset: a copy of the PC water with rough-sea settings.</summary>
+        [MenuItem("AKI/Water/Create Storm Preset")]
+        public static void CreateStormPreset()
+        {
+            EnsureMaterials(out Material pc, out _);
+            ConfigureStorm(EnsureStormPreset(pc), pc);
+            AssetDatabase.SaveAssets();
+        }
+
+        static Material EnsureStormPreset(Material pc)
+        {
+            var storm = AssetDatabase.LoadAssetAtPath<Material>(StormMaterialPath);
+            if (storm == null)
+            {
+                storm = new Material(pc) { name = "M_Water_Storm" };
+                AssetDatabase.CreateAsset(storm, StormMaterialPath);
+            }
+            return storm;
+        }
+
+        // Rough, grey-blue sea: long high swells, choppy crests, drifting patches of sea foam, less sun.
+        static void ConfigureStorm(Material storm, Material pc)
+        {
+            storm.CopyPropertiesFromMaterial(pc);
+            ConfigurePc(storm);
+
+            storm.SetFloat("_WaveAmplitude", 2.0f);
+            storm.SetFloat("_WaveLength", 38f);
+            storm.SetFloat("_WaveSteepness", 0.85f);
+            storm.SetFloat("_WaveSpread", 0.35f);
+            storm.SetFloat("_WaveSpeed", 1.15f);
+            storm.SetFloat("_WaveVariation", 0.55f);
+            storm.SetFloat("_WaveRandomness", 0.9f);
+            storm.SetFloat("_CellWaveHeight", 1.0f);
+            storm.SetFloat("_CellWaveSpeed", 1.0f);
+            storm.SetFloat("_DetailStrength", 1.2f);
+
+            storm.SetFloat("_SeaFoam", 0.55f);
+            storm.SetFloat("_CrestFoamThreshold", 0.8f);
+            storm.SetFloat("_FoamIntensity", 1.2f);
+
+            storm.SetColor("_ShallowColor", new Color(0.03f, 0.26f, 0.38f, 1f));
+            storm.SetColor("_DeepColor", new Color(0.01f, 0.05f, 0.12f, 1f));
+            storm.SetFloat("_Turbidity", 1.6f);
+            storm.SetFloat("_ScatterBrightness", 0.6f);
+            storm.SetFloat("_ReflectionStrength", 0.75f);
+            storm.SetFloat("_Roughness", 0.12f);
+            storm.SetFloat("_SpecularIntensity", 0.4f);
+
+            storm.SetColor("_UnderFogColor", new Color(0.04f, 0.16f, 0.28f, 1f));
+            storm.SetFloat("_UnderFogScale", 0.9f);
+            storm.SetFloat("_RayIntensity", 0.8f);
+            EditorUtility.SetDirty(storm);
         }
 
         public static void EnsureMaterials(out Material pc, out Material mobile)

@@ -427,7 +427,20 @@ namespace AKI.Water
         bool UsingFallback => fallbackMaterial != null && !SceneTexturesAvailable();
 
         /// <summary>The material currently used (the fallback on platforms without depth/opaque textures).</summary>
-        public Material ActiveMaterial => UsingFallback ? fallbackMaterial : material;
+        public Material ActiveMaterial => UsingFallback ? fallbackMaterial : (materialOverride != null ? materialOverride : material);
+
+        Material materialOverride;
+
+        /// <summary>
+        /// Temporarily draws the water with another material (not saved with the scene), e.g. a runtime blend of
+        /// weather presets made by <see cref="WaterWeather"/>. Pass null to go back to <see cref="material"/>.
+        /// Ignored on the mobile fallback.
+        /// </summary>
+        public void SetMaterialOverride(Material overrideMaterial)
+        {
+            materialOverride = overrideMaterial;
+            if (meshRenderer != null) ApplyMaterial();
+        }
 
         void ApplyMaterial()
         {
