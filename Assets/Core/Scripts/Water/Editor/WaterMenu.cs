@@ -18,6 +18,8 @@ namespace AKI.Water.Editor
         const string MobileMaterialPath = MaterialDir + "/M_Water_Mobile.mat";
         const string PrefabPath = "Assets/Core/Prefabs/Water.prefab";
         const string DemoScenePath = "Assets/Core/Scenes/TestScenes/WaterTest.unity";
+        const string HeightComputePath = "Assets/Core/Visual/Shaders/Water/WaterHeight.compute";
+        const string PlayerPrefabPath = "Assets/Core/Prefabs/Player.prefab";
 
         [MenuItem("GameObject/AKI/Ocean Water", false, 10)]
         public static GameObject CreateWater()
@@ -30,6 +32,7 @@ namespace AKI.Water.Editor
             surface.material = pc;
             surface.fallbackMaterial = mobile;
             surface.underwaterShader = Shader.Find("AKI/WaterUnderwater");
+            surface.heightCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>(HeightComputePath);
             surface.Refresh();
             Selection.activeGameObject = go;
             return go;
@@ -45,6 +48,7 @@ namespace AKI.Water.Editor
             surface.material = pc;
             surface.fallbackMaterial = mobile;
             surface.underwaterShader = Shader.Find("AKI/WaterUnderwater");
+            surface.heightCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>(HeightComputePath);
             surface.enabled = false;   // OnDisable removes the runtime-only mesh / underwater child before saving
             Directory.CreateDirectory(Path.GetDirectoryName(PrefabPath));
             PrefabUtility.SaveAsPrefabAsset(go, PrefabPath);
@@ -171,6 +175,7 @@ namespace AKI.Water.Editor
             cam.farClipPlane = 1500f;
             cam.gameObject.AddComponent<WaterListenerAudio>();   // muffles sound + exposes IsUnderwater for the player
             cam.gameObject.AddComponent<WaterCameraEffects>();   // wet lens + waterline
+            CreatePlayer(cam);
             InstallLensFeature();
 
             // Sea bed / beach
@@ -199,11 +204,45 @@ namespace AKI.Water.Editor
             surface.material = pc;
             surface.fallbackMaterial = mobile;
             surface.underwaterShader = Shader.Find("AKI/WaterUnderwater");
+            surface.heightCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>(HeightComputePath);
             surface.Refresh();
 
             Directory.CreateDirectory(Path.GetDirectoryName(DemoScenePath));
             EditorSceneManager.SaveScene(scene, DemoScenePath);
             AssetDatabase.SaveAssets();
+        }
+
+        // First-person swimmer standing on the beach, looking at the sea. The main camera becomes its eyes.
+        static void CreatePlayer(Camera cam)
+        {
+            var player = new GameObject("Player");
+            player.transform.SetPositionAndRotation(new Vector3(0f, 3f, 30f), Quaternion.Euler(0f, 180f, 0f));
+
+            var cc = player.AddComponent<CharacterController>();
+            cc.height = 1.8f;
+            cc.radius = 0.35f;
+            cc.center = new Vector3(0f, 0.9f, 0f);
+            cc.stepOffset = 0.4f;
+            cc.slopeLimit = 50f;
+            cc.skinWidth = 0.04f;
+
+            var pivot = new GameObject("CameraPivot").transform;
+            pivot.SetParent(player.transform, false);
+            pivot.localPosition = new Vector3(0f, 1.65f, 0f);
+
+            cam.transform.SetParent(pivot, false);
+            cam.transform.localPosition = Vector3.zero;
+            cam.transform.localRotation = Quaternion.identity;
+            cam.nearClipPlane = 0.08f;
+            cam.fieldOfView = 72f;
+
+            var swimmer = player.AddComponent<AKI.Player.FirstPersonSwimController>();
+            swimmer.cameraPivot = pivot;
+            swimmer.playerCamera = cam;
+            swimmer.inputActions = AssetDatabase.LoadAssetAtPath<UnityEngine.InputSystem.InputActionAsset>("Assets/InputSystem_Actions.inputactions");
+
+            Directory.CreateDirectory(Path.GetDirectoryName(PlayerPrefabPath));
+            PrefabUtility.SaveAsPrefabAssetAndConnect(player, PlayerPrefabPath, InteractionMode.AutomatedAction);
         }
 
         static void PlaceRock(string name, Vector3 pos, Vector3 scale, Material mat)

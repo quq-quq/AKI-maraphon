@@ -43,6 +43,10 @@ namespace AKI.Water
         public Shader underwaterShader;
         public bool underwaterEffect = true;
 
+        [Header("Height Probes (physics)")]
+        [Tooltip("WaterHeight.compute - evaluates the wave maths for WaterProbe (swimming, floating objects).")]
+        public ComputeShader heightCompute;
+
         [Header("Underwater State (audio, gameplay)")]
         [Tooltip("Whose position counts as \"the player\". Empty = the AudioListener, or the main camera if there is none.")]
         public Transform listenerOverride;
@@ -71,6 +75,136 @@ namespace AKI.Water
         static readonly string[] SyncedKeywords = { "_CAUSTICS", "_GODRAYS" };
         static readonly List<WaterSurface> instances = new List<WaterSurface>();
         static readonly int RayTexId = Shader.PropertyToID("_WaterRayTex");
+
+        // ------------------------------------------------------------------ height probes
+        const int MaxProbes = 64;
+        static readonly List<WaterProbe> probes = new List<WaterProbe>();
+        readonly List<WaterProbe> inFlight = new List<WaterProbe>();
+        readonly Vector4[] probePointData = new Vector4[MaxProbes];
+        ComputeBuffer probePoints;
+        ComputeBuffer probeResults;
+        bool readbackPending;
+        float readbackStart;
+        float readbackLatency = 0.05f;
+        int probeKernel = -1;
+        Shader propertyCacheShader;
+        string[] floatProps = new string[0];
+        string[] vectorProps = new string[0];
+
+        internal static void RegisterProbe(WaterProbe probe)
+        {
+            if (probe != null && !probes.Contains(probe)) probes.Add(probe);
+        }
+
+        internal static void UnregisterProbe(WaterProbe probe)
+        {
+            probes.Remove(probe);
+        }
+
+        /// <summary>The water whose area contains the point, or null.</summary>
+        public static WaterSurface FindAt(Vector3 worldPoint)
+        {
+            for (int i = 0; i < instances.Count; i++)
+                if (instances[i].IsInsideArea(worldPoint)) return instances[i];
+            return null;
+        }
+
+        void UpdateProbes()
+        {
+            if (!Application.isPlaying) return;
+
+            for (int i = 0; i < probes.Count; i++)
+            {
+                WaterProbe p = probes[i];
+                if (p.Water == null || !p.Water.isActiveAndEnabled || !p.Water.IsInsideArea(p.position))
+                {
+                    p.Water = FindAt(p.position);
+                    p.HasData = false;
+                }
+            }
+
+            if (readbackPending || heightCompute == null || !SystemInfo.supportsComputeShaders || !SystemInfo.supportsAsyncGPUReadback) return;
+            Material src = ActiveMaterial;
+            if (src == null) return;
+
+            inFlight.Clear();
+            for (int i = 0; i < probes.Count && inFlight.Count < MaxProbes; i++)
+            {
+                if (probes[i].Water != this) continue;
+                probePointData[inFlight.Count] = probes[i].position;
+                inFlight.Add(probes[i]);
+            }
+            if (inFlight.Count == 0) return;
+
+            if (probePoints == null)
+            {
+                probePoints = new ComputeBuffer(MaxProbes, 16);
+                probeResults = new ComputeBuffer(MaxProbes, 16);
+            }
+            if (probeKernel < 0) probeKernel = heightCompute.FindKernel("SampleHeights");
+
+            CopyMaterialToCompute(src);
+            probePoints.SetData(probePointData, 0, 0, inFlight.Count);
+            heightCompute.SetInt("_ProbeCount", inFlight.Count);
+            // results arrive a few frames later: evaluate the waves at the time they will be used
+            heightCompute.SetFloat("_ProbeTime", Time.timeSinceLevelLoad + readbackLatency);
+            heightCompute.SetFloat("_ProbeWaterLevel", WaterLevel);
+            heightCompute.SetFloat("_WaterMeshCell", size / Mathf.Max(1, builtResolution));
+            heightCompute.SetBuffer(probeKernel, "_ProbePoints", probePoints);
+            heightCompute.SetBuffer(probeKernel, "_ProbeResults", probeResults);
+            heightCompute.Dispatch(probeKernel, (inFlight.Count + 63) / 64, 1, 1);
+
+            readbackPending = true;
+            readbackStart = Time.realtimeSinceStartup;
+            AsyncGPUReadback.Request(probeResults, inFlight.Count * 16, 0, OnProbeReadback);
+        }
+
+        void OnProbeReadback(AsyncGPUReadbackRequest request)
+        {
+            readbackPending = false;
+            if (this == null || request.hasError) return;
+
+            readbackLatency = Mathf.Lerp(readbackLatency, Time.realtimeSinceStartup - readbackStart, 0.2f);
+            var data = request.GetData<Vector4>();
+            for (int i = 0; i < inFlight.Count && i < data.Length; i++)
+            {
+                WaterProbe p = inFlight[i];
+                if (p.Water != this) continue;
+                p.Height = data[i].x;
+                p.Normal = new Vector3(data[i].y, data[i].z, data[i].w);
+                p.HasData = true;
+            }
+        }
+
+        // Every float / colour / vector of the water material -> same-named globals of the compute shader.
+        void CopyMaterialToCompute(Material src)
+        {
+            if (propertyCacheShader != src.shader)
+            {
+                propertyCacheShader = src.shader;
+                var floats = new List<string>();
+                var vectors = new List<string>();
+                for (int i = 0; i < src.shader.GetPropertyCount(); i++)
+                {
+                    var type = src.shader.GetPropertyType(i);
+                    if (type == ShaderPropertyType.Float || type == ShaderPropertyType.Range) floats.Add(src.shader.GetPropertyName(i));
+                    else if (type == ShaderPropertyType.Color || type == ShaderPropertyType.Vector) vectors.Add(src.shader.GetPropertyName(i));
+                }
+                floatProps = floats.ToArray();
+                vectorProps = vectors.ToArray();
+            }
+            foreach (string n in floatProps) heightCompute.SetFloat(n, src.GetFloat(n));
+            foreach (string n in vectorProps) heightCompute.SetVector(n, src.GetVector(n));
+        }
+
+        void ReleaseProbeBuffers()
+        {
+            probePoints?.Release();
+            probeResults?.Release();
+            probePoints = null;
+            probeResults = null;
+            readbackPending = false;
+        }
 
         AudioListener cachedListener;
         float nextListenerSearch;
@@ -179,6 +313,7 @@ namespace AKI.Water
         void OnDisable()
         {
             instances.Remove(this);
+            ReleaseProbeBuffers();
             underwater = false;
             underwaterAmount = 0f;
             if (mesh != null)
@@ -278,6 +413,7 @@ namespace AKI.Water
             }
 
             PublishMeshCell();
+            UpdateProbes();
             UpdateUnderwaterState();
             SyncUnderwaterMaterial();
         }

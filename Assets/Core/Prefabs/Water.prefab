@@ -111,6 +111,7 @@ MonoBehaviour:
   fallbackMaterial: {fileID: 2100000, guid: f41c6276ced29ea4c91250fdf4792290, type: 2}
   underwaterShader: {fileID: 4800000, guid: 9ce23619c34aadf41b8d4c61564f1f83, type: 3}
   underwaterEffect: 1
+  heightCompute: {fileID: 7200000, guid: eaa8ae9742c60b840aa4b3bb79cb7cfb, type: 3}
   listenerOverride: {fileID: 0}
   transitionHeight: 0.6
   hysteresis: 0.1

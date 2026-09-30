@@ -44,7 +44,7 @@ Material:
     - _ColorCellScale: 0.03
     - _ColorVariation: 0.15
     - _CrestFoamThreshold: 0.55
-    - _DepthDistance: 8
+    - _DepthDistance: 3.5
     - _DetailFade: 90
     - _DetailStrength: 0.8
     - _EdgeSoftness: 0.35
@@ -63,11 +63,11 @@ Material:
     - _RayPhase: 0.72
     - _RayScale: 0.22
     - _RaySteps: 16
-    - _ReflectionStrength: 0.7
+    - _ReflectionStrength: 0.6
     - _RefractionStrength: 1.1
     - _Roughness: 0.08
     - _SSSIntensity: 0.5
-    - _ScatterBrightness: 1
+    - _ScatterBrightness: 0.7
     - _SceneTextures: 1
     - _ShoreFoamWidth: 1.1
     - _SimpleOpacity: 0.9
@@ -77,8 +77,8 @@ Material:
     - _ToonBands: 4
     - _ToonSoftness: 0.2
     - _Turbidity: 1
-    - _UnderDepthFalloff: 0.035
-    - _UnderFogScale: 0.55
+    - _UnderDepthFalloff: 0.05
+    - _UnderFogScale: 0.6
     - _UnderLightAbsorb: 0.6
     - _UnderMaxDistance: 120
     - _UnderWobble: 1
@@ -95,14 +95,14 @@ Material:
     - _WaveWarp: 2.6
     - _WindAngle: 30
     m_Colors:
-    - _Absorption: {r: 0.3, g: 0.075, b: 0.035, a: 0}
-    - _DeepColor: {r: 0.03, g: 0.26999995, b: 0.52, a: 1}
+    - _Absorption: {r: 0.42, g: 0.11, b: 0.05, a: 0}
+    - _DeepColor: {r: 0, g: 0.03, b: 0.14999998, a: 1}
     - _FoamColor: {r: 1, g: 1, b: 1, a: 1}
-    - _RayColor: {r: 0.7, g: 0.92, b: 1, a: 1}
-    - _SSSColor: {r: 0.29999998, g: 1, b: 0.8, a: 1}
-    - _ShallowColor: {r: 0.21999997, g: 0.78, b: 0.78, a: 1}
+    - _RayColor: {r: 0.5, g: 0.8, b: 1, a: 1}
+    - _SSSColor: {r: 0.03, g: 0.45, b: 0.75, a: 1}
+    - _ShallowColor: {r: 0.01, g: 0.31999996, b: 0.52, a: 1}
     - _ToonHighlight: {r: 0.7, g: 1, b: 0.95, a: 1}
-    - _UnderDeepColor: {r: 0.01, g: 0.06999998, b: 0.23999995, a: 1}
-    - _UnderFogColor: {r: 0.09999997, g: 0.45999992, b: 0.85, a: 1}
+    - _UnderDeepColor: {r: 0, g: 0.02, b: 0.079999976, a: 1}
+    - _UnderFogColor: {r: 0.02, g: 0.18999997, b: 0.43999997, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

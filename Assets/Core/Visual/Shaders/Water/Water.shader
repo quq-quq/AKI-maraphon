@@ -3,13 +3,13 @@ Shader "AKI/Water"
     Properties
     {
         [Header(Water Body)]
-        _ShallowColor      ("Shallow Colour", Color) = (0.22, 0.78, 0.78, 1)
-        _DeepColor         ("Deep Colour", Color) = (0.03, 0.27, 0.52, 1)
-        _Absorption        ("Absorption RGB (1/m)", Vector) = (0.30, 0.075, 0.035, 0)
-        _DepthDistance     ("Depth To Deep Colour (m)", Range(0.5, 30)) = 8
+        _ShallowColor      ("Shallow Colour", Color) = (0.01, 0.32, 0.52, 1)
+        _DeepColor         ("Deep Colour", Color) = (0.00, 0.03, 0.15, 1)
+        _Absorption        ("Absorption RGB (1/m)", Vector) = (0.42, 0.11, 0.05, 0)
+        _DepthDistance     ("Depth To Deep Colour (m)", Range(0.5, 30)) = 3.5
         _Turbidity         ("Turbidity / Haze", Range(0.2, 5)) = 1
-        _ScatterBrightness ("Scatter Brightness", Range(0, 3)) = 1.0
-        _SSSColor          ("Crest Translucency Colour", Color) = (0.30, 1.0, 0.80, 1)
+        _ScatterBrightness ("Scatter Brightness", Range(0, 3)) = 0.7
+        _SSSColor          ("Crest Translucency Colour", Color) = (0.03, 0.45, 0.75, 1)
         _SSSIntensity      ("Crest Translucency", Range(0, 3)) = 0.5
 
         [Header(Waves)]
@@ -35,7 +35,7 @@ Shader "AKI/Water"
         _FlattenDistance   ("Flatten Distance (m)", Range(50, 1500)) = 500
 
         [Header(Surface)]
-        _ReflectionStrength("Reflection", Range(0, 1)) = 0.7
+        _ReflectionStrength("Reflection", Range(0, 1)) = 0.6
         _Roughness         ("Reflection Roughness", Range(0, 0.6)) = 0.08
         _SpecularIntensity ("Sun Glint", Range(0, 5)) = 0.7
         _SpecularPower     ("Sun Glint Sharpness", Range(20, 2000)) = 500
@@ -73,7 +73,7 @@ Shader "AKI/Water"
 
         [Header(Light Shafts)]
         [Toggle(_GODRAYS)] _GodRaysOn ("Underwater Light Shafts", Float) = 1
-        _RayColor          ("Colour", Color) = (0.70, 0.92, 1, 1)
+        _RayColor          ("Colour", Color) = (0.50, 0.80, 1, 1)
         _RayIntensity      ("Intensity", Range(0, 8)) = 1.6
         _RayScale          ("Pattern Scale", Range(0.02, 1.5)) = 0.22
         _RaySteps          ("Steps (quality)", Range(2, 32)) = 16
@@ -84,12 +84,12 @@ Shader "AKI/Water"
         _RayDepthFade      ("Fade With Depth (1/m)", Range(0, 1)) = 0.06
 
         [Header(Seen From Below)]
-        _UnderFogScale     ("Underwater Fog Density", Range(0.05, 6)) = 0.55
+        _UnderFogScale     ("Underwater Fog Density", Range(0.05, 6)) = 0.6
         _UnderWobble       ("Underwater Wobble", Range(0, 3)) = 1
         _UnderMaxDistance  ("Underwater Visibility (m)", Range(5, 300)) = 120
-        _UnderFogColor     ("Underwater Haze Colour", Color) = (0.10, 0.46, 0.85, 1)
-        _UnderDeepColor    ("Underwater Deep Colour", Color) = (0.01, 0.07, 0.24, 1)
-        _UnderDepthFalloff ("Haze Darkening With Depth (1/m)", Range(0.005, 0.2)) = 0.035
+        _UnderFogColor     ("Underwater Haze Colour", Color) = (0.02, 0.19, 0.44, 1)
+        _UnderDeepColor    ("Underwater Deep Colour", Color) = (0.00, 0.02, 0.08, 1)
+        _UnderDepthFalloff ("Haze Darkening With Depth (1/m)", Range(0.005, 0.2)) = 0.05
         _UnderLightAbsorb  ("Sunlight Loss With Depth", Range(0, 2)) = 0.6
 
         [Header(Platform)]

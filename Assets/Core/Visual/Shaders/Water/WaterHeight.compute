@@ -1,0 +1,44 @@
+// Evaluates the exact same wave functions the water surface uses, for a handful of world points
+// (player, floating objects...). Read back asynchronously by WaterSurface -> WaterProbe.
+#pragma kernel SampleHeights
+
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+
+// Material properties become plain globals here (set from C# with the water material's values).
+#undef CBUFFER_START
+#undef CBUFFER_END
+#define CBUFFER_START(name)
+#define CBUFFER_END
+#include "WaterInput.hlsl"
+#include "WaterWaves.hlsl"
+
+StructuredBuffer<float4>   _ProbePoints;     // xyz = world position
+RWStructuredBuffer<float4> _ProbeResults;    // x = surface height (world Y), yzw = surface normal
+uint  _ProbeCount;
+float _ProbeTime;
+float _ProbeWaterLevel;
+
+[numthreads(64, 1, 1)]
+void SampleHeights(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _ProbeCount) return;
+
+    float2 p = _ProbePoints[id.x].xz;
+    float t = _ProbeTime;
+    float q = WaterQ();
+
+    // the surface point above p comes from a slightly different undisplaced position (Gerstner moves points
+    // sideways): find it by fixed-point iteration
+    float2 xz0 = p;
+    [unroll]
+    for (int k = 0; k < 4; k++)
+        xz0 = p - WaterDisplacement(xz0, t, q).xz;
+
+    WaterWaveField field = WaterEvalField(xz0, t);
+    float3 d = WaterDisplacementF(field, xz0, t, q);
+
+    float3 n; float jac, lace;
+    WaterNormal(field, xz0, t, 1000.0, q, n, jac, lace);
+
+    _ProbeResults[id.x] = float4(_ProbeWaterLevel + d.y, n);
+}
