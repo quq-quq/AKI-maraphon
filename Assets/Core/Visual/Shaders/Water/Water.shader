@@ -62,6 +62,9 @@ Shader "AKI/Water"
         _CrestFoamThreshold("Crest Foam Threshold", Range(0, 1)) = 0.55
         _FoamScale         ("Foam Scale", Range(0.1, 4)) = 0.9
         _FoamIntensity     ("Foam Intensity", Range(0, 2)) = 1
+        _SeaFoam           ("Sea Foam Patches (storm)", Range(0, 1)) = 0
+        _SeaFoamScale      ("Sea Foam Patch Scale (1/m)", Range(0.005, 0.2)) = 0.025
+        _SeaFoamStreak     ("Sea Foam Wind Streaks", Range(1, 8)) = 3.5
 
         [Header(Caustics)]
         [Toggle(_CAUSTICS)] _CausticsOn ("Caustics On Bottom", Float) = 1
@@ -406,6 +409,7 @@ Shader "AKI/Water"
                 float crest = saturate((_CrestFoamThreshold - jacobian) / 0.35);
                 float lap = 0.85 + 0.15 * sin(t * 1.4 + shore * 9.0);
                 float foam = WaterFoam(i.waveXZ, t, shore * lap, crest, lace) * _FoamIntensity;
+                foam = max(foam, WaterSeaFoam(i.waveXZ, t, crest) * _FoamIntensity);   // storm: patches of sea foam
 
                 // cartoon shoreline: crisp animated stripes of foam rolling in
                 float wide = saturate(1.0 - shoreDistOut / (_ShoreFoamWidth * 2.6));

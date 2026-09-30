@@ -64,6 +64,9 @@ Material:
     - _SSSIntensity: 0.5
     - _ScatterBrightness: 0.7
     - _SceneTextures: 0
+    - _SeaFoam: 0
+    - _SeaFoamScale: 0.025
+    - _SeaFoamStreak: 3.5
     - _ShoreFoamWidth: 1.1
     - _SimpleOpacity: 0.9
     - _SpecularIntensity: 0.7

@@ -64,6 +64,9 @@ Shader "AKI/WaterUnderwater"
         _CrestFoamThreshold("Crest Foam Threshold", Range(0, 1)) = 0.55
         _FoamScale         ("Foam Scale", Range(0.1, 4)) = 0.9
         _FoamIntensity     ("Foam Intensity", Range(0, 2)) = 1
+        _SeaFoam           ("Sea Foam Patches (storm)", Range(0, 1)) = 0
+        _SeaFoamScale      ("Sea Foam Patch Scale (1/m)", Range(0.005, 0.2)) = 0.025
+        _SeaFoamStreak     ("Sea Foam Wind Streaks", Range(1, 8)) = 3.5
 
         [Header(Caustics)]
         [Toggle(_CAUSTICS)] _CausticsOn ("Caustics On Bottom", Float) = 1

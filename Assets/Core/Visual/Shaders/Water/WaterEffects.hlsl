@@ -228,6 +228,29 @@ float WaterFoam(float2 xz, float t, float shore, float crest, float lace)
     return smoothstep(1.0 - cover - soft, 1.0 - cover + soft, tex) * step(0.001, cover);
 }
 
+// Drifting patches of broken-up sea foam, the white water of a stormy sea. Large soft cells decide WHERE there
+// is foam, wind-stretched noise gives the streaky lace inside a patch, and everything drifts slowly downwind.
+// Breaking crests (crest > 0) grow the patches around them.
+float WaterSeaFoam(float2 xz, float t, float crest)
+{
+    if (_SeaFoam <= 0.0) return 0.0;
+
+    float2 wind;
+    sincos(radians(_WindAngle), wind.y, wind.x);
+    float2 side = float2(-wind.y, wind.x);
+    float2 w = xz - wind * (t * 0.6 * _WaveSpeed);
+    float2 local = float2(dot(w, wind) / max(_SeaFoamStreak, 1.0), dot(w, side));
+
+    float patch = saturate((WaterSoftCells(w * _SeaFoamScale, t * 0.03).x - 0.5) * 2.2 + 0.5);
+    // coverage stays well below 1: even in the middle of a patch the foam is lace, never a solid white sheet
+    float cover = saturate((patch - (1.0 - _SeaFoam)) * 3.0 + crest * 0.4) * 0.6;
+
+    float lace = WaterValueNoise(local * 1.3) * 0.55
+               + WaterValueNoise(local * 3.7 + 11.0) * 0.30
+               + WaterValueNoise(local * 9.1 + 5.0) * 0.15;
+    return smoothstep(1.0 - cover, 1.0 - cover + 0.18, lace) * 0.9 * step(0.001, cover);
+}
+
 // ---------------------------------------------------------------- volumetric light shafts
 // How much sunlight enters the surface at xz. Waves focus the sun into a web of bright filaments; because
 // every sun ray is a straight line, this 2D field is extruded down along the sun direction into sheets

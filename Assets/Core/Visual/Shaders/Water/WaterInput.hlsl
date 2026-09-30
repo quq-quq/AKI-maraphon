@@ -63,6 +63,9 @@ CBUFFER_START(UnityPerMaterial)
     float  _CrestFoamThreshold;
     float  _FoamScale;
     float  _FoamIntensity;
+    float  _SeaFoam;             // coverage of drifting sea-foam patches (0 = calm sea)
+    float  _SeaFoamScale;        // patch size (1/m)
+    float  _SeaFoamStreak;       // how much the foam is stretched along the wind
 
     // Caustics on the bottom
     float  _CausticsIntensity;
