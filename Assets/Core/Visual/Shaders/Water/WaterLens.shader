@@ -133,6 +133,7 @@ Shader "Hidden/AKI/WaterLens"
             float4 _WaterLensNearFwd;        // forward * near distance
             float4 _WaterLensNearRight;      // right * half width of the near plane
             float4 _WaterLensNearUp;         // up * half height of the near plane
+            float  _BreathEffect;            // 0..1 suffocation from holding the breath (BreathHolding)
 
             float3 LensHash32(float2 p)
             {
@@ -284,6 +285,21 @@ Shader "Hidden/AKI/WaterLens"
                 half3 col = blur > 0.0005 ? SampleBlur(uv + offset, blur) : FragBlitSample(uv + offset);
                 col *= 1.0h - saturate(dark);
                 col += light;
+
+                // ---- running out of air: a dark vignette closes in, then the whole view fades towards black
+                float suff = saturate(_BreathEffect);
+                if (suff > 0.0)
+                {
+                    float2 d = (uv - 0.5) * float2(aspect, 1.0);
+                    float r = length(d);
+                    float pulse = 1.0 + 0.06 * suff * sin(t * 6.0);                  // faint heartbeat near the end
+                    float inner = lerp(0.95, 0.18, suff) * pulse;
+                    float vig = smoothstep(inner, inner + lerp(0.6, 0.45, suff), r);
+                    col *= 1.0h - (half)(vig * lerp(0.5, 1.0, suff));
+                    col *= 1.0h - (half)(0.85 * suff * suff);                         // everything darkens
+                    half luma = dot(col, half3(0.299, 0.587, 0.114));
+                    col = lerp(col, luma.xxx, (half)(0.5 * suff));                   // colours drain out
+                }
                 return half4(col, 1.0h);
             }
 

@@ -21,6 +21,9 @@ namespace AKI.Water
         /// <summary>Set every frame by WaterCameraEffects: the lens is wet or the camera is at the surface.</summary>
         public static bool Active;
 
+        /// <summary>Set by BreathHolding while the suffocation vignette is visible.</summary>
+        public static bool BreathActive;
+
         /// <summary>The material the pass draws with; WaterCameraEffects copies the water's settings into it.</summary>
         public static Material SharedMaterial { get; private set; }
 
@@ -44,7 +47,7 @@ namespace AKI.Water
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
-            if (!Active || material == null || pass == null) return;
+            if (!(Active || BreathActive) || material == null || pass == null) return;
             if (renderingData.cameraData.cameraType != CameraType.Game) return;
 
             pass.material = material;

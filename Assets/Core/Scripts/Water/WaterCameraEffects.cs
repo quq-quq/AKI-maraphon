@@ -100,7 +100,13 @@ namespace AKI.Water
             bool nearSurface = Mathf.Abs(depth) < band;
 
             WaterLensFeature.Active = wetness > 0.001f || nearSurface;
-            if (!WaterLensFeature.Active) return;
+            if (!WaterLensFeature.Active)
+            {
+                // the pass can still run for other effects (breath): make sure no stale drops / waterline remain
+                Shader.SetGlobalFloat(WetnessId, 0f);
+                Shader.SetGlobalFloat(NearSurfaceId, 0f);
+                return;
+            }
 
             Material lens = WaterLensFeature.SharedMaterial;
             if (lens != null && src != null) lens.CopyPropertiesFromMaterial(src);
