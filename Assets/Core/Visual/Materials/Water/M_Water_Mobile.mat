@@ -1,0 +1,103 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: M_Water_Mobile
+  m_Shader: {fileID: 4800000, guid: 182cd945ddadc034791983a6ce6c49a2, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _CausticsDispersion: 0.4
+    - _CausticsIntensity: 2.2
+    - _CausticsMaxDepth: 25
+    - _CausticsOn: 0
+    - _CausticsScale: 0.6
+    - _CausticsSpeed: 0.7
+    - _CellRipples: 0.45
+    - _CellScale: 0.42
+    - _CellWaveHeight: 0.55
+    - _CellWaveScale: 0.09
+    - _CellWaveSpeed: 0.7
+    - _ColorCellScale: 0.03
+    - _ColorVariation: 0.15
+    - _CrestFoamThreshold: 0.55
+    - _DepthDistance: 8
+    - _DetailFade: 90
+    - _DetailStrength: 0.8
+    - _EdgeSoftness: 0.35
+    - _FlattenDistance: 500
+    - _FoamIntensity: 1
+    - _FoamOn: 0
+    - _FoamScale: 0.9
+    - _GlintCellScale: 0.07
+    - _GlintCellStrength: 0.85
+    - _GodRaysOn: 0
+    - _RayContrast: 2.4
+    - _RayDepthFade: 0.06
+    - _RayFade: 0.07
+    - _RayIntensity: 1.6
+    - _RayLength: 30
+    - _RayPhase: 0.72
+    - _RayScale: 0.22
+    - _RaySteps: 16
+    - _ReflectionStrength: 0.7
+    - _RefractionStrength: 1.1
+    - _Roughness: 0.08
+    - _SSSIntensity: 0.5
+    - _ScatterBrightness: 1
+    - _SceneTextures: 0
+    - _ShoreFoamWidth: 1.1
+    - _SimpleOpacity: 0.9
+    - _SpecularIntensity: 0.7
+    - _SpecularPower: 500
+    - _ToonAmount: 0
+    - _ToonBands: 4
+    - _ToonSoftness: 0.2
+    - _Turbidity: 1
+    - _UnderDepthFalloff: 0.035
+    - _UnderFogScale: 0.55
+    - _UnderLightAbsorb: 0.6
+    - _UnderMaxDistance: 120
+    - _UnderWobble: 1
+    - _WarpScale: 0.03
+    - _WaveAmplitude: 0.9
+    - _WaveDetail: 0
+    - _WaveLength: 18
+    - _WaveRandomness: 0.85
+    - _WaveSeed: 7
+    - _WaveSpeed: 1
+    - _WaveSpread: 0.5
+    - _WaveSteepness: 0.7
+    - _WaveVariation: 0.45
+    - _WaveWarp: 2.6
+    - _WindAngle: 30
+    m_Colors:
+    - _Absorption: {r: 0.3, g: 0.075, b: 0.035, a: 0}
+    - _DeepColor: {r: 0.03, g: 0.26999995, b: 0.52, a: 1}
+    - _FoamColor: {r: 1, g: 1, b: 1, a: 1}
+    - _RayColor: {r: 0.7, g: 0.92, b: 1, a: 1}
+    - _SSSColor: {r: 0.29999998, g: 1, b: 0.8, a: 1}
+    - _ShallowColor: {r: 0.21999997, g: 0.78, b: 0.78, a: 1}
+    - _ToonHighlight: {r: 0.7, g: 1, b: 0.95, a: 1}
+    - _UnderDeepColor: {r: 0.01, g: 0.06999998, b: 0.23999995, a: 1}
+    - _UnderFogColor: {r: 0.09999997, g: 0.45999992, b: 0.85, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
