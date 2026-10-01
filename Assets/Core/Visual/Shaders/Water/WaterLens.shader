@@ -136,6 +136,10 @@ Shader "Hidden/AKI/WaterLens"
             float4 _WaterLensNearRight;      // right * half width of the near plane
             float4 _WaterLensNearUp;         // up * half height of the near plane
             float  _BreathEffect;            // 0..1 suffocation from holding the breath (BreathHolding)
+            // set by Blackout (passing out and coming to)
+            float  _ScreenFade;              // 0..1 towards black
+            float  _WakeBlur;                // 0..1 gaussian blur of a view that isn't in focus yet
+            float  _EyeClosed;               // 0 = eyes open .. 1 = lids shut
 
             float3 LensHash32(float2 p)
             {
@@ -224,6 +228,27 @@ Shader "Hidden/AKI/WaterLens"
                 return c;
             }
 
+            // Gaussian blur in one pass: taps on a sunflower (Vogel) spiral, weighted by a gaussian of their distance.
+            // radius = 2-sigma reach as a share of the screen height.
+            half3 SampleGaussian(float2 uv, float radius, float aspect)
+            {
+                const int Taps = 40;
+                half3 sum = 0;
+                float weights = 0;
+                [unroll]
+                for (int i = 0; i < Taps; i++)
+                {
+                    float r = sqrt((i + 0.5) / Taps);
+                    float a = i * 2.39996323;                 // golden angle
+                    float2 o = float2(cos(a), sin(a)) * r * radius;
+                    o.x /= aspect;
+                    float w = exp(-2.0 * r * r);
+                    sum += FragBlitSample(uv + o) * w;
+                    weights += w;
+                }
+                return sum / weights;
+            }
+
             half4 Frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
@@ -284,7 +309,9 @@ Shader "Hidden/AKI/WaterLens"
                     }
                 }
 
-                half3 col = blur > 0.0005 ? SampleBlur(uv + offset, blur) : FragBlitSample(uv + offset);
+                half3 col;
+                if (_WakeBlur > 0.001) col = SampleGaussian(uv + offset, _WakeBlur * 0.06, aspect);
+                else col = blur > 0.0005 ? SampleBlur(uv + offset, blur) : FragBlitSample(uv + offset);
                 col *= 1.0h - saturate(dark);
                 col += light;
 
@@ -302,6 +329,19 @@ Shader "Hidden/AKI/WaterLens"
                     half luma = dot(col, half3(0.299, 0.587, 0.114));
                     col = lerp(col, luma.xxx, (half)(0.5 * suff));                   // colours drain out
                 }
+
+                // ---- eyelids: an eye-shaped opening, narrower towards the sides, soft-edged lashes line
+                float closed = saturate(_EyeClosed);
+                if (closed > 0.001)
+                {
+                    float2 p = (uv - 0.5) * float2(aspect, 1.0);
+                    float side = saturate(abs(p.x) / (0.5 * aspect + 0.15));
+                    float halfOpen = (1.0 - closed) * 0.85 * (1.0 - 0.55 * side * side);
+                    float lid = smoothstep(halfOpen - 0.02, halfOpen + 0.05 + 0.12 * closed, abs(p.y));
+                    col *= 1.0h - (half)lid;
+                }
+
+                col *= 1.0h - (half)saturate(_ScreenFade);
                 return half4(col, 1.0h);
             }
 
