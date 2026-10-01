@@ -144,7 +144,7 @@ MonoBehaviour:
   <NagaDistanceSeconds>k__BackingField: 3
   <NagaSounds>k__BackingField:
   - Clip: {fileID: 0}
-    Is3D: 0
+    Is3D: 1
     IgnoreUnderwater: 0
     Volume: 1.4
     Pitch: 1
