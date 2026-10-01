@@ -13,6 +13,8 @@ GameObject:
   - component: {fileID: 7895889988339174946}
   - component: {fileID: 26049283550431448}
   - component: {fileID: 2066390542936336169}
+  - component: {fileID: 5298170660180381985}
+  - component: {fileID: 8860546526367546964}
   m_Layer: 0
   m_Name: Water
   m_TagString: Untagged
@@ -147,3 +149,47 @@ MonoBehaviour:
   lengthScale0: 250
   lengthScale1: 17
   lengthScale2: 5
+--- !u!114 &5298170660180381985
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6302377064929433891}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22c2f04a541bc48fd991c81fef13ef2b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Water.WaterCurrent
+  direction: 60
+  speed: 1
+  depthFalloff: 12
+  deepShare: 0.35
+  directionVariation: 25
+  speedVariation: 0.35
+  variationScale: 30
+  variationSpeed: 0.04
+--- !u!114 &8860546526367546964
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6302377064929433891}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8379aac6066b34c98846e6c2878e1816, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Water.WaterCurrentView
+  material: {fileID: 2100000, guid: a12aeb61d0ad6468ca76fcceb1228d8e, type: 2}
+  extent: {x: 7, y: 4, z: 7}
+  fadeDensity: 0.06
+  specks: 600
+  speckSize: {x: 0.06, y: 0.12}
+  speckStretch: 0.3
+  speckColor: {r: 0.75, g: 0.9, b: 1, a: 1}
+  streaks: 50
+  streakSize: {x: 0.04, y: 0.06}
+  streakStretch: 2.5
+  streakColor: {r: 0.85, g: 0.95, b: 1, a: 0.9}
+  wobble: 0.05

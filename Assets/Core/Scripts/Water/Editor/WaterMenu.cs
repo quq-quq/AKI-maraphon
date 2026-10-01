@@ -21,6 +21,7 @@ namespace AKI.Water.Editor
         const string HeightComputePath = "Assets/Core/Visual/Shaders/Water/WaterHeight.compute";
         const string OceanComputePath = "Assets/Core/Visual/Shaders/Water/OceanFFT.compute";
         const string PlayerPrefabPath = "Assets/Core/Prefabs/Player.prefab";
+        const string CurrentMaterialPath = "Assets/Core/Visual/Materials/VFX/M_BubbleFizz.mat";
 
         [MenuItem("GameObject/AKI/Ocean Water", false, 10)]
         public static GameObject CreateWater()
@@ -262,6 +263,23 @@ namespace AKI.Water.Editor
             var ocean = surface.GetComponent<OceanFFT>();
             if (ocean == null) ocean = surface.gameObject.AddComponent<OceanFFT>();
             ocean.fftCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>(OceanComputePath);
+            AddCurrent(surface.gameObject);
+        }
+
+        /// <summary>The sea's current and the drifting specks / streaks that show it (once).</summary>
+        [MenuItem("AKI/Water/Add Current To Selected Water")]
+        static void AddCurrentToSelection()
+        {
+            foreach (GameObject go in Selection.gameObjects)
+                if (go.GetComponent<WaterSurface>() != null) AddCurrent(go);
+        }
+
+        public static void AddCurrent(GameObject water)
+        {
+            if (water.GetComponent<WaterCurrent>() == null) Undo.AddComponent<WaterCurrent>(water);
+            var view = water.GetComponent<WaterCurrentView>();
+            if (view == null) view = Undo.AddComponent<WaterCurrentView>(water);
+            if (view.material == null) view.material = AssetDatabase.LoadAssetAtPath<Material>(CurrentMaterialPath);
         }
 
         static void PlaceRock(string name, Vector3 pos, Vector3 scale, Material mat)

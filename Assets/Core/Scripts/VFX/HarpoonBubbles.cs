@@ -74,6 +74,10 @@ namespace AKI.VFX
 
         void Update()
         {
+            // bubbles already in the water drift with the current
+            if (fireBurst != null) foreach (ParticleSystem ps in fireBurst) WaterCurrent.Drift(ps, transform.position);
+            if (trail != null) foreach (ParticleSystem ps in trail) WaterCurrent.Drift(ps, transform.position);
+
             if (!flying) return;
             if (armDelay > 0)
             {
