@@ -18,6 +18,8 @@ namespace AKI.Player
         [Tooltip("Where the gun sits relative to the camera (hip).")]
         public Vector3 holdPosition = new Vector3(0.14f, -0.16f, 0.7f);
         public Vector3 holdRotation = Vector3.zero;
+        [Tooltip("Size of the gun in the hands (the shot arrow takes the same size).")]
+        [Min(0.1f)] public float gunScale = 1.35f;
         [Tooltip("How far ahead to look for the aim point under the crosshair.")]
         [Min(1f)] public float aimDistance = 40f;
         public LayerMask aimMask = Physics.DefaultRaycastLayers;
@@ -169,6 +171,7 @@ namespace AKI.Player
             }
 
             Transform t = gun.transform;
+            t.localScale = Vector3.one * gunScale;
             t.localPosition = position + Vector3.back * (recoilKick * recoil * shake);
             t.localRotation = rotation * Quaternion.Euler(swayAngles * shake) * Quaternion.Euler(-recoilPitch * recoil * shake, 0f, 0f);
         }
