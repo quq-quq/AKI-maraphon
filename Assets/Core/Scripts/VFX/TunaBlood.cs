@@ -72,6 +72,20 @@ namespace AKI.VFX
             Apply();
         }
 
+        /// <summary>The fish is gone: stop bleeding and leave the blood in the water until it has faded.</summary>
+        public void StopAndDetach()
+        {
+            StopBleeding();
+            transform.SetParent(null, true);
+            float life = 0f;
+            foreach (ParticleSystem ps in GetComponentsInChildren<ParticleSystem>())
+            {
+                ps.Stop(false, ParticleSystemStopBehavior.StopEmitting);
+                life = Mathf.Max(life, ps.main.startLifetime.constantMax);
+            }
+            Destroy(gameObject, life + 0.5f);
+        }
+
         void Update()
         {
             if (hitStrength <= 0f) return;

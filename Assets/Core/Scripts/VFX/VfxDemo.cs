@@ -6,6 +6,7 @@ namespace AKI.VFX
     /// <summary>
     /// Test bench for the harpoon bubbles and the tuna blood until the real fish and the player's shooting exist:
     /// a stand-in tuna swims in a circle in front of this object and the speargun shoots at it every few seconds.
+    /// A caught tuna melts away (<see cref="Catchable"/>) and a new one comes in.
     /// Created by AKI > VFX > Add Harpoon Demo To Scene.
     /// </summary>
     public class VfxDemo : MonoBehaviour
@@ -22,21 +23,42 @@ namespace AKI.VFX
 
         float angle;
         float nextShot;
+        GameObject tunaTemplate;
+        float respawnAt = -1f;
 
         void Start()
         {
             nextShot = Time.time + 1f;
+            tunaTemplate = Instantiate(tuna.gameObject, tuna.parent);   // untouched copy for the next tuna
+            tunaTemplate.name = tuna.name;
+            tunaTemplate.SetActive(false);
         }
 
         void Update()
         {
             angle += tunaSpeed * Time.deltaTime;
+            if (tuna == null && !Respawn()) return;
             tuna.SetPositionAndRotation(TunaPosition(angle), Quaternion.LookRotation(TunaHeading(angle)));
 
             if (Time.time < nextShot || !gun.IsLoaded) return;
+            if (tuna.TryGetComponent(out Catchable prey) && prey.IsCaught) return;
             Aim();
             gun.Shoot();
             nextShot = Time.time + shotInterval;
+        }
+
+        // the caught one is gone: a new tuna a moment later
+        bool Respawn()
+        {
+            if (respawnAt < 0f) respawnAt = Time.time + 1.5f;
+            if (Time.time < respawnAt) return false;
+            respawnAt = -1f;
+            GameObject next = Instantiate(tunaTemplate, tunaTemplate.transform.parent);
+            next.name = tunaTemplate.name;
+            next.SetActive(true);
+            tuna = next.transform;
+            nextShot = Time.time + 1f;
+            return true;
         }
 
         // lead the target: where will the tuna be when the harpoon gets there

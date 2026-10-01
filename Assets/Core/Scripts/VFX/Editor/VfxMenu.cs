@@ -82,6 +82,7 @@ namespace AKI.VFX.Editor
             body.height = 1.2f;
             AddVisual(PrimitiveType.Capsule, tuna, Vector3.zero, Quaternion.Euler(90f, 0f, 0f), new Vector3(0.35f, 0.6f, 0.35f));
             PrefabUtility.InstantiatePrefab(bloodFx, tuna);
+            tuna.gameObject.AddComponent<Catchable>().dissolveShader = Shader.Find("AKI/DissolveLit");
 
             bench.gun = gun.GetComponent<Speargun>();
             bench.tuna = tuna;

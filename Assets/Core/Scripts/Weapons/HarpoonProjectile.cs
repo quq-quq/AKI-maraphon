@@ -7,8 +7,9 @@ namespace AKI.Weapons
     /// <summary>
     /// A harpoon arrow in flight. Its origin is the tip and it flies along its forward axis on a ballistic arc: under
     /// water it loses speed and drops, in the air it keeps its speed and falls faster. On hitting a collider it sticks in;
-    /// a fish with <see cref="TunaBlood"/> starts bleeding. The bubble streak (<see cref="HarpoonBubbles"/> at the tip)
-    /// starts with the shot and stops on the hit.
+    /// a fish with <see cref="TunaBlood"/> starts bleeding, and a <see cref="Catchable"/> one is caught (it melts away
+    /// together with the arrow and its line). The bubble streak (<see cref="HarpoonBubbles"/> at the tip) starts with
+    /// the shot and stops on the hit.
     /// </summary>
     public class HarpoonProjectile : MonoBehaviour
     {
@@ -40,10 +41,14 @@ namespace AKI.Weapons
         Transform ignoreRoot;
         HarpoonRope rope;
         Vector3 tailLocal;
+        bool caught;
 
         public bool IsFlying => flying;
 
         public Vector3 Velocity => velocity;
+
+        /// <summary>This arrow's line (null without one, or once it is gone).</summary>
+        public HarpoonRope Rope => rope;
 
         /// <summary>Starts the flight from the current pose. Colliders under the gun's owner are ignored.</summary>
         public void Launch(Speargun from)
@@ -57,6 +62,13 @@ namespace AKI.Weapons
 
             tailLocal = TailLocal();
             if (from != null && from.RopeAnchor != null) rope = HarpoonRope.Create(from, this, tailLocal);
+        }
+
+        /// <summary>Leaves the bubbles already in the water behind (the arrow is about to disappear).</summary>
+        public void DetachEffects()
+        {
+            if (bubbles != null) bubbles.StopAndDetach();
+            bubbles = null;
         }
 
         /// <summary>The gun fired again: cut this arrow's line at the gun.</summary>
@@ -89,7 +101,7 @@ namespace AKI.Weapons
             age += Time.deltaTime;
             if (!flying)
             {
-                if (age >= stuckLifetime) Remove();
+                if (age >= stuckLifetime && !caught) Remove();   // a caught fish takes the arrow with it
                 return;
             }
             if (age >= flightLifetime)
@@ -151,6 +163,13 @@ namespace AKI.Weapons
             TunaBlood blood = hit.collider.GetComponentInParent<TunaBlood>();
             if (blood == null) blood = hit.collider.GetComponentInChildren<TunaBlood>();
             if (blood != null) blood.Hit(point, dir);
+
+            Catchable prey = hit.collider.GetComponentInParent<Catchable>();
+            if (prey != null && !prey.IsCaught)
+            {
+                caught = true;
+                prey.Catch(this);
+            }
 
             if (gun != null) gun.onHit.Invoke(hit.collider);
         }
