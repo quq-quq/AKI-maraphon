@@ -6,8 +6,8 @@ namespace AKI.Weapons
 {
     /// <summary>
     /// A harpoon arrow in flight. Its origin is the tip and it flies along its forward axis on a heavy ballistic arc:
-    /// under water it is slow, loses speed and drops; in the air it keeps its speed and falls. On hitting a collider it sticks in
-    /// (an <see cref="IHarpoonTarget"/> decides how deep and reacts to the hit);
+    /// under water it is slow, loses speed, drops and drifts with the current; in the air it keeps its speed and falls.
+    /// On hitting a collider it sticks in;
     /// a fish with <see cref="TunaBlood"/> starts bleeding, and a <see cref="Catchable"/> one is caught (it melts away
     /// together with the arrow and its line). The bubble streak (<see cref="HarpoonBubbles"/> at the tip) starts with
     /// the shot and stops on the hit.
@@ -22,6 +22,8 @@ namespace AKI.Weapons
         [Min(0f)] public float waterDrag = 0.55f;
         [Tooltip("Share of normal gravity under water (buoyancy takes the rest).")]
         [Range(0f, 1f)] public float waterGravityScale = 0.8f;
+        [Tooltip("How strongly the water current (WaterCurrent) carries the arrow off its line.")]
+        [Min(0f)] public float currentInfluence = 1f;
 
         [Header("In the air")]
         [Min(0f)] public float airDrag = 0.02f;
@@ -112,7 +114,9 @@ namespace AKI.Weapons
 
             float dt = Time.deltaTime;
             bool inWater = WaterSurface.IsPointUnderwater(transform.position);
-            velocity *= Mathf.Max(0f, 1f - (inWater ? waterDrag : airDrag) * dt);
+            // the water slows the arrow down to the water's own speed: a current carries it sideways
+            Vector3 flow = inWater ? WaterCurrent.At(transform.position) * currentInfluence : Vector3.zero;
+            velocity = flow + (velocity - flow) * Mathf.Max(0f, 1f - (inWater ? waterDrag : airDrag) * dt);
             velocity += Physics.gravity * ((inWater ? waterGravityScale : airGravityScale) * dt);
 
             Vector3 from = transform.position;
@@ -154,9 +158,7 @@ namespace AKI.Weapons
         {
             flying = false;
             Vector3 point = hit.distance > 0f ? hit.point : transform.position;
-            IHarpoonTarget target = hit.collider.GetComponentInParent<IHarpoonTarget>();
-            float depth = target != null ? target.GetPenetration(point, dir, penetration) : penetration;
-            transform.SetPositionAndRotation(point + dir * depth, Quaternion.LookRotation(dir));   // the tip goes in
+            transform.SetPositionAndRotation(point + dir * penetration, Quaternion.LookRotation(dir));   // the tip goes in
             Transform carrier = hit.rigidbody != null ? hit.rigidbody.transform : hit.transform;
             if (IsUniform(carrier.lossyScale)) transform.SetParent(carrier, true);   // moves with the fish (a stretched parent would skew the arrow)
             if (bubbles != null) bubbles.Stop();
@@ -164,8 +166,6 @@ namespace AKI.Weapons
             TunaBlood blood = hit.collider.GetComponentInParent<TunaBlood>();
             if (blood == null) blood = hit.collider.GetComponentInChildren<TunaBlood>();
             if (blood != null) blood.Hit(point, dir);
-
-            if (target != null) target.OnHarpoonHit(this, point, dir);
 
             Catchable prey = hit.collider.GetComponentInParent<Catchable>();
             if (prey != null && !prey.IsCaught && !vanishing)

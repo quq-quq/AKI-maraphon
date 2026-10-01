@@ -1,3 +1,4 @@
+using AKI.Water;
 using UnityEngine;
 
 namespace AKI.VFX
@@ -88,6 +89,10 @@ namespace AKI.VFX
 
         void Update()
         {
+            // blood in the water drifts away with the current
+            if (hitBurst != null) foreach (ParticleSystem ps in hitBurst) if (ps != null) WaterCurrent.Drift(ps, ps.transform.position);
+            if (bleedTrail != null) WaterCurrent.Drift(bleedTrail, bleedTrail.transform.position);
+
             if (hitStrength <= 0f) return;
             sinceHit += Time.deltaTime;
             if (sinceHit >= bleedSeconds) hitStrength = 0f;

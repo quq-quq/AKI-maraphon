@@ -271,13 +271,13 @@ namespace AKI.Weapons
             if (pinTail) pos[n - 1] = tail;
         }
 
-        // slow wandering water movement, so a slack line keeps swaying
+        // the sea's current (WaterCurrent) plus slow small eddies, so a slack line keeps swaying
         static Vector3 Current(Vector3 p, float t)
         {
             float x = Mathf.PerlinNoise(p.x * 0.15f + t * 0.07f, p.z * 0.15f) - 0.5f;
             float y = Mathf.PerlinNoise(p.y * 0.15f + 13.7f, p.x * 0.15f + t * 0.05f) - 0.5f;
             float z = Mathf.PerlinNoise(p.z * 0.15f - t * 0.06f, p.y * 0.15f + 41.3f) - 0.5f;
-            return new Vector3(x, y * 0.5f, z) * (2f * CurrentSpeed);
+            return WaterCurrent.At(p) + new Vector3(x, y * 0.5f, z) * (2f * CurrentSpeed);
         }
 
         // Once per frame: the line lies on the bottom and on rocks instead of sinking through them.
