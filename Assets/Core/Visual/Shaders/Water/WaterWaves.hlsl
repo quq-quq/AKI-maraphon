@@ -24,6 +24,73 @@
 // Distance between mesh vertices (m); set globally by WaterSurface. Waves shorter than a few cells cannot be
 // represented by the grid (they alias into spikes), so they only shade the surface instead of moving vertices.
 float _WaterMeshCell;
+float _WaterMeshGrowth;     // expanding grid: cell size grows by 1 + distance / growth
+float4 _WaterMeshCenter;
+
+// ------------------------------------------------------------------------------------------------
+// FFT ocean (OceanFFT.cs): three cascades of displacement + derivatives, published as global textures.
+#if defined(_FFT_WAVES)
+TEXTURE2D(_OceanDisp0);
+TEXTURE2D(_OceanDisp1);
+TEXTURE2D(_OceanDisp2);
+TEXTURE2D(_OceanDeriv0);
+TEXTURE2D(_OceanDeriv1);
+TEXTURE2D(_OceanDeriv2);
+SamplerState ocean_trilinear_repeat_sampler;
+float4 _OceanLengthScales;
+
+// mip level whose texel matches the local mesh cell, so vertices never sample waves the grid can't show
+float OceanLod(float lengthScale, float cell)
+{
+    return max(0.0, log2(cell * 256.0 / lengthScale));
+}
+
+float OceanCellAt(float2 xz)
+{
+    return max(_WaterMeshCell, 1e-3) * (1.0 + length(xz - _WaterMeshCenter.xz) / max(_WaterMeshGrowth, 1e-3));
+}
+
+// displacement (xyz, metres) of the undisplaced point xz; mesh-matched mip levels
+float3 OceanDisplacement(float2 xz)
+{
+    float cell = OceanCellAt(xz);
+    float3 d = SAMPLE_TEXTURE2D_LOD(_OceanDisp0, ocean_trilinear_repeat_sampler, xz / _OceanLengthScales.x, OceanLod(_OceanLengthScales.x, cell)).xyz;
+    d += SAMPLE_TEXTURE2D_LOD(_OceanDisp1, ocean_trilinear_repeat_sampler, xz / _OceanLengthScales.y, OceanLod(_OceanLengthScales.y, cell)).xyz;
+    d += SAMPLE_TEXTURE2D_LOD(_OceanDisp2, ocean_trilinear_repeat_sampler, xz / _OceanLengthScales.z, OceanLod(_OceanLengthScales.z, cell)).xyz;
+    return d;
+}
+
+// per pixel: normal from the summed slopes, and "turbulence" (low where crests break -> foam)
+void OceanSurface(float2 xz, out float3 normal, out float turbulence)
+{
+    float2 uv0 = xz / _OceanLengthScales.x;
+    float2 uv1 = xz / _OceanLengthScales.y;
+    float2 uv2 = xz / _OceanLengthScales.z;
+    float4 deriv = SAMPLE_TEXTURE2D(_OceanDeriv0, ocean_trilinear_repeat_sampler, uv0)
+                 + SAMPLE_TEXTURE2D(_OceanDeriv1, ocean_trilinear_repeat_sampler, uv1)
+                 + SAMPLE_TEXTURE2D(_OceanDeriv2, ocean_trilinear_repeat_sampler, uv2);
+    float2 slope = float2(deriv.x / (1.0 + deriv.z), deriv.y / (1.0 + deriv.w));
+    normal = normalize(float3(-slope.x, 1.0, -slope.y));
+
+    float t0 = SAMPLE_TEXTURE2D(_OceanDisp0, ocean_trilinear_repeat_sampler, uv0).w;
+    float t1 = SAMPLE_TEXTURE2D(_OceanDisp1, ocean_trilinear_repeat_sampler, uv1).w;
+    turbulence = min(t0, lerp(1.0, t1, 0.6));
+}
+
+// same as OceanSurface with an explicit mip level (compute shaders / vertex stage)
+void OceanSurfaceLod(float2 xz, float lod, out float3 normal, out float turbulence)
+{
+    float2 uv0 = xz / _OceanLengthScales.x;
+    float2 uv1 = xz / _OceanLengthScales.y;
+    float2 uv2 = xz / _OceanLengthScales.z;
+    float4 deriv = SAMPLE_TEXTURE2D_LOD(_OceanDeriv0, ocean_trilinear_repeat_sampler, uv0, lod)
+                 + SAMPLE_TEXTURE2D_LOD(_OceanDeriv1, ocean_trilinear_repeat_sampler, uv1, lod)
+                 + SAMPLE_TEXTURE2D_LOD(_OceanDeriv2, ocean_trilinear_repeat_sampler, uv2, lod);
+    float2 slope = float2(deriv.x / (1.0 + deriv.z), deriv.y / (1.0 + deriv.w));
+    normal = normalize(float3(-slope.x, 1.0, -slope.y));
+    turbulence = SAMPLE_TEXTURE2D_LOD(_OceanDisp0, ocean_trilinear_repeat_sampler, uv0, lod).w;
+}
+#endif
 
 float WaterRand(float n)
 {
@@ -263,7 +330,11 @@ float3 WaterDisplacementF(WaterWaveField f, float2 xz, float t, float q)
 
 float3 WaterDisplacement(float2 xz, float t, float q)
 {
+#if defined(_FFT_WAVES)
+    return OceanDisplacement(xz);
+#else
     return WaterDisplacementF(WaterEvalField(xz, t), xz, t, q);
+#endif
 }
 
 // ------------------------------------------------------------------------------------------------

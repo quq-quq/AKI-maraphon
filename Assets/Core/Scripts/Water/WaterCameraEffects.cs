@@ -109,7 +109,12 @@ namespace AKI.Water
             }
 
             Material lens = WaterLensFeature.SharedMaterial;
-            if (lens != null && src != null) lens.CopyPropertiesFromMaterial(src);
+            if (lens != null && src != null)
+            {
+                lens.CopyPropertiesFromMaterial(src);
+                if (src.IsKeywordEnabled("_FFT_WAVES")) lens.EnableKeyword("_FFT_WAVES");
+                else lens.DisableKeyword("_FFT_WAVES");
+            }
 
             Shader.SetGlobalFloat(WetnessId, wetness);
             Shader.SetGlobalFloat(SinceExitId, since);
