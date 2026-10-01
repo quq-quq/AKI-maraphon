@@ -17,14 +17,14 @@ namespace AKI.Water
         [Min(0f)] public float fadeDensity = 0.06f;
 
         [Header("Specks")]
-        [Min(0)] public int specks = 500;
+        [Min(0)] public int specks = 1400;
         public Vector2 speckSize = new Vector2(0.035f, 0.07f);
         [Tooltip("Stretch along the motion (seconds of travel).")]
         [Min(0f)] public float speckStretch = 0.06f;
         public Color speckColor = new Color(0.75f, 0.9f, 1f, 0.6f);
 
         [Header("Streaks")]
-        [Min(0)] public int streaks = 18;
+        [Min(0)] public int streaks = 30;
         public Vector2 streakSize = new Vector2(0.015f, 0.025f);
         [Min(0f)] public float streakStretch = 0.9f;
         public Color streakColor = new Color(0.85f, 0.95f, 1f, 0.4f);
