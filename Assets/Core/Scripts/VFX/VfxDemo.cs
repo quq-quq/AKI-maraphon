@@ -45,8 +45,15 @@ namespace AKI.VFX
             float speed = gun.projectilePrefab != null ? gun.projectilePrefab.speed * 0.9f : 20f;   // ~ average speed with drag
             Vector3 from = gun.muzzle.position;
             Vector3 aim = tuna.position;
+            float t = 0f;
             for (int k = 0; k < 3; k++)
-                aim = TunaPosition(angle + tunaSpeed * Vector3.Distance(from, aim) / speed);
+            {
+                t = Vector3.Distance(from, aim) / speed;
+                aim = TunaPosition(angle + tunaSpeed * t);
+            }
+            // aim above it by the drop of the arc (the bench is under water)
+            float gravity = gun.projectilePrefab != null ? gun.projectilePrefab.waterGravityScale : 0.5f;
+            aim += Vector3.up * (0.5f * Physics.gravity.magnitude * gravity * t * t);
 
             // turn the whole gun so that its muzzle points at the target
             Quaternion delta = Quaternion.LookRotation(aim - from) * Quaternion.Inverse(gun.muzzle.rotation);

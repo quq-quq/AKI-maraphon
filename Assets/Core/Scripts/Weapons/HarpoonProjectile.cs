@@ -5,8 +5,8 @@ using UnityEngine;
 namespace AKI.Weapons
 {
     /// <summary>
-    /// A harpoon arrow in flight. Its origin is the tip and it flies along its forward axis: under water it quickly
-    /// loses speed and barely sinks, in the air it keeps its speed and drops. On hitting a collider it sticks in;
+    /// A harpoon arrow in flight. Its origin is the tip and it flies along its forward axis on a ballistic arc: under
+    /// water it loses speed and drops, in the air it keeps its speed and falls faster. On hitting a collider it sticks in;
     /// a fish with <see cref="TunaBlood"/> starts bleeding. The bubble streak (<see cref="HarpoonBubbles"/> at the tip)
     /// starts with the shot and stops on the hit.
     /// </summary>
@@ -18,8 +18,8 @@ namespace AKI.Weapons
         [Header("Under water")]
         [Tooltip("Speed lost per second (fraction of the current speed).")]
         [Min(0f)] public float waterDrag = 0.3f;
-        [Tooltip("Share of normal gravity: a harpoon barely sinks under water.")]
-        [Range(0f, 1f)] public float waterGravityScale = 0.1f;
+        [Tooltip("Share of normal gravity under water (buoyancy takes the rest).")]
+        [Range(0f, 1f)] public float waterGravityScale = 0.5f;
 
         [Header("In the air")]
         [Min(0f)] public float airDrag = 0.02f;
@@ -38,6 +38,7 @@ namespace AKI.Weapons
         bool flying;
         Speargun gun;
         Transform ignoreRoot;
+        HarpoonRope rope;
 
         public bool IsFlying => flying;
 
@@ -52,6 +53,38 @@ namespace AKI.Weapons
             flying = true;
             age = 0f;
             if (bubbles != null) bubbles.Fire();
+
+            Transform anchor = from != null ? from.RopeAnchor : null;
+            if (anchor != null)
+            {
+                rope = gameObject.AddComponent<HarpoonRope>();
+                rope.Init(anchor, TailLocal(), from.ropeWidth, from.ropeColor);
+            }
+        }
+
+        /// <summary>The gun reloaded: cut the line at the gun.</summary>
+        public void CutRope()
+        {
+            if (rope != null) rope.Cut();
+        }
+
+        // The line is tied near the back of the shaft: the rearmost point of the arrow mesh.
+        Vector3 TailLocal()
+        {
+            float back = 0f;
+            foreach (Renderer r in GetComponentsInChildren<Renderer>())
+            {
+                Mesh mesh = r is SkinnedMeshRenderer skinned ? skinned.sharedMesh
+                          : r.TryGetComponent(out MeshFilter filter) ? filter.sharedMesh : null;
+                if (mesh == null) continue;
+                Bounds b = mesh.bounds;
+                for (int c = 0; c < 8; c++)
+                {
+                    Vector3 corner = b.center + Vector3.Scale(b.extents, new Vector3((c & 1) == 0 ? -1 : 1, (c & 2) == 0 ? -1 : 1, (c & 4) == 0 ? -1 : 1));
+                    back = Mathf.Min(back, transform.InverseTransformPoint(r.transform.TransformPoint(corner)).z);
+                }
+            }
+            return new Vector3(0f, 0f, back * 0.9f);
         }
 
         void Update()

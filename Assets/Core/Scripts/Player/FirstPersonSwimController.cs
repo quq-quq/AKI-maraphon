@@ -27,7 +27,7 @@ namespace AKI.Player
         [Tooltip("Pitch pivot at eye height; the camera is its child.")]
         public Transform cameraPivot;
         public Camera playerCamera;
-        [Tooltip("Uses the Player map: Move, Look, Jump, Crouch, Sprint (+ Attack for the speargun).")]
+        [Tooltip("Uses the Player map: Move, Look, Jump, Crouch, Sprint (+ Attack / Aim for the speargun).")]
         public InputActionAsset inputActions;
 
         [Header("Look")]
@@ -106,6 +106,10 @@ namespace AKI.Player
         public Vector3 Velocity => velocity;
         /// <summary>The runtime copy of the input actions (enabled with this component), for other player scripts.</summary>
         public InputActionAsset Actions => actions;
+        /// <summary>Multiplies the field of view (e.g. zoom while aiming). 1 = normal.</summary>
+        public float FovScale { get; set; } = 1f;
+        /// <summary>Multiplies look sensitivity (e.g. steadier while aiming). 1 = normal.</summary>
+        public float LookScale { get; set; } = 1f;
 
         CharacterController controller;
         InputActionAsset actions;
@@ -170,6 +174,9 @@ namespace AKI.Player
             var attack = map.AddAction("Attack", InputActionType.Button);
             attack.AddBinding("<Mouse>/leftButton");
             attack.AddBinding("<Gamepad>/rightTrigger");
+            var aim = map.AddAction("Aim", InputActionType.Button);
+            aim.AddBinding("<Mouse>/rightButton");
+            aim.AddBinding("<Gamepad>/leftTrigger");
             return asset;
         }
 
@@ -245,7 +252,7 @@ namespace AKI.Player
             if (Cursor.lockState != CursorLockMode.Locked) return;
             Vector2 raw = lookAction.ReadValue<Vector2>();
             bool pointer = lookAction.activeControl != null && lookAction.activeControl.device is Pointer;
-            Vector2 delta = pointer ? raw * mouseSensitivity : raw * (gamepadLookSpeed * dt);
+            Vector2 delta = (pointer ? raw * mouseSensitivity : raw * (gamepadLookSpeed * dt)) * LookScale;
 
             float k = lookSmoothing > 0f ? 1f - Mathf.Exp(-dt / lookSmoothing) : 1f;
             smoothLook = Vector2.Lerp(smoothLook, delta, k);
@@ -562,7 +569,7 @@ namespace AKI.Player
             {
                 playerCamera.transform.localPosition = pos;
                 float speed01 = Mathf.Clamp01(new Vector3(velocity.x, 0f, velocity.z).magnitude / (swimming ? fastSwimSpeed : sprintSpeed));
-                float targetFov = baseFov + sprintFovBoost * Mathf.SmoothStep(0f, 1f, (speed01 - 0.55f) / 0.45f);
+                float targetFov = (baseFov + sprintFovBoost * Mathf.SmoothStep(0f, 1f, (speed01 - 0.55f) / 0.45f)) * FovScale;
                 playerCamera.fieldOfView = Mathf.Lerp(playerCamera.fieldOfView, targetFov, 1f - Mathf.Exp(-dt * 5f));
             }
         }

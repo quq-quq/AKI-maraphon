@@ -141,7 +141,7 @@ MonoBehaviour:
   bubbles: {fileID: 2332849641767023222}
   speed: 25
   waterDrag: 0.3
-  waterGravityScale: 0.1
+  waterGravityScale: 0.5
   airDrag: 0.02
   airGravityScale: 1
   hitRadius: 0.02

@@ -5,7 +5,8 @@ namespace AKI.Weapons
 {
     /// <summary>
     /// The speargun model: plays the shot animation, hides the loaded arrow and launches a <see cref="HarpoonProjectile"/>
-    /// copy of it from the muzzle (the arrow tip). After <see cref="reloadSeconds"/> the arrow is back in the gun.
+    /// copy of it from the muzzle (the arrow tip), tied to the gun with a <see cref="HarpoonRope"/>. After
+    /// <see cref="reloadSeconds"/> the line is cut and the arrow is back in the gun.
     /// The player drives it through <see cref="AKI.Player.PlayerSpeargun"/>.
     /// </summary>
     public class Speargun : MonoBehaviour
@@ -22,12 +23,21 @@ namespace AKI.Weapons
         [Tooltip("Arrows never hit colliders under this (the player holding the gun). Empty = the gun itself.")]
         public Transform owner;
 
+        [Header("Line")]
+        public bool rope = true;
+        [Tooltip("Where the line leaves the gun. Empty = on the arrow axis, Rope Anchor Back behind the muzzle.")]
+        public Transform ropeAnchor;
+        [Min(0f)] public float ropeAnchorBack = 0.3f;
+        [Min(0.001f)] public float ropeWidth = 0.005f;
+        public Color ropeColor = new Color(0.78f, 0.75f, 0.66f);
+
         public UnityEvent onShoot = new UnityEvent();
         public UnityEvent onReloaded = new UnityEvent();
         [Tooltip("An arrow from this gun stuck into something.")]
         public UnityEvent<Collider> onHit = new UnityEvent<Collider>();
 
         float reloadAt;
+        HarpoonProjectile lastShot;
 
         public bool IsLoaded { get; private set; } = true;
 
@@ -35,6 +45,22 @@ namespace AKI.Weapons
         public float Reload01 => IsLoaded ? 1f : 1f - Mathf.Clamp01((reloadAt - Time.time) / Mathf.Max(reloadSeconds, 1e-4f));
 
         public Transform Owner => owner != null ? owner : transform;
+
+        /// <summary>The line's end on the gun (created on demand), or null with the line off.</summary>
+        public Transform RopeAnchor
+        {
+            get
+            {
+                if (!rope || muzzle == null) return null;
+                if (ropeAnchor == null)
+                {
+                    ropeAnchor = new GameObject("RopeAnchor").transform;
+                    ropeAnchor.SetParent(muzzle, false);
+                    ropeAnchor.localPosition = new Vector3(0f, -0.012f, -ropeAnchorBack);
+                }
+                return ropeAnchor;
+            }
+        }
 
         /// <summary>Fires straight out of the muzzle if loaded. Returns the arrow in flight, or null.</summary>
         public HarpoonProjectile Shoot() => Launch(muzzle != null ? muzzle.rotation : Quaternion.identity);
@@ -60,6 +86,7 @@ namespace AKI.Weapons
 
             HarpoonProjectile arrow = Instantiate(projectilePrefab, muzzle.position, rotation);
             arrow.Launch(this);
+            lastShot = arrow;
             onShoot.Invoke();
             return arrow;
         }
@@ -68,6 +95,8 @@ namespace AKI.Weapons
         {
             if (IsLoaded || Time.time < reloadAt) return;
             IsLoaded = true;
+            if (lastShot != null) lastShot.CutRope();
+            lastShot = null;
             if (loadedArrow != null) loadedArrow.SetActive(true);
             onReloaded.Invoke();
         }
