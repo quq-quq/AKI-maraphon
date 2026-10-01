@@ -81,7 +81,8 @@ MonoBehaviour:
   loadedArrow: {fileID: 5242081014891293551}
   muzzle: {fileID: 1745914475101961212}
   projectilePrefab: {fileID: 8972933763769063897, guid: 8a4154d809b7e47b7bcb3f453ea5473a, type: 3}
-  reloadSeconds: 1.5
+  cooldown: 5
+  materializeSeconds: 1.2
   owner: {fileID: 0}
   rope: 1
   ropeAnchor: {fileID: 0}
@@ -89,6 +90,9 @@ MonoBehaviour:
   ropeWidth: 0.014
   ropeLength: 25
   ropeMaterial: {fileID: 2100000, guid: d0e2c1ffd22e2452c8a3304a07998adc, type: 2}
+  dissolveShader: {fileID: 4800000, guid: fb3f0018d15a0438894ec375a56894d9, type: 3}
+  dissolveNoiseScale: 9
+  dissolveEdgeColor: {r: 0.35, g: 0.65, b: 0.8, a: 1}
   onShoot:
     m_PersistentCalls:
       m_Calls: []

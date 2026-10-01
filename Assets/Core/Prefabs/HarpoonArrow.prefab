@@ -139,17 +139,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AKI.Weapons.HarpoonProjectile
   bubbles: {fileID: 2332849641767023222}
-  speed: 25
-  waterDrag: 0.3
-  waterGravityScale: 0.5
+  speed: 12
+  waterDrag: 0.55
+  waterGravityScale: 0.8
   airDrag: 0.02
   airGravityScale: 1
   hitRadius: 0.02
+  penetration: 0.06
   hitMask:
     serializedVersion: 2
     m_Bits: 4294967291
-  flightLifetime: 6
-  stuckLifetime: 10
+  lifetime: 3.5
+  vanishSeconds: 1
 --- !u!1001 &2254851468335429691
 PrefabInstance:
   m_ObjectHideFlags: 0

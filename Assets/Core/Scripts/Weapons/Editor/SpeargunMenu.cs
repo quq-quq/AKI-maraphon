@@ -73,6 +73,7 @@ namespace AKI.Weapons.Editor
             gun.muzzle = muzzle;
             gun.projectilePrefab = BuildArrowPrefab(arrow, muzzle, bubblesFx);
             gun.ropeMaterial = EnsureRopeMaterial();
+            gun.dissolveShader = Shader.Find("AKI/DissolveLit");
             GameObject saved = SavePrefab(root, PrefabPath);
             AssetDatabase.SaveAssets();
             return saved;

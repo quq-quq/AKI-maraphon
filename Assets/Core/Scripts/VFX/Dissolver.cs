@@ -5,9 +5,11 @@ using UnityEngine;
 namespace AKI.VFX
 {
     /// <summary>
-    /// Melts an object's meshes away in noise patches over a few seconds (AKI/DissolveLit). Its materials are swapped
-    /// for dissolve copies with the same textures and values, so it looks unchanged until the holes open.
-    /// Particles, lines and trails are left alone. When done the meshes stay hidden and <c>onDone</c> is called.
+    /// Melts an object's meshes away in noise patches over a few seconds (AKI/DissolveLit), or the other way round:
+    /// grows them in out of the noise (<see cref="Materialize"/>). Its materials are swapped for dissolve copies with
+    /// the same textures and values, so it looks unchanged outside the holes. Particles, lines and trails are left alone.
+    /// Melting: when done the meshes stay hidden and <c>onDone</c> is called.
+    /// Materializing: when done the original materials are put back and the component removes itself.
     /// </summary>
     public class Dissolver : MonoBehaviour
     {
@@ -18,11 +20,22 @@ namespace AKI.VFX
 
         readonly List<Material> instances = new List<Material>();
         readonly List<Renderer> renderers = new List<Renderer>();
+        readonly List<Material[]> originals = new List<Material[]>();
         float duration;
         float progress;
+        bool appear;
         Action onDone;
 
         public float Progress => progress;
+
+        /// <summary>Grows <paramref name="target"/> in out of the noise over <paramref name="seconds"/>.</summary>
+        public static Dissolver Materialize(GameObject target, Shader shader, float seconds, float noiseScale, Color edgeColor, Action onDone = null)
+        {
+            Dissolver dissolver = Begin(target, shader, seconds, noiseScale, edgeColor, onDone);
+            dissolver.appear = true;
+            foreach (Material m in dissolver.instances) m.SetFloat(DissolveId, 1f);   // invisible from the first frame
+            return dissolver;
+        }
 
         /// <summary>
         /// Starts melting <paramref name="target"/>: <paramref name="noiseScale"/> noise cells per metre, rim in
@@ -47,6 +60,7 @@ namespace AKI.VFX
                 }
                 r.sharedMaterials = swapped;
                 dissolver.renderers.Add(r);
+                dissolver.originals.Add(source);
             }
             return dissolver;
         }
@@ -74,9 +88,18 @@ namespace AKI.VFX
             if (progress >= 1f) return;
             progress = Mathf.Min(1f, progress + Time.deltaTime / duration);
             float value = Mathf.SmoothStep(0f, 1f, progress);
+            if (appear) value = 1f - value;
             foreach (Material m in instances) m.SetFloat(DissolveId, value);
 
             if (progress < 1f) return;
+            if (appear)
+            {
+                for (int i = 0; i < renderers.Count; i++)
+                    if (renderers[i] != null) renderers[i].sharedMaterials = originals[i];
+                onDone?.Invoke();
+                Destroy(this);
+                return;
+            }
             foreach (Renderer r in renderers)
                 if (r != null) r.enabled = false;
             onDone?.Invoke();

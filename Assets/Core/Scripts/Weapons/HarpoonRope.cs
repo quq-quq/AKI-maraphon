@@ -206,7 +206,13 @@ namespace AKI.Weapons
 
             for (int i = 0; i < n; i++)
             {
-                if ((i == 0 && pinHead) || (i == n - 1 && pinTail)) continue;
+                if ((i == 0 && pinHead) || (i == n - 1 && pinTail))
+                {
+                    // a held end moves with what holds it: keep its last position, so that once it is let go
+                    // (line cut, arrow gone) it carries on with its real speed instead of a jump from long ago
+                    prev[i] = pos[i];
+                    continue;
+                }
                 Vector3 p = pos[i];
                 Vector3 v = p - prev[i];
                 Vector3 accel;

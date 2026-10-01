@@ -1,3 +1,4 @@
+using AKI.VFX;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -5,9 +6,9 @@ namespace AKI.Weapons
 {
     /// <summary>
     /// The speargun model: plays the shot animation, hides the loaded arrow and launches a <see cref="HarpoonProjectile"/>
-    /// copy of it from the muzzle (the arrow tip), tied to the gun with a <see cref="HarpoonRope"/>. After
-    /// <see cref="reloadSeconds"/> the arrow is back in the gun; the line stays on the last arrow until the next shot.
-    /// The player drives it through <see cref="AKI.Player.PlayerSpeargun"/>.
+    /// copy of it from the muzzle (the arrow tip), tied to the gun with a <see cref="HarpoonRope"/>. One arrow at a time:
+    /// a new one only grows back into the gun (out of noise) once the shot one is gone, and never sooner than
+    /// <see cref="cooldown"/> after the shot. The player drives it through <see cref="AKI.Player.PlayerSpeargun"/>.
     /// </summary>
     public class Speargun : MonoBehaviour
     {
@@ -19,7 +20,10 @@ namespace AKI.Weapons
         [Tooltip("Tip of the loaded arrow, pointing where the gun shoots.")]
         public Transform muzzle;
         public HarpoonProjectile projectilePrefab;
-        [Min(0f)] public float reloadSeconds = 1.5f;
+        [Tooltip("Shortest time from a shot until the gun is loaded again (s).")]
+        [Min(0f)] public float cooldown = 5f;
+        [Tooltip("Seconds the new arrow takes to grow in out of the noise (at least).")]
+        [Min(0.1f)] public float materializeSeconds = 1.2f;
         [Tooltip("Arrows never hit colliders under this (the player holding the gun). Empty = the gun itself.")]
         public Transform owner;
 
@@ -35,18 +39,25 @@ namespace AKI.Weapons
         [Tooltip("Lit material for the line tube (M_HarpoonRope). Empty = plain coloured fallback.")]
         public Material ropeMaterial;
 
+        [Header("Noise dissolve")]
+        [Tooltip("AKI/DissolveLit: arrows melt away and grow back with it.")]
+        public Shader dissolveShader;
+        [Min(0.1f)] public float dissolveNoiseScale = 9f;
+        [ColorUsage(false, true)] public Color dissolveEdgeColor = new Color(0.35f, 0.65f, 0.8f);
+
         public UnityEvent onShoot = new UnityEvent();
         public UnityEvent onReloaded = new UnityEvent();
         [Tooltip("An arrow from this gun stuck into something.")]
         public UnityEvent<Collider> onHit = new UnityEvent<Collider>();
 
-        float reloadAt;
+        float shotAt = -999f;
         HarpoonProjectile lastShot;
+        bool materializing;
 
         public bool IsLoaded { get; private set; } = true;
 
-        /// <summary>Reload progress, 0 right after a shot .. 1 loaded (for UI).</summary>
-        public float Reload01 => IsLoaded ? 1f : 1f - Mathf.Clamp01((reloadAt - Time.time) / Mathf.Max(reloadSeconds, 1e-4f));
+        /// <summary>Cooldown progress, 0 right after a shot .. 1 loaded (for UI).</summary>
+        public float Reload01 => IsLoaded ? 1f : Mathf.Clamp01((Time.time - shotAt) / Mathf.Max(cooldown, 1e-4f));
 
         public Transform Owner => owner != null ? owner : transform;
 
@@ -84,7 +95,7 @@ namespace AKI.Weapons
             if (!IsLoaded || projectilePrefab == null || muzzle == null) return null;
 
             IsLoaded = false;
-            reloadAt = Time.time + reloadSeconds;
+            shotAt = Time.time;
             if (animator != null) animator.SetTrigger(ShootId);
             if (loadedArrow != null) loadedArrow.SetActive(false);
 
@@ -98,9 +109,25 @@ namespace AKI.Weapons
 
         void Update()
         {
-            if (IsLoaded || Time.time < reloadAt) return;
+            if (IsLoaded || materializing) return;
+            if (lastShot != null) return;   // the shot arrow is still out there
+
+            // the new arrow grows in so that it is complete when the cooldown is over (and never in a rush)
+            float seconds = Mathf.Max(materializeSeconds, shotAt + cooldown - Time.time);
+            if (loadedArrow == null)
+            {
+                if (Time.time >= shotAt + cooldown) Loaded();
+                return;
+            }
+            materializing = true;
+            loadedArrow.SetActive(true);
+            Dissolver.Materialize(loadedArrow, dissolveShader, seconds, dissolveNoiseScale, dissolveEdgeColor, Loaded);
+        }
+
+        void Loaded()
+        {
+            materializing = false;
             IsLoaded = true;
-            if (loadedArrow != null) loadedArrow.SetActive(true);
             onReloaded.Invoke();
         }
     }

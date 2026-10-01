@@ -5,8 +5,8 @@ using UnityEngine;
 namespace AKI.Weapons
 {
     /// <summary>
-    /// A harpoon arrow in flight. Its origin is the tip and it flies along its forward axis on a ballistic arc: under
-    /// water it loses speed and drops, in the air it keeps its speed and falls faster. On hitting a collider it sticks in;
+    /// A harpoon arrow in flight. Its origin is the tip and it flies along its forward axis on a heavy ballistic arc:
+    /// under water it is slow, loses speed and drops; in the air it keeps its speed and falls. On hitting a collider it sticks in;
     /// a fish with <see cref="TunaBlood"/> starts bleeding, and a <see cref="Catchable"/> one is caught (it melts away
     /// together with the arrow and its line). The bubble streak (<see cref="HarpoonBubbles"/> at the tip) starts with
     /// the shot and stops on the hit.
@@ -14,13 +14,13 @@ namespace AKI.Weapons
     public class HarpoonProjectile : MonoBehaviour
     {
         public HarpoonBubbles bubbles;
-        [Min(1f)] public float speed = 25f;
+        [Min(1f)] public float speed = 12f;
 
         [Header("Under water")]
         [Tooltip("Speed lost per second (fraction of the current speed).")]
-        [Min(0f)] public float waterDrag = 0.3f;
+        [Min(0f)] public float waterDrag = 0.55f;
         [Tooltip("Share of normal gravity under water (buoyancy takes the rest).")]
-        [Range(0f, 1f)] public float waterGravityScale = 0.5f;
+        [Range(0f, 1f)] public float waterGravityScale = 0.8f;
 
         [Header("In the air")]
         [Min(0f)] public float airDrag = 0.02f;
@@ -31,10 +31,11 @@ namespace AKI.Weapons
         [Tooltip("How deep the tip goes into what it hits (m).")]
         [Min(0f)] public float penetration = 0.06f;
         public LayerMask hitMask = Physics.DefaultRaycastLayers;
-        [Tooltip("Seconds before a harpoon that hit nothing is removed.")]
-        [Min(0.5f)] public float flightLifetime = 6f;
-        [Tooltip("Seconds a harpoon stays stuck in its target.")]
-        [Min(0.5f)] public float stuckLifetime = 10f;
+
+        [Header("Going away")]
+        [Tooltip("Seconds after the shot before the arrow and its line melt away (unless a caught fish takes them).")]
+        [Min(0.5f)] public float lifetime = 3.5f;
+        [Min(0.1f)] public float vanishSeconds = 1f;
 
         Vector3 velocity;
         float age;
@@ -44,6 +45,7 @@ namespace AKI.Weapons
         HarpoonRope rope;
         Vector3 tailLocal;
         bool caught;
+        bool vanishing;
 
         public bool IsFlying => flying;
 
@@ -51,6 +53,9 @@ namespace AKI.Weapons
 
         /// <summary>This arrow's line (null without one, or once it is gone).</summary>
         public HarpoonRope Rope => rope;
+
+        /// <summary>A fish took it, or it is melting away: it can't catch anything any more.</summary>
+        public bool IsTaken => caught || vanishing;
 
         /// <summary>Starts the flight from the current pose. Colliders under the gun's owner are ignored.</summary>
         public void Launch(Speargun from)
@@ -101,16 +106,8 @@ namespace AKI.Weapons
         void Update()
         {
             age += Time.deltaTime;
-            if (!flying)
-            {
-                if (age >= stuckLifetime && !caught) Remove();   // a caught fish takes the arrow with it
-                return;
-            }
-            if (age >= flightLifetime)
-            {
-                Remove();
-                return;
-            }
+            if (age >= lifetime && !caught && !vanishing) Vanish();   // a caught fish takes the arrow with it instead
+            if (!flying) return;
 
             float dt = Time.deltaTime;
             bool inWater = WaterSurface.IsPointUnderwater(transform.position);
@@ -155,7 +152,6 @@ namespace AKI.Weapons
         void StickInto(RaycastHit hit, Vector3 dir)
         {
             flying = false;
-            age = 0f;
             Vector3 point = hit.distance > 0f ? hit.point : transform.position;
             transform.SetPositionAndRotation(point + dir * penetration, Quaternion.LookRotation(dir));   // the tip goes in
             Transform carrier = hit.rigidbody != null ? hit.rigidbody.transform : hit.transform;
@@ -167,7 +163,7 @@ namespace AKI.Weapons
             if (blood != null) blood.Hit(point, dir);
 
             Catchable prey = hit.collider.GetComponentInParent<Catchable>();
-            if (prey != null && !prey.IsCaught)
+            if (prey != null && !prey.IsCaught && !vanishing)
             {
                 caught = true;
                 prey.Catch(this);
@@ -181,10 +177,20 @@ namespace AKI.Weapons
             return Mathf.Abs(s.x - s.y) < 0.01f * Mathf.Abs(s.x) && Mathf.Abs(s.x - s.z) < 0.01f * Mathf.Abs(s.x);
         }
 
-        void Remove()
+        // The arrow and its line melt away in noise; the bubbles already in the water finish rising on their own.
+        void Vanish()
         {
-            if (bubbles != null) bubbles.StopAndDetach();   // the bubbles finish rising on their own
-            Destroy(gameObject);
+            vanishing = true;
+            DetachEffects();
+            Shader shader = gun != null ? gun.dissolveShader : null;
+            float scale = gun != null ? gun.dissolveNoiseScale : 9f;
+            Color edge = gun != null ? gun.dissolveEdgeColor : Color.black;
+            if (rope != null)
+            {
+                GameObject line = rope.gameObject;
+                Dissolver.Begin(line, shader, vanishSeconds, scale * 1.5f, edge, () => Destroy(line));
+            }
+            Dissolver.Begin(gameObject, shader, vanishSeconds, scale, edge, () => Destroy(gameObject));
         }
     }
 }
