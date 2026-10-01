@@ -33,7 +33,7 @@ namespace AKI.Water
         [Tooltip("Where the drift flows to without a Wind in the scene (degrees around Y: 0 = +Z, 90 = +X).")]
         [Range(0f, 360f)] public float direction = 60f;
         [Tooltip("Drift speed right under the surface (m/s).")]
-        [Min(0f)] public float speed = 0.45f;
+        [Min(0f)] public float speed = 0.9f;
         [Tooltip("How far the drift direction swings either way across the sea (degrees).")]
         [Range(0f, 90f)] public float directionVariation = 10f;
         [Tooltip("Size of the patches the drift changes over (m).")]
@@ -43,8 +43,8 @@ namespace AKI.Water
 
         [Header("Depth and gusts")]
         [Tooltip("Depth (m) over which the drift eases off towards Deep Share (the swell fades on its own, by wavelength).")]
-        [Min(0.1f)] public float depthFalloff = 20f;
-        [Range(0f, 1f)] public float deepShare = 0.6f;
+        [Min(0.1f)] public float depthFalloff = 25f;
+        [Range(0f, 1f)] public float deepShare = 0.85f;
         [Tooltip("How much the whole current swells and eases off over time (share).")]
         [Range(0f, 1f)] public float gusts = 0.2f;
         [Tooltip("Seconds of a typical gust.")]
