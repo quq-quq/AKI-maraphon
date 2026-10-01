@@ -8,8 +8,8 @@ namespace AKI.Player
     /// <summary>
     /// Holding your breath under water. While the head is under the surface the air runs out; after a while a dark
     /// vignette closes in and the view slowly fades towards black ("he's feeling bad"). Back above the water
-    /// everything clears up smoothly (DOTween). Running out of air is visual only and fires <see cref="onOutOfAir"/>,
-    /// so damage or death can be hooked up later.
+    /// everything clears up smoothly (DOTween). Running out of air fires <see cref="onOutOfAir"/> and (by default) makes
+    /// the player pass out: the view goes black, the scene reloads and they come to (<see cref="Blackout"/>).
     /// Drawn by the water lens pass (WaterLensFeature), so it doesn't touch the project's post-processing.
     /// </summary>
     [RequireComponent(typeof(FirstPersonSwimController))]
@@ -23,6 +23,14 @@ namespace AKI.Player
         [Range(0f, 0.9f)] public float effectStart = 0.35f;
         [Tooltip("Seconds for the vignette and darkness to fade after surfacing.")]
         [Min(0.05f)] public float recoverDuration = 1.5f;
+
+        [Header("Passing out")]
+        [Tooltip("When the air runs out: black out, reload the scene and come to again.")]
+        public bool passOutWhenOutOfAir = true;
+        [Tooltip("Seconds for the view to go black.")]
+        [Min(0.1f)] public float blackoutSeconds = 1.5f;
+        [Tooltip("Seconds for the eyes to open and the view to come into focus after the reload.")]
+        [Min(0.5f)] public float wakeSeconds = 2.5f;
 
         public UnityEvent onOutOfAir = new UnityEvent();
         public UnityEvent onBreathRestored = new UnityEvent();
@@ -73,6 +81,7 @@ namespace AKI.Player
                 {
                     outOfAir = true;
                     onOutOfAir.Invoke();
+                    if (passOutWhenOutOfAir) Blackout.ReloadScene(blackoutSeconds, wakeSeconds);
                 }
             }
             else

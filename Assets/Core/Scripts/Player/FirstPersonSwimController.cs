@@ -13,6 +13,7 @@ namespace AKI.Player
     /// Surface:     floats with the head just above the real waves (GPU wave height via <see cref="WaterProbe"/>),
     ///              bobs and rolls with them, gets pushed a little by their slope. Jump = hop out / climb a ledge.
     /// Under water: full 3D swimming in the look direction, Jump = up, Crouch/Ctrl = down, Sprint = fast swim.
+    ///              The water's own movement (<see cref="WaterCurrent"/>) carries you along.
     ///              Thrust comes in rhythmic strokes with glide in between, momentum carries you.
     ///              Look down and swim (or press Crouch) at the surface to dive.
     ///
@@ -71,6 +72,8 @@ namespace AKI.Player
         [Tooltip("How much the slope of the waves pushes you around at the surface.")]
         public float wavePush = 1.2f;
         public float waterHopSpeed = 3.6f;
+        [Tooltip("How much the water's movement (WaterCurrent: swell push and pull, drift) carries the swimmer.")]
+        [Min(0f)] public float currentInfluence = 1f;
 
         [Header("Climbing out")]
         public float climbMaxHeight = 1.6f;
@@ -427,7 +430,10 @@ namespace AKI.Player
             strokeKick = Mathf.MoveTowards(strokeKick, 0f, dt * 3f);
 
             float speed = sprint ? fastSwimSpeed : swimSpeed;
-            Vector3 target = wish * (speed * pulse);
+            // the water itself moves: swimming is relative to it, and without strokes you drift with it
+            Vector3 flow = WaterCurrent.At(transform.position + Vector3.up * chestHeight) * currentInfluence;
+            if (atSurface) flow.y = 0f;   // floating height is the waves' business
+            Vector3 target = wish * (speed * pulse) + flow;
             float k = thrusting ? swimAcceleration : waterDrag;
             velocity = Vector3.Lerp(velocity, target, 1f - Mathf.Exp(-k * dt));
 
