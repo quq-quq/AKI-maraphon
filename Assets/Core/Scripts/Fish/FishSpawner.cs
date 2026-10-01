@@ -1,4 +1,3 @@
-using AKI.Water;
 using AKI.Weapons;
 using UnityEngine;
 using UnityEngine.Events;
@@ -24,12 +23,8 @@ namespace AKI.Fish
         [Header("Where")]
         [Tooltip("Distance from the player where a new fish appears (m): far enough for the water to hide it.")]
         [Min(1f)] public float spawnDistance = 22f;
-        [Tooltip("Height range around the player's eyes (m).")]
-        [Min(0f)] public float spawnHeightRange = 2f;
         [Tooltip("Half-angle in front of the player where fish never appear (degrees).")]
         [Range(0f, 179f)] public float hiddenAngle = 70f;
-        [Tooltip("Kept at least this far below the mean water level (m).")]
-        [Min(0f)] public float surfaceMargin = 1f;
 
         [Header("Events")]
         [Tooltip("A new fish is in the water.")]
@@ -104,17 +99,14 @@ namespace AKI.Fish
         }
 
         // Somewhere around the player, behind or beside them, never in the cone they look into.
+        // The height doesn't matter: the fish puts itself at its own depth (FishAI.Init).
         Vector3 SpawnPoint(Transform eye)
         {
             Vector3 forward = Vector3.ProjectOnPlane(eye.forward, Vector3.up);
             if (forward.sqrMagnitude < 1e-4f) forward = Vector3.forward;
             float yaw = Random.Range(hiddenAngle, 360f - hiddenAngle);
             Vector3 direction = Quaternion.AngleAxis(yaw, Vector3.up) * forward.normalized;
-
-            Vector3 p = eye.position + direction * spawnDistance + Vector3.up * Random.Range(-spawnHeightRange, spawnHeightRange);
-            WaterSurface water = WaterSurface.FindAt(p);
-            if (water != null) p.y = Mathf.Min(p.y, water.WaterLevel - surfaceMargin);
-            return p;
+            return eye.position + direction * spawnDistance;
         }
 
         Transform Eye()

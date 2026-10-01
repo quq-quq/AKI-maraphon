@@ -5,110 +5,110 @@ using UnityEngine;
 namespace AKI.Fish
 {
     /// <summary>
-    /// Tuna movement: keeps around the player at a set distance and moves in jerky darts along the circle around them:
-    /// a quick flick to the next spot, a short hold with a small tremble, the next flick (sometimes back the other way).
-    /// It never comes closer than <see cref="minDistance"/>, stays under the water and above the bottom.
-    /// A fresh fish first swims in from where the spawner put it. Darts are planned a few steps ahead, and the gizmos
-    /// draw the path: where the fish has been, the current dart and the planned ones.
+    /// Tuna movement: swims slowly around the player along a sine wave that bends the path both sideways (distance
+    /// from the player swings in and out) and up and down (around its own depth). Every fish picks its depth, distance,
+    /// wave start and direction at random.
+    /// Like the player (<see cref="AKI.Player.FirstPersonSwimController"/>) it asks the water for the real wavy surface
+    /// above it (<see cref="WaterProbe"/>), and always keeps its back at least <see cref="surfaceMargin"/> under it.
+    /// It never comes closer than <see cref="minDistance"/> (horizontally).
+    /// A fresh fish first swims in from where the spawner put it. The gizmos draw the whole path and where it has been.
     /// </summary>
     public class FishAI : MonoBehaviour
     {
-        enum State { Approach, Dart, Hold, Stopped }
-
-        // A spot on the circle around the player: angle (degrees around Y), horizontal distance, height above the eyes.
-        struct Waypoint
-        {
-            public float angle, radius, height;
-            public float dartSeconds;   // time to get here
-            public float holdSeconds;   // time to stay here
-        }
+        enum State { Approach, Swim, Stopped }
 
         const float TrailStep = 0.05f;
-        const int ArcSegments = 16;
+        const int PathSegments = 128;
 
         [Tooltip("What the fish circles (the player's camera). Empty = the main camera.")]
         public Transform target;
 
-        [Header("Distance")]
-        [Tooltip("Usual distance from the player (horizontal, m).")]
+        [Header("Depth")]
+        [Tooltip("Average depth under the sea level (m, min / max). Every fish picks one at random.")]
+        public Vector2 depthRange = new Vector2(4f, 7f);
+        [Tooltip("The fish's back always stays at least this far under the real (wavy) surface (m).")]
+        [Min(0f)] public float surfaceMargin = 1.5f;
+        [Tooltip("From the fish's centre up to its back (m).")]
+        [Min(0f)] public float bodyHalfHeight = 0.2f;
+
+        [Header("Path: sideways wave")]
+        [Tooltip("Average distance from the player (horizontal, m).")]
         [Min(0.5f)] public float orbitRadius = 6f;
-        [Tooltip("Each dart picks a distance within ± this of the orbit radius.")]
-        [Min(0f)] public float radiusSpread = 1.5f;
-        [Tooltip("The fish never comes closer than this to the player (m).")]
+        [Tooltip("Every fish picks its own average distance within ± this.")]
+        [Min(0f)] public float radiusSpread = 1f;
+        [Tooltip("How far the wave swings in and out of the circle (m).")]
+        [Min(0f)] public float waveAmplitude = 1.5f;
+        [Tooltip("Sideways waves per full lap around the player.")]
+        [Range(1, 12)] public int waveCount = 4;
+
+        [Header("Path: up-and-down wave")]
+        [Tooltip("How far the wave swings above and below the fish's depth (m).")]
+        [Min(0f)] public float verticalAmplitude = 1f;
+        [Tooltip("Up-and-down waves per full lap (different from the sideways count = a less repetitive path).")]
+        [Range(1, 12)] public int verticalWaveCount = 3;
+
+        [Header("Distance")]
+        [Tooltip("The fish never comes closer than this to the player (horizontal, m).")]
         [Min(0.5f)] public float minDistance = 3.5f;
-        [Tooltip("How far above / below the player's eyes the fish may go (m).")]
-        [Min(0f)] public float heightRange = 2f;
         [Tooltip("Seconds the circle's centre lags behind the player, so the fish doesn't copy every move.")]
-        [Min(0f)] public float followLag = 0.6f;
-
-        [Header("Darts")]
-        [Tooltip("Degrees around the player per dart (min, max).")]
-        public Vector2 dartAngle = new Vector2(20f, 65f);
-        [Tooltip("Seconds per dart (min, max).")]
-        public Vector2 dartSeconds = new Vector2(0.35f, 0.8f);
-        [Tooltip("Seconds of holding still between darts (min, max).")]
-        public Vector2 holdSeconds = new Vector2(0.2f, 1f);
-        [Tooltip("Largest height change per dart (m).")]
-        [Min(0f)] public float heightStep = 1f;
-        [Tooltip("Chance that the next dart goes back the other way.")]
-        [Range(0f, 1f)] public float turnBackChance = 0.3f;
-
-        [Header("Twitching")]
-        [Tooltip("Size of the constant small tremble (m).")]
-        [Min(0f)] public float jitterStrength = 0.06f;
-        [Tooltip("Speed of the tremble (Hz).")]
-        [Min(0f)] public float jitterFrequency = 7f;
+        [Min(0f)] public float followLag = 0.8f;
 
         [Header("Swimming")]
+        [Tooltip("Speed along the path (m/s).")]
+        [Min(0.1f)] public float swimSpeed = 1.2f;
         [Tooltip("Speed when coming in from the spawn point (m/s).")]
-        [Min(0.1f)] public float approachSpeed = 4f;
+        [Min(0.1f)] public float approachSpeed = 2.5f;
         [Tooltip("How quickly the fish turns to where it swims (higher = snappier).")]
-        [Min(0.1f)] public float turnSharpness = 10f;
+        [Min(0.1f)] public float turnSharpness = 4f;
+        [Tooltip("Largest nose up / down angle (degrees).")]
+        [Range(0f, 60f)] public float maxPitch = 25f;
         [Tooltip("Tail wag (degrees) at full speed.")]
         [Min(0f)] public float wiggleDegrees = 8f;
         [Tooltip("Tail wags per second at full speed.")]
-        [Min(0f)] public float wiggleFrequency = 3f;
-
-        [Header("Staying in the water")]
-        [Tooltip("Kept at least this far below the mean water level (m).")]
-        [Min(0f)] public float surfaceMargin = 0.8f;
-        [Tooltip("Kept at least this far above whatever is under it (m). 0 = off.")]
-        [Min(0f)] public float bottomClearance = 0.6f;
-        [Tooltip("What counts as the bottom (everything but Ignore Raycast and Water).")]
-        public LayerMask groundMask = ~((1 << 2) | (1 << 4));
+        [Min(0f)] public float wiggleFrequency = 2f;
 
         [Header("Gizmos")]
         public bool drawGizmos = true;
         [Tooltip("Seconds of the path behind the fish to draw.")]
-        [Min(0f)] public float trailSeconds = 3f;
-        [Tooltip("How many darts are planned (and drawn) ahead.")]
-        [Range(1, 8)] public int plannedDarts = 3;
+        [Min(0f)] public float trailSeconds = 4f;
 
-        static readonly RaycastHit[] GroundHits = new RaycastHit[8];
-
-        State state = State.Approach;
-        readonly List<Waypoint> plan = new List<Waypoint>();
+        readonly WaterProbe probe = new WaterProbe();
         readonly Queue<Vector3> trail = new Queue<Vector3>();
-        Waypoint from, to;              // the current dart (or the spot held, which is 'to')
-        float timer;
-        int direction = 1;
+        State state = State.Approach;
+        float depth;           // this fish's average depth under the sea level
+        float radius;          // this fish's average distance
+        float phase;           // where on the sideways wave it starts
+        float verticalPhase;   // where on the up-and-down wave it starts
+        int direction = 1;     // clockwise or not
+        float angle;           // degrees around the player
         Vector3 centre, centreVelocity;
-        Vector3 basePosition;           // where the fish swims, without the tremble
-        Vector3 lastBase;
+        Vector3 lastPosition;
         Quaternion heading;
         float wigglePhase;
-        float noiseSeed;
         float trailTimer;
 
         public bool IsStopped => state == State.Stopped;
 
-        /// <summary>Movement speed without the tremble (m/s).</summary>
+        /// <summary>This fish's average depth under the sea level (m).</summary>
+        public float Depth => depth;
+
+        /// <summary>Metres from the fish's back up to the real wave surface (negative = sticking out).</summary>
+        public float DepthUnderSurface { get; private set; }
+
+        /// <summary>Same test as the player's head: the whole fish is under the wavy surface.</summary>
+        public bool IsUnderwater => DepthUnderSurface > 0f;
+
         public Vector3 Velocity { get; private set; }
 
         /// <summary>Called by the spawner right after the fish is created.</summary>
         public void Init(Transform player)
         {
             target = player;
+            centre = player != null ? player.position : transform.position;
+            angle = AngleAround(transform.position);
+            Vector3 p = transform.position;
+            p.y = PathHeight(angle);   // at its depth from the very first frame
+            transform.position = p;
         }
 
         /// <summary>Stops all movement (the fish was hit): whoever stopped it moves it from now on.</summary>
@@ -118,32 +118,42 @@ namespace AKI.Fish
             Velocity = Vector3.zero;
         }
 
+        void Awake()
+        {
+            // every fish its own depth, distance, wave start and direction
+            depth = Random.Range(depthRange.x, depthRange.y);
+            // the inner swing of the wave must stay outside the minimum distance
+            radius = Mathf.Max(orbitRadius + Random.Range(-radiusSpread, radiusSpread), minDistance + waveAmplitude);
+            phase = Random.Range(0f, 2f * Mathf.PI);
+            verticalPhase = Random.Range(0f, 2f * Mathf.PI);
+            direction = Random.value < 0.5f ? -1 : 1;
+        }
+
+        void OnEnable()
+        {
+            WaterProbe.Register(probe);
+        }
+
+        void OnDisable()
+        {
+            WaterProbe.Unregister(probe);
+        }
+
         void Start()
         {
             if (target == null && Camera.main != null) target = Camera.main.transform;
 
             centre = TargetPosition();
-            basePosition = lastBase = transform.position;
-            heading = transform.rotation;
-            noiseSeed = Random.value * 100f;
-            direction = Random.value < 0.5f ? -1 : 1;
-
-            // the first spot on the circle: the side of the player the fish comes from
-            Vector3 offset = transform.position - centre;
-            to = new Waypoint
-            {
-                angle = Mathf.Atan2(offset.x, offset.z) * Mathf.Rad2Deg,
-                radius = RandomRadius(),
-                height = Mathf.Clamp(offset.y, -heightRange, heightRange),
-                holdSeconds = Random.Range(holdSeconds.x, holdSeconds.y),
-            };
-            from = to;
-            FillPlan();
+            angle = AngleAround(transform.position);
+            transform.position = lastPosition = new Vector3(transform.position.x, PathHeight(angle), transform.position.z);
+            Vector3 look = Flat(PathPoint(angle) - transform.position);
+            heading = look.sqrMagnitude > 1e-4f ? Quaternion.LookRotation(look) : transform.rotation;
             state = State.Approach;
         }
 
         void Update()
         {
+            probe.position = transform.position;   // read back by the water for the next frames
             if (state == State.Stopped) return;
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
@@ -151,164 +161,111 @@ namespace AKI.Fish
             Vector3 player = TargetPosition();
             centre = followLag > 0f ? Vector3.SmoothDamp(centre, player, ref centreVelocity, followLag) : player;
 
-            switch (state)
-            {
-                case State.Approach: Approach(dt); break;
-                case State.Hold: Hold(dt); break;
-                case State.Dart: Dart(dt); break;
-            }
+            Vector3 position = state == State.Approach ? Approach(dt) : Swim(dt);
+            position = KeepAway(position, player);
+            position.y = KeepUnder(position);
 
-            Velocity = (basePosition - lastBase) / dt;
-            lastBase = basePosition;
-
-            Vector3 position = Constrain(basePosition + Tremble(Time.time), player);
+            Velocity = (position - lastPosition) / dt;
+            lastPosition = position;
             transform.SetPositionAndRotation(position, Turn(dt));
             RecordTrail(position, dt);
         }
 
-        // ------------------------------------------------------------------ states
+        // ------------------------------------------------------------------ path
 
-        void Approach(float dt)
+        Vector3 Approach(float dt)
         {
-            Vector3 spot = OrbitPoint(to);
-            basePosition = Vector3.MoveTowards(basePosition, spot, approachSpeed * dt);
-            if ((basePosition - spot).sqrMagnitude < 0.01f)
-            {
-                state = State.Hold;
-                timer = 0f;
-            }
+            Vector3 spot = PathPoint(angle);
+            Vector3 position = Vector3.MoveTowards(transform.position, spot, approachSpeed * dt);
+            if ((position - spot).sqrMagnitude < 0.01f) state = State.Swim;
+            return position;
         }
 
-        void Hold(float dt)
+        Vector3 Swim(float dt)
         {
-            basePosition = OrbitPoint(to);
-            timer += dt;
-            if (timer < to.holdSeconds) return;
-
-            // flick to the next planned spot
-            from = to;
-            FillPlan();
-            to = plan[0];
-            plan.RemoveAt(0);
-            FillPlan();
-            timer = 0f;
-            state = State.Dart;
+            // constant speed along the curve: the angle step depends on how long the curve is here
+            float a = angle * Mathf.Deg2Rad;
+            float r = WaveRadius(a);
+            float dr = waveAmplitude * waveCount * Mathf.Cos(waveCount * a + phase);
+            float dy = verticalAmplitude * verticalWaveCount * Mathf.Cos(verticalWaveCount * a + verticalPhase);
+            float step = swimSpeed * dt / Mathf.Max(0.1f, Mathf.Sqrt(r * r + dr * dr + dy * dy));
+            angle += direction * step * Mathf.Rad2Deg;
+            return PathPoint(angle);
         }
 
-        void Dart(float dt)
+        float WaveRadius(float radians)
         {
-            timer += dt;
-            float t = Mathf.Clamp01(timer / Mathf.Max(0.01f, to.dartSeconds));
-            float eased = 1f - (1f - t) * (1f - t) * (1f - t);   // full speed at once, then brakes: a jerk, not a glide
-            basePosition = OrbitPoint(Lerp(from, to, eased));
-            if (t < 1f) return;
-            state = State.Hold;
-            timer = 0f;
+            return radius + waveAmplitude * Mathf.Sin(waveCount * radians + phase);
         }
 
-        // ------------------------------------------------------------------ planning
-
-        void FillPlan()
+        float PathHeight(float degrees)
         {
-            while (plan.Count > plannedDarts) plan.RemoveAt(plan.Count - 1);
-            while (plan.Count < plannedDarts) plan.Add(Next(plan.Count > 0 ? plan[plan.Count - 1] : to));
+            float a = degrees * Mathf.Deg2Rad;
+            return SeaLevel() - depth + verticalAmplitude * Mathf.Sin(verticalWaveCount * a + verticalPhase);
         }
 
-        Waypoint Next(Waypoint previous)
+        Vector3 PathPoint(float degrees)
         {
-            if (Random.value < turnBackChance) direction = -direction;
-            return new Waypoint
-            {
-                angle = previous.angle + direction * Random.Range(dartAngle.x, dartAngle.y),
-                radius = RandomRadius(),
-                height = Mathf.Clamp(previous.height + Random.Range(-heightStep, heightStep), -heightRange, heightRange),
-                dartSeconds = Random.Range(dartSeconds.x, dartSeconds.y),
-                holdSeconds = Random.Range(holdSeconds.x, holdSeconds.y),
-            };
+            float a = degrees * Mathf.Deg2Rad;
+            float r = WaveRadius(a);
+            return new Vector3(centre.x + Mathf.Sin(a) * r, PathHeight(degrees), centre.z + Mathf.Cos(a) * r);
         }
 
-        float RandomRadius()
+        float AngleAround(Vector3 p)
         {
-            return Mathf.Max(minDistance, orbitRadius + Random.Range(-radiusSpread, radiusSpread));
+            return Mathf.Atan2(p.x - centre.x, p.z - centre.z) * Mathf.Rad2Deg;
         }
 
-        static Waypoint Lerp(Waypoint a, Waypoint b, float t)
+        // Mean sea level here. Without any water: y = 0.
+        float SeaLevel()
         {
-            return new Waypoint
-            {
-                angle = Mathf.Lerp(a.angle, b.angle, t),
-                radius = Mathf.Lerp(a.radius, b.radius, t),
-                height = Mathf.Lerp(a.height, b.height, t),
-            };
+            WaterSurface water = WaterSurface.FindAt(centre);
+            if (water == null && WaterSurface.Instances.Count > 0) water = WaterSurface.Instances[0];
+            return water != null ? water.WaterLevel : 0f;
         }
 
-        Vector3 OrbitPoint(Waypoint w)
+        // The same check as the player's head: the real wave height above the fish (GPU probe; the mean level
+        // until the first readback). The back of the fish stays surfaceMargin under it.
+        float KeepUnder(Vector3 p)
         {
-            float a = w.angle * Mathf.Deg2Rad;
-            return centre + new Vector3(Mathf.Sin(a) * w.radius, w.height, Mathf.Cos(a) * w.radius);
+            float surface = probe.HeightOr(SeaLevel());
+            float y = Mathf.Min(p.y, surface - surfaceMargin - bodyHalfHeight);
+            DepthUnderSurface = surface - (y + bodyHalfHeight);
+            return y;
         }
-
-        // ------------------------------------------------------------------ motion helpers
 
         Vector3 TargetPosition()
         {
             return target != null ? target.position : centre;
         }
 
-        Vector3 Tremble(float time)
+        // The centre lags behind, so the player can catch up with the fish: push it back out sideways.
+        Vector3 KeepAway(Vector3 p, Vector3 player)
         {
-            if (jitterStrength <= 0f) return Vector3.zero;
-            float t = time * jitterFrequency;
-            return new Vector3(
-                Mathf.PerlinNoise(t, noiseSeed) - 0.5f,
-                Mathf.PerlinNoise(noiseSeed + 17.3f, t) - 0.5f,
-                Mathf.PerlinNoise(t + 31.7f, noiseSeed + 5.1f) - 0.5f) * (2f * jitterStrength);
+            Vector3 flat = new Vector3(p.x - player.x, 0f, p.z - player.z);
+            if (flat.sqrMagnitude >= minDistance * minDistance) return p;
+            if (flat.sqrMagnitude < 1e-6f) flat = new Vector3(Mathf.Sin(angle * Mathf.Deg2Rad), 0f, Mathf.Cos(angle * Mathf.Deg2Rad));
+            return new Vector3(player.x, p.y, player.z) + flat.normalized * minDistance;
         }
 
-        // Under the water, above the bottom, and never closer to the player than minDistance (that one wins).
-        Vector3 Constrain(Vector3 p, Vector3 player)
+        static Vector3 Flat(Vector3 v)
         {
-            WaterSurface water = WaterSurface.FindAt(p);
-            if (water != null) p.y = Mathf.Min(p.y, water.WaterLevel - surfaceMargin);
-            if (bottomClearance > 0f) p.y = Mathf.Max(p.y, BottomAt(p) + bottomClearance);
-
-            Vector3 away = p - player;
-            if (away.sqrMagnitude < minDistance * minDistance)
-            {
-                // push out sideways, keeping the height
-                Vector3 flat = new Vector3(away.x, 0f, away.z);
-                if (flat.sqrMagnitude < 1e-6f) flat = new Vector3(Mathf.Sin(to.angle * Mathf.Deg2Rad), 0f, Mathf.Cos(to.angle * Mathf.Deg2Rad));
-                float side = Mathf.Sqrt(Mathf.Max(0f, minDistance * minDistance - away.y * away.y));
-                p = new Vector3(player.x, p.y, player.z) + flat.normalized * side;
-            }
-            return p;
+            return new Vector3(v.x, 0f, v.z);
         }
 
-        float BottomAt(Vector3 p)
-        {
-            const float above = 2f;
-            int count = Physics.RaycastNonAlloc(p + Vector3.up * above, Vector3.down, GroundHits, above + bottomClearance, groundMask, QueryTriggerInteraction.Ignore);
-            float bottom = float.NegativeInfinity;
-            for (int i = 0; i < count; i++)
-            {
-                Transform hit = GroundHits[i].transform;
-                if (hit.IsChildOf(transform) || (target != null && hit.IsChildOf(target.root))) continue;   // itself, a stuck arrow, the player
-                bottom = Mathf.Max(bottom, GroundHits[i].point.y);
-            }
-            return bottom;
-        }
+        // ------------------------------------------------------------------ looks
 
-        // Faces where it swims (pitch kept under 45°) and wags its tail faster the faster it goes.
+        // Faces where it swims (nose up / down limited to maxPitch) and wags its tail faster the faster it goes.
         Quaternion Turn(float dt)
         {
             Vector3 v = Velocity;
             float flat = new Vector2(v.x, v.z).magnitude;
-            if (v.sqrMagnitude > 0.25f && flat > 1e-3f)
+            if (v.sqrMagnitude > 0.01f && flat > 1e-3f)
             {
-                v.y = Mathf.Clamp(v.y, -flat, flat);
+                v.y = Mathf.Clamp(v.y, -flat * Mathf.Tan(maxPitch * Mathf.Deg2Rad), flat * Mathf.Tan(maxPitch * Mathf.Deg2Rad));
                 heading = Quaternion.Slerp(heading, Quaternion.LookRotation(v), 1f - Mathf.Exp(-turnSharpness * dt));
             }
-            float speed01 = Mathf.Clamp01(Velocity.magnitude / approachSpeed);
+            float speed01 = Mathf.Clamp01(Velocity.magnitude / Mathf.Max(swimSpeed, approachSpeed));
             wigglePhase += dt * wiggleFrequency * Mathf.Lerp(0.4f, 1f, speed01) * 2f * Mathf.PI;
             return heading * Quaternion.Euler(0f, Mathf.Sin(wigglePhase) * wiggleDegrees * speed01, 0f);
         }
@@ -329,19 +286,25 @@ namespace AKI.Fish
         {
             if (!drawGizmos) return;
             bool playing = Application.isPlaying;
-            Vector3 circleCentre = playing ? centre : target != null ? target.position : transform.position;
-            Vector3 player = playing ? TargetPosition() : circleCentre;
+            Vector3 player = playing ? TargetPosition() : target != null ? target.position : transform.position;
 
-            // the circle the fish keeps to, and the distance it never comes closer than
-            Gizmos.color = new Color(1f, 0.8f, 0.2f, 0.35f);
-            DrawCircle(circleCentre, orbitRadius);
+            // the distance the fish never comes closer than (at the fish's height)
             Gizmos.color = new Color(1f, 0.25f, 0.2f, 0.6f);
-            DrawCircle(player, minDistance);
+            DrawCircle(new Vector3(player.x, transform.position.y, player.z), minDistance);
             if (!playing) return;
+
+            // the whole wavy path around the player
+            Gizmos.color = state == State.Stopped ? new Color(1f, 0.8f, 0.2f, 0.25f) : new Color(1f, 0.8f, 0.2f, 0.8f);
+            Vector3 previous = PathPoint(0f);
+            for (int i = 1; i <= PathSegments; i++)
+            {
+                Vector3 p = PathPoint(i * 360f / PathSegments);
+                Gizmos.DrawLine(previous, p);
+                previous = p;
+            }
 
             // where it has been
             Gizmos.color = new Color(0.2f, 0.9f, 1f, 0.9f);
-            Vector3 previous = Vector3.zero;
             bool first = true;
             foreach (Vector3 p in trail)
             {
@@ -351,46 +314,29 @@ namespace AKI.Fish
             }
             if (!first) Gizmos.DrawLine(previous, transform.position);
 
+            // up to the real surface: blue while under it, red if it would stick out
+            Gizmos.color = IsUnderwater ? new Color(0.3f, 0.5f, 1f, 0.8f) : Color.red;
+            Vector3 back = transform.position + Vector3.up * bodyHalfHeight;
+            Gizmos.DrawLine(back, back + Vector3.up * DepthUnderSurface);
+
             Gizmos.color = new Color(1f, 1f, 1f, 0.25f);
             Gizmos.DrawLine(transform.position, player);
-            if (state == State.Stopped) return;
-
-            // where it is going now
-            Gizmos.color = new Color(0.3f, 1f, 0.3f, 1f);
-            if (state == State.Approach) Gizmos.DrawLine(transform.position, OrbitPoint(to));
-            else if (state == State.Dart) DrawArc(from, to);
-            Gizmos.DrawWireSphere(OrbitPoint(to), 0.2f);
-
-            // and the darts after that
-            Waypoint last = to;
-            for (int i = 0; i < plan.Count; i++)
+            if (state == State.Approach)
             {
-                Gizmos.color = new Color(1f, 0.9f, 0.3f, Mathf.Lerp(0.9f, 0.3f, plan.Count > 1 ? i / (plan.Count - 1f) : 0f));
-                DrawArc(last, plan[i]);
-                Gizmos.DrawWireSphere(OrbitPoint(plan[i]), 0.12f);
-                last = plan[i];
+                Gizmos.color = new Color(0.3f, 1f, 0.3f, 1f);
+                Gizmos.DrawLine(transform.position, PathPoint(angle));
+                Gizmos.DrawWireSphere(PathPoint(angle), 0.2f);
             }
         }
 
-        void DrawArc(Waypoint a, Waypoint b)
-        {
-            Vector3 previous = OrbitPoint(a);
-            for (int i = 1; i <= ArcSegments; i++)
-            {
-                Vector3 p = OrbitPoint(Lerp(a, b, i / (float)ArcSegments));
-                Gizmos.DrawLine(previous, p);
-                previous = p;
-            }
-        }
-
-        static void DrawCircle(Vector3 c, float radius)
+        static void DrawCircle(Vector3 c, float r)
         {
             const int segments = 48;
-            Vector3 previous = c + new Vector3(0f, 0f, radius);
+            Vector3 previous = c + new Vector3(0f, 0f, r);
             for (int i = 1; i <= segments; i++)
             {
                 float a = i * 2f * Mathf.PI / segments;
-                Vector3 p = c + new Vector3(Mathf.Sin(a) * radius, 0f, Mathf.Cos(a) * radius);
+                Vector3 p = c + new Vector3(Mathf.Sin(a) * r, 0f, Mathf.Cos(a) * r);
                 Gizmos.DrawLine(previous, p);
                 previous = p;
             }

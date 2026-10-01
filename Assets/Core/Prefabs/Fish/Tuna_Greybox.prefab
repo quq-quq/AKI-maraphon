@@ -751,30 +751,25 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AKI.Fish.FishAI
   target: {fileID: 0}
+  depthRange: {x: 4, y: 7}
+  surfaceMargin: 1.5
+  bodyHalfHeight: 0.2
   orbitRadius: 6
-  radiusSpread: 1.5
+  radiusSpread: 1
+  waveAmplitude: 1.5
+  waveCount: 4
+  verticalAmplitude: 1
+  verticalWaveCount: 3
   minDistance: 3.5
-  heightRange: 2
-  followLag: 0.6
-  dartAngle: {x: 20, y: 65}
-  dartSeconds: {x: 0.35, y: 0.8}
-  holdSeconds: {x: 0.2, y: 1}
-  heightStep: 1
-  turnBackChance: 0.3
-  jitterStrength: 0.06
-  jitterFrequency: 7
-  approachSpeed: 4
-  turnSharpness: 10
+  followLag: 0.8
+  swimSpeed: 1.2
+  approachSpeed: 2.5
+  turnSharpness: 4
+  maxPitch: 25
   wiggleDegrees: 8
-  wiggleFrequency: 3
-  surfaceMargin: 0.8
-  bottomClearance: 0.6
-  groundMask:
-    serializedVersion: 2
-    m_Bits: 35
+  wiggleFrequency: 2
   drawGizmos: 1
-  trailSeconds: 3
-  plannedDarts: 3
+  trailSeconds: 4
 --- !u!114 &4563236538120273966
 MonoBehaviour:
   m_ObjectHideFlags: 0
