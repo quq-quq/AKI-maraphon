@@ -35,6 +35,9 @@ namespace Core.Scripts.Sound
     public class AudioClipConfig
     {
         public AudioClip Clip;
+        public bool Is3D;
+        [Tooltip("Not muffled under water (e.g. music).")]
+        public bool IgnoreUnderwater;
         public float Volume = 1f;
         [Range(-3f, 3f)] public float Pitch = 1f;
         [Space(20)]

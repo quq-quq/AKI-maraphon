@@ -179,7 +179,6 @@ namespace AKI.Water.Editor
             cam.transform.position = new Vector3(0f, 7f, -32f);
             cam.transform.rotation = Quaternion.Euler(14f, 0f, 0f);
             cam.farClipPlane = 1500f;
-            cam.gameObject.AddComponent<WaterListenerAudio>();   // muffles sound + exposes IsUnderwater for the player
             cam.gameObject.AddComponent<WaterCameraEffects>();   // wet lens + waterline
             CreatePlayer(cam);
             InstallLensFeature();

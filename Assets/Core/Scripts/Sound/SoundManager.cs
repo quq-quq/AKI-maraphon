@@ -3,13 +3,14 @@ using UnityEngine;
 
 namespace Core.Scripts.Sound
 {
-    public class SoundManager : MonoBehaviour
+    public partial class SoundManager : MonoBehaviour
     {
         public static SoundManager Instance { get; private set; }
 
         [SerializeField] private SoundConfig _soundConfig;
         [SerializeField] private Transform _wavesTransform;
         [SerializeField] private Transform _seagoolTransform;
+        [SerializeField] private WaterListenerAudio _underwaterAudio = new WaterListenerAudio();
 
         private AudioSource _menuGamelanSource;
         private AudioSource _fishingGamelanSource;
@@ -17,6 +18,7 @@ namespace Core.Scripts.Sound
         private AudioSource _fishSwimmingSource;
         private AudioSource _nagaSwimmingSource;
         private AudioSource _arrowMoveSource;
+        private AudioListener _audiolistener;
         private Coroutine _nagaCoroutine;
 
         private void Awake()
@@ -42,6 +44,13 @@ namespace Core.Scripts.Sound
         {
             if (_nagaCoroutine != null)
                 StopCoroutine(_nagaCoroutine);
+
+            _underwaterAudio.Reset();
+        }
+
+        private void Update()
+        {
+            _underwaterAudio.Tick();
         }
 
         #region SoundsRealization
@@ -71,6 +80,8 @@ namespace Core.Scripts.Sound
 
         private void OnWaterDown()
         {
+            _underwaterAudio.Enter();
+
             _waterAmbientSource = PlayLoopSound(_soundConfig.WaterAmbient, Camera.main.transform);
 
             int randomIndex = Random.Range(0, _soundConfig.SplashSound.Count);
@@ -80,6 +91,8 @@ namespace Core.Scripts.Sound
 
         private void OnWaterUp()
         {
+            _underwaterAudio.Exit();
+
             if(_waterAmbientSource != null)
                 Destroy(_waterAmbientSource.gameObject);
             _waterAmbientSource = null;
@@ -169,12 +182,12 @@ namespace Core.Scripts.Sound
 
         private void OnTargetHit(Transform targetTransform)
         {
-            PlayLoopSound(_soundConfig.HitSound, targetTransform);
+            PlaySound(_soundConfig.HitSound, targetTransform.position);
         }
 
         private void OnFishDeathSound(Transform targetTransform)
         {
-            PlayLoopSound(_soundConfig.HitSound, targetTransform);
+            PlaySound(_soundConfig.HitSound, targetTransform.position);
         }
 
         #endregion
@@ -186,7 +199,10 @@ namespace Core.Scripts.Sound
 
             AudioSource audioSource = sourceObj.AddComponent<AudioSource>();
             audioSource.loop = true;
+            audioSource.spatialBlend = clipConfig.Is3D ? 1f : 0f;
+            audioSource.bypassListenerEffects = clipConfig.IgnoreUnderwater;
             audioSource.volume = clipConfig.Volume;
+            audioSource.clip = clipConfig.Clip;
             audioSource.Play();
 
             return audioSource;
@@ -197,13 +213,14 @@ namespace Core.Scripts.Sound
             GameObject tempObj = new GameObject("TempAudio");
             tempObj.transform.position = position;
 
-            AudioSource source = tempObj.AddComponent<AudioSource>();
-            source.spatialBlend = 1f;
-            source.pitch = clipConfig.GetPitch();
-            source.volume = clipConfig.GetVolume();
-            source.PlayOneShot(clipConfig.Clip);
+            AudioSource audioSource = tempObj.AddComponent<AudioSource>();
+            audioSource.spatialBlend = clipConfig.Is3D ? 1f : 0f;
+            audioSource.bypassListenerEffects = clipConfig.IgnoreUnderwater;
+            audioSource.pitch = clipConfig.GetPitch();
+            audioSource.volume = clipConfig.GetVolume();
+            audioSource.PlayOneShot(clipConfig.Clip);
 
-            StartCoroutine(DestroyAfterPlay(source, clipConfig.Clip.length));
+            StartCoroutine(DestroyAfterPlay(audioSource, clipConfig.Clip.length));
         }
 
         private IEnumerator DestroyAfterPlay(AudioSource source, float clipLength)
