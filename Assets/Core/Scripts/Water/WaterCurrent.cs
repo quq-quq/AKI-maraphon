@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace AKI.Water
@@ -5,14 +6,15 @@ namespace AKI.Water
     /// <summary>
     /// How the water moves under the surface. Two parts:
     /// <list type="bullet">
+    /// <item>a steady drift along the <see cref="Wind"/>, turning with it (so things go round in wide loops), wandering
+    /// a little across the sea and easing off with depth;</item>
     /// <item>the swell's push and pull: under passing waves the water swings to and fro (and a little up and down) with
     /// the wave period, along the waves' direction, fading with depth - taken from the FFT ocean so it matches the
-    /// waves you see (their period, direction and size);</item>
-    /// <item>a weak steady drift that wanders across the sea and over time.</item>
+    /// waves you see.</item>
     /// </list>
-    /// The whole thing swells and eases off slowly, so it is never constant. It carries the swimmer, harpoons, their
-    /// line, bubbles and blood, and the specks of <see cref="WaterCurrentView"/>. One per scene, next to the
-    /// <see cref="WaterSurface"/>. Ask it with <see cref="At"/>.
+    /// The whole thing swells and eases off slowly. It carries every non-kinematic Rigidbody under water, the swimmer,
+    /// harpoons, their line, bubbles and blood, and the specks of <see cref="WaterCurrentView"/>. One per scene, next
+    /// to the <see cref="WaterSurface"/>. Ask it with <see cref="At"/>.
     /// </summary>
     public class WaterCurrent : MonoBehaviour
     {
@@ -20,7 +22,7 @@ namespace AKI.Water
 
         [Header("Waves (push and pull)")]
         [Tooltip("Peak speed of the to-and-fro swing right under the surface (m/s), times the ocean's wave scale.")]
-        [Min(0f)] public float surge = 0.6f;
+        [Min(0f)] public float surge = 0.15f;
         [Tooltip("Up and down part of the swing, as a share of the horizontal one.")]
         [Range(0f, 1f)] public float surgeVertical = 0.4f;
         [Tooltip("Without an FFT ocean: direction the waves run to (degrees around Y: 0 = +X, 90 = +Z) and their period (s).")]
@@ -28,12 +30,12 @@ namespace AKI.Water
         [Min(1f)] public float fallbackWavePeriod = 8f;
 
         [Header("Steady drift")]
-        [Tooltip("Where the drift flows to (degrees around Y: 0 = +Z, 90 = +X).")]
+        [Tooltip("Where the drift flows to without a Wind in the scene (degrees around Y: 0 = +Z, 90 = +X).")]
         [Range(0f, 360f)] public float direction = 60f;
-        [Tooltip("Drift speed at the surface (m/s).")]
-        [Min(0f)] public float speed = 0.25f;
-        [Tooltip("How far the drift direction swings either way (degrees).")]
-        [Range(0f, 90f)] public float directionVariation = 25f;
+        [Tooltip("Drift speed right under the surface (m/s).")]
+        [Min(0f)] public float speed = 0.45f;
+        [Tooltip("How far the drift direction swings either way across the sea (degrees).")]
+        [Range(0f, 90f)] public float directionVariation = 10f;
         [Tooltip("Size of the patches the drift changes over (m).")]
         [Min(1f)] public float variationScale = 30f;
         [Tooltip("How quickly the drift pattern changes (1/s).")]
@@ -41,14 +43,20 @@ namespace AKI.Water
 
         [Header("Depth and gusts")]
         [Tooltip("Depth (m) over which the drift eases off towards Deep Share (the swell fades on its own, by wavelength).")]
-        [Min(0.1f)] public float depthFalloff = 12f;
-        [Range(0f, 1f)] public float deepShare = 0.35f;
+        [Min(0.1f)] public float depthFalloff = 20f;
+        [Range(0f, 1f)] public float deepShare = 0.6f;
         [Tooltip("How much the whole current swells and eases off over time (share).")]
-        [Range(0f, 1f)] public float gusts = 0.45f;
+        [Range(0f, 1f)] public float gusts = 0.2f;
         [Tooltip("Seconds of a typical gust.")]
         [Min(1f)] public float gustPeriod = 20f;
 
+        [Header("Rigidbodies")]
+        [Tooltip("How quickly the water drags rigidbodies along with it (1/s). 0 = leave them alone.")]
+        [Min(0f)] public float bodyDrag = 1.2f;
+
         static WaterCurrent active;
+        readonly List<Rigidbody> bodies = new List<Rigidbody>();
+        float nextBodyScan;
 
         /// <summary>The scene's current, or null.</summary>
         public static WaterCurrent Active => active;
@@ -82,7 +90,8 @@ namespace AKI.Water
             float u = p.x / variationScale, v = p.z / variationScale;
             float swing = Mathf.PerlinNoise(u + tv, v - 0.7f * tv) * 2f - 1f;
             float surgeNoise = Mathf.PerlinNoise(v + 37.1f - 0.5f * tv, u + 11.3f + 0.3f * tv);
-            float angle = (direction + swing * directionVariation) * Mathf.Deg2Rad;
+            float heading = Wind.Active != null ? Wind.Active.heading : direction;
+            float angle = (heading + swing * directionVariation) * Mathf.Deg2Rad;
             float strength = speed * (0.6f + 0.8f * surgeNoise) * Mathf.Lerp(deepShare, 1f, Mathf.Exp(-depth / depthFalloff));
             return new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle)) * strength;
         }
@@ -132,7 +141,26 @@ namespace AKI.Water
         }
 
         /// <summary>The steady drift's main direction (no wandering), for gizmos and UI.</summary>
-        public Vector3 MainDirection => Quaternion.Euler(0f, direction, 0f) * Vector3.forward;
+        public Vector3 MainDirection => Quaternion.Euler(0f, Wind.Active != null ? Wind.Active.heading : direction, 0f) * Vector3.forward;
+
+        // Every loose rigidbody under water is dragged towards the water's own velocity.
+        void FixedUpdate()
+        {
+            if (bodyDrag <= 0f) return;
+            if (Time.time >= nextBodyScan)
+            {
+                bodies.Clear();
+                bodies.AddRange(FindObjectsByType<Rigidbody>(FindObjectsSortMode.None));
+                nextBodyScan = Time.time + 1f;
+            }
+            foreach (Rigidbody body in bodies)
+            {
+                if (body == null || body.isKinematic) continue;
+                Vector3 flow = Sample(body.worldCenterOfMass);
+                if (flow == Vector3.zero) continue;   // out of the water
+                body.AddForce((flow - body.linearVelocity) * bodyDrag, ForceMode.Acceleration);
+            }
+        }
 
         // depth below the (mean) surface of the water the point is in
         static bool TryDepth(Vector3 p, out float depth)

@@ -23,7 +23,7 @@ namespace AKI.Weapons
         [Tooltip("Share of normal gravity under water (buoyancy takes the rest).")]
         [Range(0f, 1f)] public float waterGravityScale = 0.8f;
         [Tooltip("How strongly the water current (WaterCurrent) carries the arrow off its line.")]
-        [Min(0f)] public float currentInfluence = 2.5f;
+        [Min(0f)] public float currentInfluence = 1f;
 
         [Header("In the air")]
         [Min(0f)] public float airDrag = 0.02f;

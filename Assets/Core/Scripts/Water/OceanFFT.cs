@@ -61,6 +61,17 @@ namespace AKI.Water
         /// <summary>Angular frequency of the dominant waves (JONSWAP peak, rad/s); their period is 2π / this.</summary>
         public float PeakOmega => 22f * Mathf.Pow(9.81f * 9.81f / (Mathf.Max(windSpeed, 0.5f) * fetchKm * 1000f), 1f / 3f);
 
+        /// <summary>
+        /// Turns the wind (degrees, same convention as <see cref="windDirection"/>). The spectrum is rebuilt only when
+        /// it moved enough to matter; the wave phases stay, so the sea re-forms smoothly instead of jumping.
+        /// </summary>
+        public void SetWindDirection(float degrees)
+        {
+            if (Mathf.Abs(Mathf.DeltaAngle(degrees, windDirection)) < 0.25f) return;
+            windDirection = Mathf.Repeat(degrees, 360f);
+            spectrumDirty = true;
+        }
+
         /// <summary>Direction the waves run in, on the XZ plane (same angle the spectrum uses).</summary>
         public Vector2 WaveDirection => new Vector2(Mathf.Cos(windDirection * Mathf.Deg2Rad), Mathf.Sin(windDirection * Mathf.Deg2Rad));
         public RenderTexture GetDisplacement(int cascade) => cascades != null ? cascades[cascade].displacement : null;

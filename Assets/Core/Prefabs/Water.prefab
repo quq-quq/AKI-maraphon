@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 2066390542936336169}
   - component: {fileID: 5298170660180381985}
   - component: {fileID: 8860546526367546964}
+  - component: {fileID: 5579632356728492473}
   m_Layer: 0
   m_Name: Water
   m_TagString: Untagged
@@ -161,19 +162,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 22c2f04a541bc48fd991c81fef13ef2b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AKI.Water.WaterCurrent
-  surge: 0.6
+  surge: 0.15
   surgeVertical: 0.4
   fallbackWaveDirection: 30
   fallbackWavePeriod: 8
   direction: 60
-  speed: 0.25
-  directionVariation: 25
+  speed: 0.45
+  directionVariation: 10
   variationScale: 30
   variationSpeed: 0.04
-  depthFalloff: 12
-  deepShare: 0.35
-  gusts: 0.45
+  depthFalloff: 20
+  deepShare: 0.6
+  gusts: 0.2
   gustPeriod: 20
+  bodyDrag: 1.2
 --- !u!114 &8860546526367546964
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -198,3 +200,17 @@ MonoBehaviour:
   streakStretch: 0.9
   streakColor: {r: 0.85, g: 0.95, b: 1, a: 0.4}
   wobble: 0.05
+--- !u!114 &5579632356728492473
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6302377064929433891}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca9e83c0f309c4a4babb940f1b2c74b7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Water.Wind
+  heading: 60
+  turnRate: 36
