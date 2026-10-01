@@ -247,6 +247,7 @@ namespace AKI.Water.Editor
             swimmer.cameraPivot = pivot;
             swimmer.playerCamera = cam;
             swimmer.inputActions = AssetDatabase.LoadAssetAtPath<UnityEngine.InputSystem.InputActionAsset>("Assets/InputSystem_Actions.inputactions");
+            AKI.Weapons.Editor.SpeargunMenu.AttachToPlayer(player);
 
             Directory.CreateDirectory(Path.GetDirectoryName(PlayerPrefabPath));
             PrefabUtility.SaveAsPrefabAssetAndConnect(player, PlayerPrefabPath, InteractionMode.AutomatedAction);
@@ -270,6 +271,9 @@ namespace AKI.Water.Editor
             go.transform.position = pos;
             go.transform.localScale = scale;
             go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+            // a sphere collider stays round (radius of the largest axis) and would stick out of a stretched rock
+            Object.DestroyImmediate(go.GetComponent<SphereCollider>());
+            go.AddComponent<MeshCollider>();
         }
 
         static Mesh BuildSeabedMesh()
