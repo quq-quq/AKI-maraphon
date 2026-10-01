@@ -19,6 +19,7 @@ namespace AKI.Water.Editor
         const string PrefabPath = "Assets/Core/Prefabs/Water.prefab";
         const string DemoScenePath = "Assets/Core/Scenes/TestScenes/WaterTest.unity";
         const string HeightComputePath = "Assets/Core/Visual/Shaders/Water/WaterHeight.compute";
+        const string OceanComputePath = "Assets/Core/Visual/Shaders/Water/OceanFFT.compute";
         const string PlayerPrefabPath = "Assets/Core/Prefabs/Player.prefab";
 
         [MenuItem("GameObject/AKI/Ocean Water", false, 10)]
@@ -33,6 +34,7 @@ namespace AKI.Water.Editor
             surface.fallbackMaterial = mobile;
             surface.underwaterShader = Shader.Find("AKI/WaterUnderwater");
             surface.heightCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>(HeightComputePath);
+            AddOcean(surface);
             surface.Refresh();
             Selection.activeGameObject = go;
             return go;
@@ -49,6 +51,7 @@ namespace AKI.Water.Editor
             surface.fallbackMaterial = mobile;
             surface.underwaterShader = Shader.Find("AKI/WaterUnderwater");
             surface.heightCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>(HeightComputePath);
+            AddOcean(surface);
             surface.enabled = false;   // OnDisable removes the runtime-only mesh / underwater child before saving
             Directory.CreateDirectory(Path.GetDirectoryName(PrefabPath));
             PrefabUtility.SaveAsPrefabAsset(go, PrefabPath);
@@ -139,6 +142,9 @@ namespace AKI.Water.Editor
             SetToggle(m, "_FoamOn", "_FOAM", true);
             SetToggle(m, "_CausticsOn", "_CAUSTICS", true);
             SetToggle(m, "_GodRaysOn", "_GODRAYS", true);
+            SetToggle(m, "_FFTWaves", "_FFT_WAVES", true);
+            m.SetFloat("_CrestFoamThreshold", 0.86f);   // FFT foam: share of breaking crests
+            m.SetFloat("_SpecularIntensity", 0.25f);
         }
 
         // Mobile: analytic colour only, no scene textures, no shafts / caustics / foam.
@@ -205,6 +211,7 @@ namespace AKI.Water.Editor
             surface.fallbackMaterial = mobile;
             surface.underwaterShader = Shader.Find("AKI/WaterUnderwater");
             surface.heightCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>(HeightComputePath);
+            AddOcean(surface);
             surface.Refresh();
 
             Directory.CreateDirectory(Path.GetDirectoryName(DemoScenePath));
@@ -243,6 +250,17 @@ namespace AKI.Water.Editor
 
             Directory.CreateDirectory(Path.GetDirectoryName(PlayerPrefabPath));
             PrefabUtility.SaveAsPrefabAssetAndConnect(player, PlayerPrefabPath, InteractionMode.AutomatedAction);
+        }
+
+        // FFT open ocean: real wind-wave spectrum, grid that reaches the horizon
+        static void AddOcean(WaterSurface surface)
+        {
+            surface.size = 6000f;
+            surface.expandingGrid = true;
+            surface.detailRadius = 60f;
+            var ocean = surface.GetComponent<OceanFFT>();
+            if (ocean == null) ocean = surface.gameObject.AddComponent<OceanFFT>();
+            ocean.fftCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>(OceanComputePath);
         }
 
         static void PlaceRock(string name, Vector3 pos, Vector3 scale, Material mat)

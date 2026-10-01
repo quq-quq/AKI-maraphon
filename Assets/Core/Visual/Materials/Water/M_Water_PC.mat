@@ -13,6 +13,7 @@ Material:
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
   - _CAUSTICS
+  - _FFT_WAVES
   - _FOAM
   - _GODRAYS
   - _SCENE_TEXTURES
@@ -43,12 +44,14 @@ Material:
     - _CellWaveSpeed: 0.7
     - _ColorCellScale: 0.03
     - _ColorVariation: 0.15
-    - _CrestFoamThreshold: 0.55
+    - _CrestFoamThreshold: 0.86
     - _DepthDistance: 3.5
     - _DetailFade: 90
     - _DetailStrength: 0.8
     - _EdgeSoftness: 0.35
+    - _FFTWaves: 1
     - _FlattenDistance: 500
+    - _FoamHaze: 0
     - _FoamIntensity: 1
     - _FoamOn: 1
     - _FoamScale: 0.9
@@ -69,9 +72,12 @@ Material:
     - _SSSIntensity: 0.5
     - _ScatterBrightness: 0.7
     - _SceneTextures: 1
+    - _SeaFoam: 0
+    - _SeaFoamScale: 0.025
+    - _SeaFoamStreak: 3.5
     - _ShoreFoamWidth: 1.1
     - _SimpleOpacity: 0.9
-    - _SpecularIntensity: 0.7
+    - _SpecularIntensity: 0.25
     - _SpecularPower: 500
     - _ToonAmount: 0
     - _ToonBands: 4
@@ -83,7 +89,7 @@ Material:
     - _UnderMaxDistance: 120
     - _UnderWobble: 1
     - _WarpScale: 0.03
-    - _WaveAmplitude: 0.9
+    - _WaveAmplitude: 2
     - _WaveDetail: 1
     - _WaveLength: 18
     - _WaveRandomness: 0.85
@@ -99,6 +105,7 @@ Material:
     - _DeepColor: {r: 0, g: 0.03, b: 0.14999998, a: 1}
     - _FoamColor: {r: 1, g: 1, b: 1, a: 1}
     - _RayColor: {r: 0.5, g: 0.8, b: 1, a: 1}
+    - _ReflectionTint: {r: 1, g: 1, b: 1, a: 1}
     - _SSSColor: {r: 0.03, g: 0.45, b: 0.75, a: 1}
     - _ShallowColor: {r: 0.01, g: 0.31999996, b: 0.52, a: 1}
     - _ToonHighlight: {r: 0.7, g: 1, b: 0.95, a: 1}

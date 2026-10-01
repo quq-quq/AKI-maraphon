@@ -1,0 +1,255 @@
+// FFT ocean (Tessendorf). One N x N cascade per dispatch set:
+//   InitSpectrum   (when settings change)  JONSWAP spectrum with directional spreading -> h0(k)
+//   PackConjugate  (when settings change)  h0(k) and conj(h0(-k)) side by side
+//   TimeSpectrum   (every frame)           h(k, t) and the spectra of displacement + derivatives
+//   IFFTHorizontal / IFFTVertical          inverse FFT of 4 complex signals packed in two float4 textures
+//   Assemble       (every frame)           displacement, slopes, and foam that builds up on breaking crests
+#pragma kernel InitSpectrum
+#pragma kernel PackConjugate
+#pragma kernel TimeSpectrum
+#pragma kernel IFFTHorizontal
+#pragma kernel IFFTVertical
+#pragma kernel Assemble
+
+#define SIZE 256
+#define LOG_SIZE 8
+#define PI 3.14159265358979
+#define G 9.81
+
+uint _Size;
+float _LengthScale;
+float _CutoffLow;
+float _CutoffHigh;
+float _Time;
+float _DeltaTime;
+
+// JONSWAP
+float _WindSpeed;
+float _WindAngle;      // radians
+float _Alpha;
+float _PeakOmega;
+float _Gamma;
+float _SpreadBlend;    // 0 = waves from every direction, 1 = following the wind
+float _Swell;          // narrows the directional spreading
+float _ShortWavesFade;
+float _Scale;
+
+float _Lambda;         // choppiness
+float _FoamDecay;      // how fast foam fades (per second)
+float _FoamBias;       // jacobian below this makes foam
+float _Reset;          // 1 on the first frame: start without foam
+
+Texture2D<float4>   _Noise;       // two independent gaussian pairs
+RWTexture2D<float2> _H0K;
+RWTexture2D<float4> _WaveData;    // kx, kz, 1/|k|, omega
+RWTexture2D<float4> _H0;          // h0(k).xy, conj(h0(-k)).xy
+RWTexture2D<float4> _SpecA;       // (Dx + i Dy), (Dz + i dDx/dz)
+RWTexture2D<float4> _SpecB;       // (dDy/dx + i dDy/dz), (dDx/dx + i dDz/dz)
+RWTexture2D<float4> _Displacement;
+RWTexture2D<float4> _Derivatives;
+
+// ------------------------------------------------------------------ spectrum
+
+float Frequency(float k)
+{
+    return sqrt(G * k);                       // deep water dispersion
+}
+
+float FrequencyDerivative(float k)
+{
+    return G / (2.0 * sqrt(G * k));
+}
+
+float Jonswap(float omega)
+{
+    float sigma = omega <= _PeakOmega ? 0.07 : 0.09;
+    float r = exp(-(omega - _PeakOmega) * (omega - _PeakOmega) / (2.0 * sigma * sigma * _PeakOmega * _PeakOmega));
+    float oneOverOmega = 1.0 / omega;
+    float peakOverOmega = _PeakOmega / omega;
+    return _Scale * _Alpha * G * G * oneOverOmega * oneOverOmega * oneOverOmega * oneOverOmega * oneOverOmega
+         * exp(-1.25 * peakOverOmega * peakOverOmega * peakOverOmega * peakOverOmega)
+         * pow(abs(_Gamma), r);
+}
+
+// Mitsuyasu cos-2s spreading; the gamma-function normalisation uses Stirling's approximation.
+float SpreadPower(float omega)
+{
+    if (omega > _PeakOmega)
+        return 9.77 * pow(abs(omega / _PeakOmega), -2.5);
+    return 6.97 * pow(abs(omega / _PeakOmega), 5.0);
+}
+
+float Direction(float theta, float omega)
+{
+    float s = SpreadPower(omega) + 16.0 * tanh(min(omega / _PeakOmega, 20.0)) * _Swell * _Swell;
+    s = max(s, 0.5);
+    float norm = sqrt(s / PI) * 0.5;
+    float directional = norm * pow(abs(cos(0.5 * theta)), 2.0 * s);
+    return lerp(2.0 / PI * cos(theta) * cos(theta), directional, _SpreadBlend);
+}
+
+[numthreads(8, 8, 1)]
+void InitSpectrum(uint3 id : SV_DispatchThreadID)
+{
+    float deltaK = 2.0 * PI / _LengthScale;
+    int halfSize = (int)(_Size >> 1);
+    int nx = (int)id.x - halfSize;
+    int nz = (int)id.y - halfSize;
+    float2 k = float2(nx, nz) * deltaK;
+    float kLength = length(k);
+
+    if (kLength <= _CutoffHigh && kLength >= _CutoffLow)
+    {
+        float omega = Frequency(kLength);
+        _WaveData[id.xy] = float4(k.x, k.y, 1.0 / kLength, omega);
+
+        float kAngle = atan2(k.y, k.x);
+        float dOmegadk = FrequencyDerivative(kLength);
+        float spectrum = Jonswap(omega) * Direction(kAngle - _WindAngle, omega)
+                       * exp(-kLength * kLength * _ShortWavesFade * _ShortWavesFade);
+        float amplitude = sqrt(2.0 * spectrum * abs(dOmegadk) / kLength * deltaK * deltaK);
+        // var(h) = sum over k of |h0(k)|^2 + |h0(-k)|^2 must equal the spectrum's energy, and the noise is a complex
+        // gaussian (E|xi|^2 = 2): h0 = xi * sqrt(S dk^2) / 2  ->  sqrt(2 S dk^2) / (2 sqrt 2)
+        _H0K[id.xy] = _Noise[id.xy].xy * (amplitude * 0.35355339);
+    }
+    else
+    {
+        _H0K[id.xy] = 0;
+        _WaveData[id.xy] = float4(k.x, k.y, 1.0, 0.0);
+    }
+}
+
+[numthreads(8, 8, 1)]
+void PackConjugate(uint3 id : SV_DispatchThreadID)
+{
+    float2 h0k = _H0K[id.xy];
+    float2 h0MinusK = _H0K[uint2((_Size - id.x) % _Size, (_Size - id.y) % _Size)];
+    _H0[id.xy] = float4(h0k.x, h0k.y, h0MinusK.x, -h0MinusK.y);
+}
+
+// ------------------------------------------------------------------ time evolution
+
+float2 ComplexMult(float2 a, float2 b)
+{
+    return float2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+}
+
+[numthreads(8, 8, 1)]
+void TimeSpectrum(uint3 id : SV_DispatchThreadID)
+{
+    float4 wave = _WaveData[id.xy];
+    float phase = wave.w * _Time;
+    float2 e = float2(cos(phase), sin(phase));
+    float4 h0 = _H0[id.xy];
+    float2 h = ComplexMult(h0.xy, e) + ComplexMult(h0.zw, float2(e.x, -e.y));
+    float2 ih = float2(-h.y, h.x);
+
+    float2 dispX = ih * wave.x * wave.z;
+    float2 dispY = h;
+    float2 dispZ = ih * wave.y * wave.z;
+
+    float2 dispXdx = -h * wave.x * wave.x * wave.z;
+    float2 dispYdx = ih * wave.x;
+    float2 dispZdx = -h * wave.x * wave.y * wave.z;
+
+    float2 dispYdz = ih * wave.y;
+    float2 dispZdz = -h * wave.y * wave.y * wave.z;
+
+    // two real fields per complex number: a + i*b
+    _SpecA[id.xy] = float4(dispX.x - dispY.y, dispX.y + dispY.x, dispZ.x - dispZdx.y, dispZ.y + dispZdx.x);
+    _SpecB[id.xy] = float4(dispYdx.x - dispYdz.y, dispYdx.y + dispYdz.x, dispXdx.x - dispZdz.y, dispXdx.y + dispZdz.x);
+}
+
+// ------------------------------------------------------------------ inverse FFT (radix-2, in groupshared memory)
+
+groupshared float4 sharedA[SIZE];
+groupshared float4 sharedB[SIZE];
+
+float2 Twiddle(uint j, uint m)
+{
+    float angle = 2.0 * PI * j / m;          // + sign: inverse transform
+    return float2(cos(angle), sin(angle));
+}
+
+void FFTInShared(uint i)
+{
+    for (uint stage = 1; stage <= LOG_SIZE; stage++)
+    {
+        GroupMemoryBarrierWithGroupSync();
+        uint m = 1u << stage;
+        uint half = m >> 1;
+        if (i < SIZE / 2)
+        {
+            uint j = i % half;
+            uint k = (i / half) * m + j;
+            float2 w = Twiddle(j, m);
+
+            float4 ua = sharedA[k], ta = sharedA[k + half];
+            float4 ub = sharedB[k], tb = sharedB[k + half];
+            ta = float4(ComplexMult(w, ta.xy), ComplexMult(w, ta.zw));
+            tb = float4(ComplexMult(w, tb.xy), ComplexMult(w, tb.zw));
+
+            sharedA[k] = ua + ta;
+            sharedA[k + half] = ua - ta;
+            sharedB[k] = ub + tb;
+            sharedB[k + half] = ub - tb;
+        }
+    }
+    GroupMemoryBarrierWithGroupSync();
+}
+
+uint BitReverse(uint x)
+{
+    return reversebits(x) >> (32 - LOG_SIZE);
+}
+
+[numthreads(SIZE, 1, 1)]
+void IFFTHorizontal(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
+{
+    uint i = threadId.x;
+    uint row = groupId.x;
+    uint src = BitReverse(i);
+    sharedA[i] = _SpecA[uint2(src, row)];
+    sharedB[i] = _SpecB[uint2(src, row)];
+    FFTInShared(i);
+    _SpecA[uint2(i, row)] = sharedA[i];
+    _SpecB[uint2(i, row)] = sharedB[i];
+}
+
+[numthreads(SIZE, 1, 1)]
+void IFFTVertical(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
+{
+    uint i = threadId.x;
+    uint col = groupId.x;
+    uint src = BitReverse(i);
+    sharedA[i] = _SpecA[uint2(col, src)];
+    sharedB[i] = _SpecB[uint2(col, src)];
+    FFTInShared(i);
+    _SpecA[uint2(col, i)] = sharedA[i];
+    _SpecB[uint2(col, i)] = sharedB[i];
+}
+
+// ------------------------------------------------------------------ assemble
+
+[numthreads(8, 8, 1)]
+void Assemble(uint3 id : SV_DispatchThreadID)
+{
+    // k was centred on N/2, which shifts the result by (-1)^(x+z)
+    float sign = ((id.x + id.y) & 1u) ? -1.0 : 1.0;
+    float4 a = _SpecA[id.xy] * sign;
+    float4 b = _SpecB[id.xy] * sign;
+
+    float Dx = a.x, Dy = a.y, Dz = a.z, dDxdz = a.w;
+    float dDydx = b.x, dDydz = b.y, dDxdx = b.z, dDzdz = b.w;
+
+    float jacobian = (1.0 + _Lambda * dDxdx) * (1.0 + _Lambda * dDzdz) - _Lambda * _Lambda * dDxdz * dDxdz;
+
+    // "turbulence": drops to the jacobian where the crest folds (breaks), then slowly recovers.
+    // The water moves on while the texture stays, so the foam is left behind as trails and patches.
+    float previous = _Reset > 0.5 ? 1.0 : _Displacement[id.xy].w;
+    float turbulence = previous + _DeltaTime * _FoamDecay / max(jacobian, 0.5);
+    turbulence = min(jacobian, turbulence);
+
+    _Displacement[id.xy] = float4(_Lambda * Dx, Dy, _Lambda * Dz, turbulence);
+    _Derivatives[id.xy] = float4(dDydx, dDydz, _Lambda * dDxdx, _Lambda * dDzdz);
+}

@@ -228,6 +228,26 @@ float WaterFoam(float2 xz, float t, float shore, float crest, float lace)
     return smoothstep(1.0 - cover - soft, 1.0 - cover + soft, tex) * step(0.001, cover);
 }
 
+// FFT ocean foam: grows smoothly with how hard the crest is breaking (turbulence from OceanFFT, which also leaves
+// trails behind moving crests). Dense in the middle of a breaking patch, broken lace towards its edges.
+float OceanFoam(float2 xz, float t, float turbulence, out float haze)
+{
+    float amount = saturate((_CrestFoamThreshold - turbulence) * 7.0);
+    haze = saturate((_CrestFoamThreshold + 0.08 - turbulence) * 5.0);      // milky water a bit beyond the foam
+
+    // lace stretched along the wind: dense white where the crest breaks hardest, torn streaks around it
+    float2 wind;
+    sincos(radians(_WindAngle), wind.y, wind.x);
+    float2 q = float2(dot(xz, wind) * 0.45, dot(xz, float2(-wind.y, wind.x))) * _FoamScale;
+    float lace = WaterValueNoise(q * 1.3 + float2(t * 0.05, 0.0)) * 0.5
+               + WaterValueNoise(q * 3.7 - t * 0.04) * 0.3
+               + WaterValueNoise(q * 9.0 + 4.0) * 0.2;
+    // never fully solid: even the heart of a breaking crest has holes and thinner areas
+    float cover = saturate(sqrt(amount) * 1.3) * 0.82;
+    float f = smoothstep(1.0 - cover, 1.0 - cover + 0.22, lace);
+    return f * (0.55 + 0.45 * saturate(lace * 1.4)) * (0.6 + 0.4 * amount);
+}
+
 // ---------------------------------------------------------------- volumetric light shafts
 // How much sunlight enters the surface at xz. Waves focus the sun into a web of bright filaments; because
 // every sun ray is a straight line, this 2D field is extruded down along the sun direction into sheets

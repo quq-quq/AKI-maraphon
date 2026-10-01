@@ -30,6 +30,7 @@ Shader "AKI/Water"
         _CellWaveScale     ("Voronoi Wave Scale (1/m)", Range(0.02, 0.4)) = 0.09
         _CellWaveSpeed     ("Voronoi Wave Speed", Range(0, 3)) = 0.7
         [Toggle(_WAVE_DETAIL)] _WaveDetail ("Per-pixel Detail Waves", Float) = 1
+        [Toggle(_FFT_WAVES)] _FFTWaves ("FFT Ocean (needs OceanFFT component)", Float) = 0
         _DetailStrength    ("Detail Strength", Range(0, 2)) = 0.8
         _DetailFade        ("Detail Fade (x wavelength)", Range(10, 300)) = 90
         _FlattenDistance   ("Flatten Distance (m)", Range(50, 1500)) = 500
@@ -122,6 +123,7 @@ Shader "AKI/Water"
 
             #pragma shader_feature_local_fragment _SCENE_TEXTURES
             #pragma shader_feature_local_fragment _WAVE_DETAIL
+            #pragma shader_feature_local _FFT_WAVES
             #pragma shader_feature_local_fragment _FOAM
             #pragma shader_feature_local_fragment _CAUSTICS
             #pragma shader_feature_local_fragment _GODRAYS
@@ -167,11 +169,17 @@ Shader "AKI/Water"
                 float dist = distance(posWS, _WorldSpaceCameraPos);
                 float geoFade = saturate(1.0 - (dist - _FlattenDistance * 0.6) / (_FlattenDistance * 0.4));
                 const float tt = _Time.y;
+            #if defined(_FFT_WAVES)
+                o.fieldA = 0; o.fieldB = 0; o.fieldC = 0;
+                o.cellColor = 0;
+                posWS += OceanDisplacement(posWS.xz) * geoFade;
+            #else
                 WaterWaveField field = WaterEvalField(posWS.xz, tt);
                 WaterPackField(field, o.fieldA, o.fieldB, o.fieldC);
                 o.cellColor = float4((WaterSoftCells(posWS.xz * _ColorCellScale, tt * 0.04) - 0.5) * 1.8,
                                      WaterSoftCells(posWS.xz * _GlintCellScale, tt * 0.08));
                 posWS += WaterDisplacementF(field, posWS.xz, tt, o.q) * geoFade;
+            #endif
 
                 o.positionWS = posWS;
                 o.positionCS = TransformWorldToHClip(posWS);
@@ -261,8 +269,13 @@ Shader "AKI/Water"
                 // ---- waves: normal + how much the surface is pinching (foam)
                 float3 n;
                 float jacobian, lace;
+            #if defined(_FFT_WAVES)
+                OceanSurface(i.waveXZ, n, jacobian);     // turbulence plays the jacobian's role for foam
+                lace = 0.0;
+            #else
                 WaterWaveField field = WaterUnpackField(i.fieldA, i.fieldB, i.fieldC);
                 WaterNormal(field, i.waveXZ, t, dist, i.q, n, jacobian, lace);
+            #endif
                 n = normalize(lerp(n, float3(0, 1, 0), 0.25 * _ToonAmount));   // cartoon: calmer normals
                 n = normalize(lerp(n, float3(0, 1, 0), saturate((dist - _FlattenDistance * 0.5) / (_FlattenDistance * 0.5))));
 
@@ -405,7 +418,14 @@ Shader "AKI/Water"
             #if defined(_FOAM)
                 float crest = saturate((_CrestFoamThreshold - jacobian) / 0.35);
                 float lap = 0.85 + 0.15 * sin(t * 1.4 + shore * 9.0);
+            #if defined(_FFT_WAVES)
+                float foam = WaterFoam(i.waveXZ, t, shore * lap, 0.0, lace) * _FoamIntensity;      // shoreline
+                float oceanHaze;
+                foam = max(foam, OceanFoam(i.waveXZ, t, jacobian, oceanHaze) * _FoamIntensity);  // breaking crests
+                col = lerp(col, _FoamColor.rgb * (ambient + lightColor * 0.35) * 0.45, oceanHaze * oceanHaze * 0.18);   // churned water
+            #else
                 float foam = WaterFoam(i.waveXZ, t, shore * lap, crest, lace) * _FoamIntensity;
+            #endif
 
                 // cartoon shoreline: crisp animated stripes of foam rolling in
                 float wide = saturate(1.0 - shoreDistOut / (_ShoreFoamWidth * 2.6));

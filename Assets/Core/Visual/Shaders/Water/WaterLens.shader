@@ -33,6 +33,7 @@ Shader "Hidden/AKI/WaterLens"
         _CellWaveScale     ("Voronoi Wave Scale (1/m)", Range(0.02, 0.4)) = 0.09
         _CellWaveSpeed     ("Voronoi Wave Speed", Range(0, 3)) = 0.7
         [Toggle(_WAVE_DETAIL)] _WaveDetail ("Per-pixel Detail Waves", Float) = 1
+        [Toggle(_FFT_WAVES)] _FFTWaves ("FFT Ocean (needs OceanFFT component)", Float) = 0
         _DetailStrength    ("Detail Strength", Range(0, 2)) = 0.8
         _DetailFade        ("Detail Fade (x wavelength)", Range(10, 300)) = 90
         _FlattenDistance   ("Flatten Distance (m)", Range(50, 1500)) = 500
@@ -115,6 +116,7 @@ Shader "Hidden/AKI/WaterLens"
             #pragma target 3.5
             #pragma vertex Vert
             #pragma fragment Frag
+            #pragma multi_compile_local _ _FFT_WAVES
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
