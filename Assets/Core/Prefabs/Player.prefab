@@ -197,6 +197,7 @@ GameObject:
   - component: {fileID: 868813301614671140}
   - component: {fileID: 5127874268717475519}
   - component: {fileID: 8546200670089918104}
+  - component: {fileID: 1061537911927120286}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -323,5 +324,27 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   onClimbOut:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!114 &1061537911927120286
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9182919468106720292}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b145d87b2ce3dc143a1469cd4445854c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Player.BreathHolding
+  maxBreathSeconds: 30
+  refillSeconds: 3
+  effectStart: 0.35
+  recoverDuration: 1.5
+  onOutOfAir:
+    m_PersistentCalls:
+      m_Calls: []
+  onBreathRestored:
     m_PersistentCalls:
       m_Calls: []
