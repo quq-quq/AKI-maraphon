@@ -271,6 +271,9 @@ namespace AKI.Water.Editor
             go.transform.position = pos;
             go.transform.localScale = scale;
             go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+            // a sphere collider stays round (radius of the largest axis) and would stick out of a stretched rock
+            Object.DestroyImmediate(go.GetComponent<SphereCollider>());
+            go.AddComponent<MeshCollider>();
         }
 
         static Mesh BuildSeabedMesh()

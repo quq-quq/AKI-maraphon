@@ -187,7 +187,7 @@ namespace AKI.Weapons.Editor
             // a little glow of its own, so the line stays readable in deep blue water
             material.SetColor("_EmissionColor", new Color(0.32f, 0.27f, 0.14f));
             material.EnableKeyword("_EMISSION");
-            material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+            material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;   // URP drops _EMISSION without an emissive flag
             material.SetTexture("_BumpMap", normal);
             material.SetFloat("_BumpScale", 1.2f);
             material.EnableKeyword("_NORMALMAP");

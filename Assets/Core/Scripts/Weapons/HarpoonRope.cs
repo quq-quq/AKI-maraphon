@@ -29,6 +29,7 @@ namespace AKI.Weapons
         const float CurrentSpeed = 0.05f;
         const float AirDrag = 0.05f;
         const float Stiffness = 0.15f;       // resistance to sharp bends
+        const float MaxPointSpeed = 12f;     // m/s: solver corrections must not turn into wild flailing
         const float FadeDelay = 1.5f;        // after the arrow is gone
         const float FadeTime = 1f;
 
@@ -102,19 +103,21 @@ namespace AKI.Weapons
         }
 
         /// <summary>
-        /// Called by the arrow after it moved: a fully paid out line won't let its end (<paramref name="tailWorld"/>)
-        /// get further away. Returns the correction for the arrow and takes the outward part out of its velocity.
+        /// Called by the arrow after it moved: once the whole line is out, its end (<paramref name="tailWorld"/>)
+        /// can't get further from the gun than the line is long. Measured from the gun itself, not from the next
+        /// rope point (that one is pulled along by the arrow, and the two would keep yanking each other).
+        /// Returns the correction for the arrow and takes the outward part out of its velocity.
         /// </summary>
         public Vector3 Tether(Vector3 tailWorld, ref Vector3 velocity)
         {
-            if (!FullyPaidOut || pos.Count < 2) return Vector3.zero;
-            Vector3 d = tailWorld - pos[pos.Count - 2];
+            if (!gunAttached || anchor == null || !FullyPaidOut) return Vector3.zero;
+            Vector3 d = tailWorld - anchor.position;
             float dist = d.magnitude;
-            if (dist <= SegmentLength) return Vector3.zero;
+            if (dist <= maxLength) return Vector3.zero;
             Vector3 dir = d / dist;
             float outward = Vector3.Dot(velocity, dir);
             if (outward > 0f) velocity -= dir * outward;
-            return -dir * (dist - SegmentLength);
+            return -dir * (dist - maxLength);
         }
 
         bool HasArrow => arrow != null;
@@ -217,6 +220,7 @@ namespace AKI.Weapons
                     v *= airKeep;
                     accel = Physics.gravity;
                 }
+                v = Vector3.ClampMagnitude(v, MaxPointSpeed * h);
                 prev[i] = p;
                 pos[i] = p + v + accel * (h * h);
             }
@@ -323,7 +327,11 @@ namespace AKI.Weapons
                 Vector3 before = path[Mathf.Max(r - 1, 0)];
                 Vector3 t = (next - before).normalized;
                 if (t.sqrMagnitude < 1e-6f) t = tangent;
-                normal = Quaternion.FromToRotation(tangent, t) * normal;   // parallel transport: no twisting seams
+                // carry the ring orientation along: keep the last normal, minus its part along the new tangent.
+                // Stable even where the line doubles back (a rotation between opposite tangents would flip it).
+                Vector3 n0 = normal - t * Vector3.Dot(normal, t);
+                if (n0.sqrMagnitude < 1e-6f) n0 = Vector3.Cross(t, Mathf.Abs(t.y) < 0.9f ? Vector3.up : Vector3.right);
+                normal = n0.normalized;
                 tangent = t;
                 Vector3 binormal = Vector3.Cross(tangent, normal);
                 if (r > 0) along += Vector3.Distance(path[r], path[r - 1]);

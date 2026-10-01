@@ -28,6 +28,8 @@ namespace AKI.Weapons
 
         [Header("Hitting")]
         [Min(0f)] public float hitRadius = 0.02f;
+        [Tooltip("How deep the tip goes into what it hits (m).")]
+        [Min(0f)] public float penetration = 0.06f;
         public LayerMask hitMask = Physics.DefaultRaycastLayers;
         [Tooltip("Seconds before a harpoon that hit nothing is removed.")]
         [Min(0.5f)] public float flightLifetime = 6f;
@@ -155,7 +157,7 @@ namespace AKI.Weapons
             flying = false;
             age = 0f;
             Vector3 point = hit.distance > 0f ? hit.point : transform.position;
-            transform.SetPositionAndRotation(point, Quaternion.LookRotation(dir));
+            transform.SetPositionAndRotation(point + dir * penetration, Quaternion.LookRotation(dir));   // the tip goes in
             Transform carrier = hit.rigidbody != null ? hit.rigidbody.transform : hit.transform;
             if (IsUniform(carrier.lossyScale)) transform.SetParent(carrier, true);   // moves with the fish (a stretched parent would skew the arrow)
             if (bubbles != null) bubbles.Stop();
