@@ -27,7 +27,7 @@ namespace AKI.Player
         [Tooltip("Pitch pivot at eye height; the camera is its child.")]
         public Transform cameraPivot;
         public Camera playerCamera;
-        [Tooltip("Uses the Player map: Move, Look, Jump, Crouch, Sprint.")]
+        [Tooltip("Uses the Player map: Move, Look, Jump, Crouch, Sprint (+ Attack for the speargun).")]
         public InputActionAsset inputActions;
 
         [Header("Look")]
@@ -104,6 +104,8 @@ namespace AKI.Player
         /// <summary>Metres the eyes are below the wave surface (negative = above).</summary>
         public float EyeDepth { get; private set; }
         public Vector3 Velocity => velocity;
+        /// <summary>The runtime copy of the input actions (enabled with this component), for other player scripts.</summary>
+        public InputActionAsset Actions => actions;
 
         CharacterController controller;
         InputActionAsset actions;
@@ -165,6 +167,9 @@ namespace AKI.Player
             map.AddAction("Jump", InputActionType.Button).AddBinding("<Keyboard>/space");
             map.AddAction("Crouch", InputActionType.Button).AddBinding("<Keyboard>/c");
             map.AddAction("Sprint", InputActionType.Button).AddBinding("<Keyboard>/leftShift");
+            var attack = map.AddAction("Attack", InputActionType.Button);
+            attack.AddBinding("<Mouse>/leftButton");
+            attack.AddBinding("<Gamepad>/rightTrigger");
             return asset;
         }
 
