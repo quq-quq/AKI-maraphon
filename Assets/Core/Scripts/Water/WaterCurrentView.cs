@@ -17,17 +17,17 @@ namespace AKI.Water
         [Min(0f)] public float fadeDensity = 0.06f;
 
         [Header("Specks")]
-        [Min(0)] public int specks = 600;
-        public Vector2 speckSize = new Vector2(0.06f, 0.12f);
+        [Min(0)] public int specks = 500;
+        public Vector2 speckSize = new Vector2(0.035f, 0.07f);
         [Tooltip("Stretch along the motion (seconds of travel).")]
-        [Min(0f)] public float speckStretch = 0.3f;
-        public Color speckColor = new Color(0.75f, 0.9f, 1f, 1f);
+        [Min(0f)] public float speckStretch = 0.06f;
+        public Color speckColor = new Color(0.75f, 0.9f, 1f, 0.6f);
 
         [Header("Streaks")]
-        [Min(0)] public int streaks = 50;
-        public Vector2 streakSize = new Vector2(0.04f, 0.06f);
-        [Min(0f)] public float streakStretch = 2.5f;
-        public Color streakColor = new Color(0.85f, 0.95f, 1f, 0.9f);
+        [Min(0)] public int streaks = 18;
+        public Vector2 streakSize = new Vector2(0.015f, 0.025f);
+        [Min(0f)] public float streakStretch = 0.9f;
+        public Color streakColor = new Color(0.85f, 0.95f, 1f, 0.4f);
 
         [Tooltip("Random drift on top of the current (m/s), so specks don't move in lockstep.")]
         [Min(0f)] public float wobble = 0.05f;

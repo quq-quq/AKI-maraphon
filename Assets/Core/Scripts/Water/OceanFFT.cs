@@ -57,6 +57,12 @@ namespace AKI.Water
         public static OceanFFT Active { get; private set; }
 
         public Vector4 LengthScales => new Vector4(lengthScale0, lengthScale1, lengthScale2, 0f);
+
+        /// <summary>Angular frequency of the dominant waves (JONSWAP peak, rad/s); their period is 2π / this.</summary>
+        public float PeakOmega => 22f * Mathf.Pow(9.81f * 9.81f / (Mathf.Max(windSpeed, 0.5f) * fetchKm * 1000f), 1f / 3f);
+
+        /// <summary>Direction the waves run in, on the XZ plane (same angle the spectrum uses).</summary>
+        public Vector2 WaveDirection => new Vector2(Mathf.Cos(windDirection * Mathf.Deg2Rad), Mathf.Sin(windDirection * Mathf.Deg2Rad));
         public RenderTexture GetDisplacement(int cascade) => cascades != null ? cascades[cascade].displacement : null;
         public RenderTexture GetDerivatives(int cascade) => cascades != null ? cascades[cascade].derivatives : null;
 
@@ -190,7 +196,7 @@ namespace AKI.Water
             float fetch = fetchKm * 1000f;
             float u = Mathf.Max(windSpeed, 0.5f);
             float alpha = 0.076f * Mathf.Pow(u * u / (fetch * g), 0.22f);
-            float peakOmega = 22f * Mathf.Pow(g * g / (u * fetch), 1f / 3f);
+            float peakOmega = PeakOmega;
 
             fftCompute.SetInt("_Size", Size);
             fftCompute.SetFloat("_WindSpeed", u);

@@ -161,14 +161,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 22c2f04a541bc48fd991c81fef13ef2b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AKI.Water.WaterCurrent
+  surge: 0.6
+  surgeVertical: 0.4
+  fallbackWaveDirection: 30
+  fallbackWavePeriod: 8
   direction: 60
-  speed: 1
-  depthFalloff: 12
-  deepShare: 0.35
+  speed: 0.25
   directionVariation: 25
-  speedVariation: 0.35
   variationScale: 30
   variationSpeed: 0.04
+  depthFalloff: 12
+  deepShare: 0.35
+  gusts: 0.45
+  gustPeriod: 20
 --- !u!114 &8860546526367546964
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -184,12 +189,12 @@ MonoBehaviour:
   material: {fileID: 2100000, guid: a12aeb61d0ad6468ca76fcceb1228d8e, type: 2}
   extent: {x: 7, y: 4, z: 7}
   fadeDensity: 0.06
-  specks: 600
-  speckSize: {x: 0.06, y: 0.12}
-  speckStretch: 0.3
-  speckColor: {r: 0.75, g: 0.9, b: 1, a: 1}
-  streaks: 50
-  streakSize: {x: 0.04, y: 0.06}
-  streakStretch: 2.5
-  streakColor: {r: 0.85, g: 0.95, b: 1, a: 0.9}
+  specks: 500
+  speckSize: {x: 0.035, y: 0.07}
+  speckStretch: 0.06
+  speckColor: {r: 0.75, g: 0.9, b: 1, a: 0.6}
+  streaks: 18
+  streakSize: {x: 0.015, y: 0.025}
+  streakStretch: 0.9
+  streakColor: {r: 0.85, g: 0.95, b: 1, a: 0.4}
   wobble: 0.05
