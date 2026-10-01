@@ -1,8 +1,9 @@
 Shader "AKI/UnderwaterParticle"
 {
-    // Unlit particle for effects under water (bubbles, blood). The underwater haze is drawn before transparents,
-    // so particles fade and lose their red with distance on their own, roughly matching it. They also soften where
-    // they touch geometry and disappear at the water surface.
+    // Unlit particle for effects under water (bubbles, blood, the harpoon rope). The underwater haze is drawn before
+    // transparents, so particles fade and lose their red with distance on their own, roughly matching it. They also
+    // soften where they touch geometry and disappear at the real (FFT) wave surface, not just the mean water level.
+    // Drawn right after the water surface: from below, the surface would otherwise be sorted over them at random.
     // Blend is premultiplied: _Additive 0 = normal alpha blend (blood), 1 = pure glow (fizz), in between = bubbles.
     Properties
     {
@@ -14,6 +15,7 @@ Shader "AKI/UnderwaterParticle"
         [Toggle(_SOFT_PARTICLES)] _Soft ("Soft Particles (needs Depth Texture)", Float) = 0
         _SoftDistance   ("Soft Distance (m)", Range(0.01, 2)) = 0.25
         _SurfaceFade    ("Fade Below Surface (m)", Range(0.01, 1)) = 0.08
+        [ToggleUI] _ClipAboveWater ("Hide Above Water", Float) = 1
     }
 
     SubShader
@@ -22,7 +24,7 @@ Shader "AKI/UnderwaterParticle"
         {
             "RenderPipeline" = "UniversalPipeline"
             "RenderType" = "Transparent"
-            "Queue" = "Transparent"
+            "Queue" = "Transparent+10"
             "IgnoreProjector" = "True"
             "PreviewType" = "Plane"
         }
@@ -55,11 +57,48 @@ Shader "AKI/UnderwaterParticle"
                 float4 _Absorption;
                 float  _SoftDistance;
                 float  _SurfaceFade;
+                float  _ClipAboveWater;
             CBUFFER_END
 
             // set by WaterSurface: cell > 0 means there is water in the scene, centre.y is its mean level
             float  _WaterMeshCell;
+            float  _WaterMeshGrowth;
             float4 _WaterMeshCenter;
+
+            // FFT ocean (OceanFFT): three cascades of displacement; length scales stay 0 without it
+            TEXTURE2D(_OceanDisp0);
+            TEXTURE2D(_OceanDisp1);
+            TEXTURE2D(_OceanDisp2);
+            SamplerState ocean_trilinear_repeat_sampler;
+            float4 _OceanLengthScales;
+
+            // same mip choice as the water mesh (WaterWaves.hlsl), so the cut matches the surface you see
+            float OceanLod(float lengthScale, float cell)
+            {
+                return max(0.0, log2(cell * 256.0 / lengthScale));
+            }
+
+            float3 OceanDisplacement(float2 xz)
+            {
+                float cell = max(_WaterMeshCell, 1e-3) * (1.0 + length(xz - _WaterMeshCenter.xz) / max(_WaterMeshGrowth, 1e-3));
+                float3 d = SAMPLE_TEXTURE2D_LOD(_OceanDisp0, ocean_trilinear_repeat_sampler, xz / _OceanLengthScales.x, OceanLod(_OceanLengthScales.x, cell)).xyz;
+                d += SAMPLE_TEXTURE2D_LOD(_OceanDisp1, ocean_trilinear_repeat_sampler, xz / _OceanLengthScales.y, OceanLod(_OceanLengthScales.y, cell)).xyz;
+                d += SAMPLE_TEXTURE2D_LOD(_OceanDisp2, ocean_trilinear_repeat_sampler, xz / _OceanLengthScales.z, OceanLod(_OceanLengthScales.z, cell)).xyz;
+                return d;
+            }
+
+            // world Y of the wavy surface above xz (mean level without the FFT ocean)
+            float SurfaceHeight(float2 xz)
+            {
+                float level = _WaterMeshCenter.y;
+                if (_OceanLengthScales.x <= 0.0) return level;
+                // the FFT also moves water sideways: find the undisplaced point that ends up above xz
+                float2 xz0 = xz;
+                [unroll]
+                for (int k = 0; k < 2; k++)
+                    xz0 = xz - OceanDisplacement(xz0).xz;
+                return level + OceanDisplacement(xz0).y;
+            }
 
             struct Attributes
             {
@@ -74,6 +113,7 @@ Shader "AKI/UnderwaterParticle"
                 half4  color      : COLOR;
                 float2 uv         : TEXCOORD0;
                 float3 positionWS : TEXCOORD1;
+                float  surfaceY   : TEXCOORD2;
             };
 
             Varyings vert(Attributes v)
@@ -83,6 +123,8 @@ Shader "AKI/UnderwaterParticle"
                 o.positionCS = TransformWorldToHClip(o.positionWS);
                 o.color = v.color;
                 o.uv = TRANSFORM_TEX(v.uv, _BaseMap);
+                // per vertex is plenty: a bubble is far smaller than a wave
+                o.surfaceY = _WaterMeshCell > 0.0 ? SurfaceHeight(o.positionWS.xz) : 1e6;
                 return o;
             }
 
@@ -102,9 +144,15 @@ Shader "AKI/UnderwaterParticle"
                 a *= saturate((sceneZ - selfZ) / _SoftDistance);
             #endif
 
-                // bubbles pop when they reach the surface
                 if (_WaterMeshCell > 0.0)
-                    a *= saturate((_WaterMeshCenter.y - i.positionWS.y) / _SurfaceFade);
+                {
+                    float depth = i.surfaceY - i.positionWS.y;
+                    // bubbles pop when they reach the surface
+                    if (_ClipAboveWater > 0.5) a *= saturate(depth / _SurfaceFade);
+                    // seen from above, they are drawn over the water surface: sink them into it with depth
+                    if (_WorldSpaceCameraPos.y > _WaterMeshCenter.y + 0.5 && depth > 0.0)
+                        a *= exp(-depth * 1.5);
+                }
 
                 return half4(c.rgb * a, a * (1.0h - _Additive));
             }
