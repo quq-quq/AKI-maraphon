@@ -237,7 +237,7 @@ MonoBehaviour:
   strokeRate: 1.1
   strokePulse: 0.55
   chestHeight: 1.25
-  surfaceEyeHeight: 0.32
+  surfaceEyeHeight: 0.55
   surfaceSpring: 4.5
   buoyancy: 0.3
   diveAngle: 22

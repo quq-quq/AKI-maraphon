@@ -61,7 +61,7 @@ namespace AKI.Player
         [Tooltip("Height above the feet where the water has to reach before you swim instead of wade.")]
         public float chestHeight = 1.25f;
         [Tooltip("How far the eyes stay above the waves while floating.")]
-        public float surfaceEyeHeight = 0.32f;
+        public float surfaceEyeHeight = 0.55f;
         [Tooltip("Natural frequency of the float spring (higher = follows the waves more tightly).")]
         public float surfaceSpring = 4.5f;
         [Tooltip("Slow upward drift under water when not swimming (m/s²).")]
