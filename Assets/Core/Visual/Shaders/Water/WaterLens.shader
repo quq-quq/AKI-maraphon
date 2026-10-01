@@ -253,6 +253,7 @@ Shader "Hidden/AKI/WaterLens"
                 // ---- water film on the glass after surfacing
                 float film = 0;
                 float2 filmOffset = 0;
+                float filmDefocus = 0;
                 float wet = _WaterLensWetness * _WaterLensDrops;
                 if (wet > 0.001)
                 {
@@ -272,17 +273,21 @@ Shader "Hidden/AKI/WaterLens"
                         float3 nrm = normalize(float3(-grad * 0.5, 1.0));
                         light += pow(saturate(dot(nrm, normalize(float3(-0.3, 0.6, 1.0)))), 30.0) * 0.08 * saturate(h0 * 3.0);   // faint sheen, no white lines
                         film = saturate(h0 * 1.6);
+                        // looking through the water layer is also out of focus: much at first, clearing as it thins
+                        filmDefocus = saturate(h0 * 1.4) * (0.004 + 0.012 * saturate(1.0 - since / 0.8));
                     }
                 }
 
                 half3 col;
                 if (_WakeBlur > 0.001) col = SampleGaussian(uv + offset, _WakeBlur * 0.06, aspect);
+                else if (filmDefocus > 0.0015) col = SampleGaussian(uv + offset, filmDefocus, aspect);
                 else col = blur > 0.0005 ? SampleBlur(uv + offset, blur) : FragBlitSample(uv + offset);
                 if (film > 0.001)
                 {
-                    // water splits the colours a little where it bends the view most
-                    col.r = FragBlitSample(uv + offset + filmOffset * 0.08).r;
-                    col.b = FragBlitSample(uv + offset - filmOffset * 0.08).b;
+                    // water splits the colours where it bends the view most (more where it is thick)
+                    float split = 0.06 + 0.12 * film;
+                    col.r = lerp(col.r, FragBlitSample(uv + offset + filmOffset * split).r, (half)film);
+                    col.b = lerp(col.b, FragBlitSample(uv + offset - filmOffset * split).b, (half)film);
                 }
                 col *= 1.0h - saturate(dark);
                 col += light;
