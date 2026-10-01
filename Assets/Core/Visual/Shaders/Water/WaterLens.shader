@@ -156,6 +156,17 @@ Shader "Hidden/AKI/WaterLens"
                 return frac(p);
             }
 
+            // smooth 2D value noise, 0..1
+            float LensNoise(float2 p)
+            {
+                float2 i = floor(p);
+                float2 f = frac(p);
+                f = f * f * (3.0 - 2.0 * f);
+                float a = LensHash32(i).x, b = LensHash32(i + float2(1, 0)).x;
+                float c = LensHash32(i + float2(0, 1)).x, d = LensHash32(i + float2(1, 1)).x;
+                return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
+            }
+
             half3 FragBlitSample(float2 uv)
             {
                 return SAMPLE_TEXTURE2D_X_LOD(_BlitTexture, sampler_LinearClamp, saturate(uv), 0).rgb;
@@ -261,6 +272,7 @@ Shader "Hidden/AKI/WaterLens"
                 float blur = 0;
                 half light = 0;
                 half dark = 0;
+                float sheetTint = 0;
 
                 // ---- the waterline crossing the lens
                 if (_WaterLensNearSurface > 0.5)
@@ -284,15 +296,27 @@ Shader "Hidden/AKI/WaterLens"
                 {
                     float since = _WaterLensSinceExit;
 
-                    // 1) a continuous sheet of water sliding off in the first half second
-                    float edge = 1.2 - since * 2.2 + 0.035 * sin(uv.x * 19.0 + t * 3.0) + 0.02 * sin(uv.x * 47.0 - t * 5.0);
-                    float sheet = smoothstep(edge + 0.015, edge - 0.015, uv.y) * _WaterLensWetness;
-                    float2 wave = float2(sin(uv.y * 31.0 + t * 7.0 + sin(uv.x * 13.0)), cos(uv.x * 27.0 - t * 6.0 + sin(uv.y * 11.0)));
-                    offset += wave * (0.012 * sheet * _WaterLensDistortion);
-                    blur += sheet * 0.006;
-                    float edgeLine = exp(-abs(uv.y - edge) * 140.0) * step(0.001, sheet + 0.001) * _WaterLensWetness;
-                    offset.y += edgeLine * 0.02 * _WaterLensDistortion;
-                    light += edgeLine * 0.25;
+                    // 1) right after the head breaks the surface the whole lens is under a sheet of water that drains
+                    //    from the top down (~1.6 s): the view behind it is smeared into wavy, melting vertical runnels
+                    const float SheetSeconds = 1.6;
+                    float drain = since / SheetSeconds;
+                    float edge = 1.15 - drain * 1.3 + 0.05 * sin(q.x * 9.0 + since * 4.0) + 0.025 * sin(q.x * 31.0 - since * 7.0);
+                    float sheet = smoothstep(edge + 0.06, edge - 0.06, uv.y) * _WaterLensWetness;
+                    if (sheet > 0.001)
+                    {
+                        float flow = since * 1.4;   // the runnels slide down with the water
+                        float n1 = LensNoise(float2(q.x * 7.0, uv.y * 1.3 + flow));
+                        float n2 = LensNoise(float2(q.x * 17.0 + n1 * 3.0, uv.y * 2.2 + flow * 1.7));
+                        float n3 = LensNoise(float2(q.x * 4.0 - n2 * 1.5, uv.y * 0.8 + flow * 0.6 + 9.1));
+                        float2 warp = float2(n1 + 0.6 * n2 - 0.8, (n3 - 0.5) * 0.7);
+                        offset += warp * (0.075 * sheet * _WaterLensDistortion);
+                        blur += sheet * 0.004;
+                        light += pow(1.0 - abs(n2 * 2.0 - 1.0), 14.0) * 0.22 * sheet;   // runnel crests catch the light
+                        sheetTint = sheet;
+                    }
+                    float edgeLine = exp(-abs(uv.y - edge) * 90.0) * _WaterLensWetness * step(uv.y, edge + 0.1);
+                    offset.y += edgeLine * 0.025 * _WaterLensDistortion;            // thick meniscus at the draining edge
+                    light += edgeLine * 0.3;
 
                     // 2) drops and running streaks
                     const float e = 0.0015;
@@ -314,6 +338,7 @@ Shader "Hidden/AKI/WaterLens"
                 else col = blur > 0.0005 ? SampleBlur(uv + offset, blur) : FragBlitSample(uv + offset);
                 col *= 1.0h - saturate(dark);
                 col += light;
+                col = lerp(col, col * half3(0.78, 0.92, 1.05), (half)(0.45 * sheetTint));   // seen through water: a bit blue
 
                 // ---- running out of air: a dark vignette closes in, then the whole view fades towards black
                 float suff = saturate(_BreathEffect);
