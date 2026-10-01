@@ -6,7 +6,7 @@ namespace AKI.Weapons
     /// <summary>
     /// The speargun model: plays the shot animation, hides the loaded arrow and launches a <see cref="HarpoonProjectile"/>
     /// copy of it from the muzzle (the arrow tip), tied to the gun with a <see cref="HarpoonRope"/>. After
-    /// <see cref="reloadSeconds"/> the line is cut and the arrow is back in the gun.
+    /// <see cref="reloadSeconds"/> the arrow is back in the gun; the line stays on the last arrow until the next shot.
     /// The player drives it through <see cref="AKI.Player.PlayerSpeargun"/>.
     /// </summary>
     public class Speargun : MonoBehaviour
@@ -28,8 +28,12 @@ namespace AKI.Weapons
         [Tooltip("Where the line leaves the gun. Empty = on the arrow axis, Rope Anchor Back behind the muzzle.")]
         public Transform ropeAnchor;
         [Min(0f)] public float ropeAnchorBack = 0.3f;
-        [Min(0.001f)] public float ropeWidth = 0.005f;
-        public Color ropeColor = new Color(0.78f, 0.75f, 0.66f);
+        [Tooltip("Line thickness (m). Far away it is drawn at least ~2 px wide anyway.")]
+        [Min(0.001f)] public float ropeWidth = 0.014f;
+        [Tooltip("Total line on the spool (m): at full length it goes taut and holds the arrow.")]
+        [Min(1f)] public float ropeLength = 25f;
+        [Tooltip("Lit material for the line tube (M_HarpoonRope). Empty = plain coloured fallback.")]
+        public Material ropeMaterial;
 
         public UnityEvent onShoot = new UnityEvent();
         public UnityEvent onReloaded = new UnityEvent();
@@ -84,6 +88,7 @@ namespace AKI.Weapons
             if (animator != null) animator.SetTrigger(ShootId);
             if (loadedArrow != null) loadedArrow.SetActive(false);
 
+            if (lastShot != null) lastShot.CutRope();   // the new arrow takes the line
             HarpoonProjectile arrow = Instantiate(projectilePrefab, muzzle.position, rotation);
             arrow.Launch(this);
             lastShot = arrow;
@@ -95,8 +100,6 @@ namespace AKI.Weapons
         {
             if (IsLoaded || Time.time < reloadAt) return;
             IsLoaded = true;
-            if (lastShot != null) lastShot.CutRope();
-            lastShot = null;
             if (loadedArrow != null) loadedArrow.SetActive(true);
             onReloaded.Invoke();
         }

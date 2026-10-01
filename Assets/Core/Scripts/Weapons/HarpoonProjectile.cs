@@ -39,6 +39,7 @@ namespace AKI.Weapons
         Speargun gun;
         Transform ignoreRoot;
         HarpoonRope rope;
+        Vector3 tailLocal;
 
         public bool IsFlying => flying;
 
@@ -54,15 +55,11 @@ namespace AKI.Weapons
             age = 0f;
             if (bubbles != null) bubbles.Fire();
 
-            Transform anchor = from != null ? from.RopeAnchor : null;
-            if (anchor != null)
-            {
-                rope = gameObject.AddComponent<HarpoonRope>();
-                rope.Init(anchor, TailLocal(), from.ropeWidth, from.ropeColor);
-            }
+            tailLocal = TailLocal();
+            if (from != null && from.RopeAnchor != null) rope = HarpoonRope.Create(from, this, tailLocal);
         }
 
-        /// <summary>The gun reloaded: cut the line at the gun.</summary>
+        /// <summary>The gun fired again: cut this arrow's line at the gun.</summary>
         public void CutRope()
         {
             if (rope != null) rope.Cut();
@@ -108,6 +105,12 @@ namespace AKI.Weapons
 
             Vector3 from = transform.position;
             Vector3 step = velocity * dt;
+            if (rope != null && step.sqrMagnitude > 1e-10f)
+            {
+                // at the end of its line the arrow is held back
+                Vector3 tailWorld = from + step + Quaternion.LookRotation(step) * tailLocal;
+                step += rope.Tether(tailWorld, ref velocity);
+            }
             float length = step.magnitude;
             if (length < 1e-5f) return;
 

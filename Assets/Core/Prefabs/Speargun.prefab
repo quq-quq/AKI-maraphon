@@ -83,6 +83,12 @@ MonoBehaviour:
   projectilePrefab: {fileID: 8972933763769063897, guid: 8a4154d809b7e47b7bcb3f453ea5473a, type: 3}
   reloadSeconds: 1.5
   owner: {fileID: 0}
+  rope: 1
+  ropeAnchor: {fileID: 0}
+  ropeAnchorBack: 0.3
+  ropeWidth: 0.014
+  ropeLength: 25
+  ropeMaterial: {fileID: 2100000, guid: d0e2c1ffd22e2452c8a3304a07998adc, type: 2}
   onShoot:
     m_PersistentCalls:
       m_Calls: []

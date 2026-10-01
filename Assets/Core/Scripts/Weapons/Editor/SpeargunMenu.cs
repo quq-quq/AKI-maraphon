@@ -22,6 +22,9 @@ namespace AKI.Weapons.Editor
         const string ModelPath = "Assets/Core/Visual/Models/Harpoon/harpoon_with_anim.fbx";
         const string ControllerPath = "Assets/Core/Animations/AC_Speargun.controller";
         const string PlayerPrefabPath = "Assets/Core/Prefabs/Player.prefab";
+        const string RopeMaterialPath = "Assets/Core/Visual/Materials/VFX/M_HarpoonRope.mat";
+        const string RopeTexturePath = "Assets/Core/Visual/Textures/VFX/T_Rope.png";
+        const string RopeNormalPath = "Assets/Core/Visual/Textures/VFX/T_Rope_Normal.png";
 
         [MenuItem("AKI/Weapons/Create Speargun")]
         public static void CreateSpeargunMenu() => CreateSpeargun();
@@ -69,9 +72,32 @@ namespace AKI.Weapons.Editor
             gun.loadedArrow = arrow.gameObject;
             gun.muzzle = muzzle;
             gun.projectilePrefab = BuildArrowPrefab(arrow, muzzle, bubblesFx);
+            gun.ropeMaterial = EnsureRopeMaterial();
             GameObject saved = SavePrefab(root, PrefabPath);
             AssetDatabase.SaveAssets();
             return saved;
+        }
+
+        /// <summary>Creates the line material if missing and puts it on the existing Speargun prefab.</summary>
+        [MenuItem("AKI/Weapons/Apply Rope Material")]
+        public static void ApplyRopeMaterial()
+        {
+            Material material = EnsureRopeMaterial();
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath) == null) return;
+            GameObject contents = PrefabUtility.LoadPrefabContents(PrefabPath);
+            try
+            {
+                var gun = contents.GetComponent<Speargun>();
+                if (gun != null && gun.ropeMaterial != material)
+                {
+                    gun.ropeMaterial = material;
+                    PrefabUtility.SaveAsPrefabAsset(contents, PrefabPath);
+                }
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(contents);
+            }
         }
 
         [MenuItem("AKI/Weapons/Give Speargun To Player Prefab")]
@@ -142,6 +168,85 @@ namespace AKI.Weapons.Editor
 
             root.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
             return SavePrefab(root, ArrowPrefabPath).GetComponent<HarpoonProjectile>();
+        }
+
+        // ------------------------------------------------------------------ line material
+
+        // Three twisted strands: u goes around the tube, v along it (one twist per texture repeat).
+        // Light, slightly yellow line: easy to follow against blue water; a little wet gloss.
+        public static Material EnsureRopeMaterial()
+        {
+            var material = AssetDatabase.LoadAssetAtPath<Material>(RopeMaterialPath);
+            if (material != null) return material;
+
+            Texture2D albedo = EnsureRopeTexture(RopeTexturePath, false);
+            Texture2D normal = EnsureRopeTexture(RopeNormalPath, true);
+            material = new Material(Shader.Find("Universal Render Pipeline/Lit")) { name = "M_HarpoonRope" };
+            material.SetTexture("_BaseMap", albedo);
+            material.SetColor("_BaseColor", new Color(1f, 0.9f, 0.55f));
+            // a little glow of its own, so the line stays readable in deep blue water
+            material.SetColor("_EmissionColor", new Color(0.32f, 0.27f, 0.14f));
+            material.EnableKeyword("_EMISSION");
+            material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+            material.SetTexture("_BumpMap", normal);
+            material.SetFloat("_BumpScale", 1.2f);
+            material.EnableKeyword("_NORMALMAP");
+            material.SetFloat("_Smoothness", 0.45f);
+            material.SetFloat("_Metallic", 0f);
+            Directory.CreateDirectory(Path.GetDirectoryName(RopeMaterialPath));
+            AssetDatabase.CreateAsset(material, RopeMaterialPath);
+            AssetDatabase.SaveAssets();
+            return material;
+        }
+
+        static float StrandHeight(float u, float v)
+        {
+            float phase = Mathf.Repeat(3f * u + v, 1f);
+            float strand = Mathf.Pow(Mathf.Sin(phase * Mathf.PI), 0.6f);
+            float fibres = 0.08f * Mathf.Sin((phase * 9f + u * 2f) * Mathf.PI * 2f);   // fine lay of the fibres
+            return strand + fibres;
+        }
+
+        static Texture2D EnsureRopeTexture(string path, bool normalMap)
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            if (existing != null) return existing;
+
+            const int size = 64;
+            const float e = 1f / size;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float u = (x + 0.5f) / size, v = (y + 0.5f) / size;
+                float h = StrandHeight(u, v);
+                if (normalMap)
+                {
+                    float dx = (StrandHeight(u + e, v) - StrandHeight(u - e, v)) * 1.5f;
+                    float dy = (StrandHeight(u, v + e) - StrandHeight(u, v - e)) * 1.5f;
+                    Vector3 n = new Vector3(-dx, -dy, 1f).normalized;
+                    pixels[y * size + x] = new Color(n.x * 0.5f + 0.5f, n.y * 0.5f + 0.5f, n.z * 0.5f + 0.5f, 1f);
+                }
+                else
+                {
+                    float shade = Mathf.Lerp(0.45f, 1f, Mathf.Clamp01(h));   // dark grooves between the strands
+                    pixels[y * size + x] = new Color(shade, shade, shade, 1f);
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllBytes(path, tex.EncodeToPNG());
+            Object.DestroyImmediate(tex);
+            AssetDatabase.ImportAsset(path);
+
+            var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            importer.textureType = normalMap ? TextureImporterType.NormalMap : TextureImporterType.Default;
+            importer.wrapMode = TextureWrapMode.Repeat;
+            importer.mipmapEnabled = true;
+            importer.SaveAndReimport();
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }
 
         // Idle loops; the Shoot trigger plays the shot once (from any state, so fast shots restart it) and returns to idle.
