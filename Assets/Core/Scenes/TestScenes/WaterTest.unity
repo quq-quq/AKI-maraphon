@@ -814,6 +814,7 @@ GameObject:
   - component: {fileID: 1789588072}
   - component: {fileID: 1789588071}
   - component: {fileID: 1789588070}
+  - component: {fileID: 1789588074}
   m_Layer: 0
   m_Name: Water
   m_TagString: Untagged
@@ -833,8 +834,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 12b62e3068603f34588c4bf9084a45a7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AKI.Water.WaterSurface
-  size: 400
+  size: 6000
   resolution: 256
+  expandingGrid: 1
+  detailRadius: 60
   fallbackResolution: 192
   followTarget: {fileID: 0}
   followMainCamera: 1
@@ -920,6 +923,32 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1789588074
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1789588069}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 20ae524d416f01e4e8254c3b13c6ed4b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Water.OceanFFT
+  fftCompute: {fileID: 7200000, guid: 6e7cb234e514b084a90c16630433d527, type: 3}
+  windSpeed: 24
+  windDirection: 298
+  fetchKm: 300
+  waveScale: 1.01
+  choppiness: 1.3
+  spreadBlend: 0.85
+  swell: 0.2
+  peakEnhancement: 3.3
+  shortWavesFade: 0.01
+  foamDecay: 0.8
+  lengthScale0: 250
+  lengthScale1: 17
+  lengthScale2: 5
 --- !u!1001 &539679234811341236
 PrefabInstance:
   m_ObjectHideFlags: 0

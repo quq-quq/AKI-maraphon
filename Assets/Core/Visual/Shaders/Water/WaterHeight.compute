@@ -1,6 +1,7 @@
 // Evaluates the exact same wave functions the water surface uses, for a handful of world points
 // (player, floating objects...). Read back asynchronously by WaterSurface -> WaterProbe.
 #pragma kernel SampleHeights
+#pragma multi_compile_local _ _FFT_WAVES
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 
@@ -34,11 +35,17 @@ void SampleHeights(uint3 id : SV_DispatchThreadID)
     for (int k = 0; k < 4; k++)
         xz0 = p - WaterDisplacement(xz0, t, q).xz;
 
+#if defined(_FFT_WAVES)
+    float3 d = OceanDisplacement(xz0);
+    float3 n; float jac;
+    OceanSurfaceLod(xz0, 2.0, n, jac);
+#else
     WaterWaveField field = WaterEvalField(xz0, t);
     float3 d = WaterDisplacementF(field, xz0, t, q);
 
     float3 n; float jac, lace;
     WaterNormal(field, xz0, t, 1000.0, q, n, jac, lace);
+#endif
 
     _ProbeResults[id.x] = float4(_ProbeWaterLevel + d.y, n);
 }

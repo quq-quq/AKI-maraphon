@@ -32,6 +32,7 @@ Shader "AKI/WaterUnderwater"
         _CellWaveScale     ("Voronoi Wave Scale (1/m)", Range(0.02, 0.4)) = 0.09
         _CellWaveSpeed     ("Voronoi Wave Speed", Range(0, 3)) = 0.7
         [Toggle(_WAVE_DETAIL)] _WaveDetail ("Per-pixel Detail Waves", Float) = 1
+        [Toggle(_FFT_WAVES)] _FFTWaves ("FFT Ocean (needs OceanFFT component)", Float) = 0
         _DetailStrength    ("Detail Strength", Range(0, 2)) = 0.8
         _DetailFade        ("Detail Fade (x wavelength)", Range(10, 300)) = 90
         _FlattenDistance   ("Flatten Distance (m)", Range(50, 1500)) = 500
@@ -126,6 +127,7 @@ Shader "AKI/WaterUnderwater"
             // multi_compile (not shader_feature): the keywords are switched on from script at runtime
             #pragma multi_compile_local_fragment _ _CAUSTICS
             #pragma multi_compile_local_fragment _ _GODRAYS
+            #pragma multi_compile_local _ _FFT_WAVES
 
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
 

@@ -8,6 +8,8 @@ namespace Core.Scripts.Sound
         public static SoundManager Instance { get; private set; }
 
         [SerializeField] private SoundConfig _soundConfig;
+        [SerializeField] private Transform _wavesTransform;
+        [SerializeField] private Transform _seagoolTransform;
 
         private AudioSource _menuGamelanSource;
         private AudioSource _fishingGamelanSource;
@@ -33,7 +35,7 @@ namespace Core.Scripts.Sound
         private void OnEnable()
         {
             OnMenuStarted();
-            OnStartGame();
+            OnStartGame(_wavesTransform, _seagoolTransform);
         }
 
         private void OnDisable()

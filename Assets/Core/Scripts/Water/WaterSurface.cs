@@ -25,6 +25,10 @@ namespace AKI.Water
         [Header("Mesh")]
         [Min(10f)] public float size = 400f;
         [Range(16, 512)] public int resolution = 256;
+        [Tooltip("Open ocean: cells are small near the centre (camera) and grow with distance, so the sea reaches the horizon.")]
+        public bool expandingGrid = false;
+        [Tooltip("Expanding grid: distance (m) over which the cell size doubles.")]
+        [Min(5f)] public float detailRadius = 60f;
         [Tooltip("Grid resolution used together with the fallback material.")]
         [Range(16, 256)] public int fallbackResolution = 192;
 
@@ -72,7 +76,7 @@ namespace AKI.Water
         Mesh underwaterMesh;
         Material underwaterMaterial;
 
-        static readonly string[] SyncedKeywords = { "_CAUSTICS", "_GODRAYS" };
+        static readonly string[] SyncedKeywords = { "_CAUSTICS", "_GODRAYS", "_FFT_WAVES" };
         static readonly List<WaterSurface> instances = new List<WaterSurface>();
         static readonly int RayTexId = Shader.PropertyToID("_WaterRayTex");
 
@@ -149,7 +153,10 @@ namespace AKI.Water
             // results arrive a few frames later: evaluate the waves at the time they will be used
             heightCompute.SetFloat("_ProbeTime", Time.timeSinceLevelLoad + readbackLatency);
             heightCompute.SetFloat("_ProbeWaterLevel", WaterLevel);
-            heightCompute.SetFloat("_WaterMeshCell", size / Mathf.Max(1, builtResolution));
+            heightCompute.SetFloat("_WaterMeshCell", InnerCell);
+            heightCompute.SetFloat("_WaterMeshGrowth", builtExpanding ? builtRadius : 1e9f);
+            heightCompute.SetVector("_WaterMeshCenter", transform.position);
+            SetupProbeWaves(src);
             heightCompute.SetBuffer(probeKernel, "_ProbePoints", probePoints);
             heightCompute.SetBuffer(probeKernel, "_ProbeResults", probeResults);
             heightCompute.Dispatch(probeKernel, (inFlight.Count + 63) / 64, 1, 1);
@@ -157,6 +164,23 @@ namespace AKI.Water
             readbackPending = true;
             readbackStart = Time.realtimeSinceStartup;
             AsyncGPUReadback.Request(probeResults, inFlight.Count * 16, 0, OnProbeReadback);
+        }
+
+        // FFT ocean: the probes read the same displacement textures the surface is drawn with
+        void SetupProbeWaves(Material src)
+        {
+            var fftKeyword = new LocalKeyword(heightCompute, "_FFT_WAVES");
+            OceanFFT ocean = OceanFFT.Active;
+            bool fft = src.IsKeywordEnabled("_FFT_WAVES") && ocean != null && ocean.GetDisplacement(0) != null;
+            heightCompute.SetKeyword(fftKeyword, fft);
+            if (!fft) return;
+
+            for (int i = 0; i < 3; i++)
+            {
+                heightCompute.SetTexture(probeKernel, "_OceanDisp" + i, ocean.GetDisplacement(i));
+                heightCompute.SetTexture(probeKernel, "_OceanDeriv" + i, ocean.GetDerivatives(i));
+            }
+            heightCompute.SetVector("_OceanLengthScales", ocean.LengthScales);
         }
 
         void OnProbeReadback(AsyncGPUReadbackRequest request)
@@ -404,7 +428,7 @@ namespace AKI.Water
                 target = Camera.main.transform;
             if (target != null)
             {
-                float cell = size / Mathf.Max(1, builtResolution);
+                float cell = InnerCell;
                 Vector3 p = target.position;
                 p.x = Mathf.Round(p.x / cell) * cell;
                 p.z = Mathf.Round(p.z / cell) * cell;
@@ -439,20 +463,39 @@ namespace AKI.Water
         void Rebuild(bool force)
         {
             int res = UsingFallback ? Mathf.Min(fallbackResolution, resolution) : resolution;
-            if (!force && mesh != null && res == builtResolution && Mathf.Approximately(size, builtSize)) return;
+            if (!force && mesh != null && res == builtResolution && Mathf.Approximately(size, builtSize)
+                && expandingGrid == builtExpanding && Mathf.Approximately(detailRadius, builtRadius)) return;
 
             if (mesh != null) DestroyImmediate(mesh);
-            mesh = BuildGrid(size, res);
+            mesh = BuildGrid(size, res, expandingGrid, detailRadius);
             meshFilter.sharedMesh = mesh;
             builtResolution = res;
             builtSize = size;
+            builtExpanding = expandingGrid;
+            builtRadius = detailRadius;
             PublishMeshCell();
         }
 
-        // Tells the shader how coarse the grid is, so it can drop waves the grid cannot represent.
+        bool builtExpanding;
+        float builtRadius;
+
+        /// <summary>Size (m) of the grid cells at the centre of the mesh.</summary>
+        public float InnerCell => InnerCellSize(size, Mathf.Max(1, builtResolution), builtExpanding, builtRadius);
+
+        static float InnerCellSize(float size, int quads, bool expanding, float radius)
+        {
+            if (!expanding) return size / quads;
+            float k = Mathf.Log(1f + size * 0.5f / radius);
+            return radius * k * 2f / quads;
+        }
+
+        // Tells the shaders how coarse the grid is (at the centre and how it grows), so they can drop waves the grid
+        // cannot represent instead of aliasing them into spikes.
         void PublishMeshCell()
         {
-            Shader.SetGlobalFloat("_WaterMeshCell", size / Mathf.Max(1, builtResolution));
+            Shader.SetGlobalFloat("_WaterMeshCell", InnerCell);
+            Shader.SetGlobalFloat("_WaterMeshGrowth", builtExpanding ? builtRadius : 1e9f);
+            Shader.SetGlobalVector("_WaterMeshCenter", transform.position);
         }
 
         // ------------------------------------------------------------------ underwater
@@ -530,16 +573,25 @@ namespace AKI.Water
 
         // ------------------------------------------------------------------ grid
 
-        static Mesh BuildGrid(float size, int quads)
+        // Uniform grid, or an "expanding" one: coordinate u in [-1, 1] maps to radius * (e^(k|u|) - 1), so the cell size
+        // grows linearly with distance from the centre (inner cell * (1 + distance / radius)).
+        static Mesh BuildGrid(float size, int quads, bool expanding, float radius)
         {
             int verts = quads + 1;
             var positions = new Vector3[verts * verts];
             float half = size * 0.5f;
-            float step = size / quads;
+            float k = Mathf.Log(1f + half / radius);
+
+            float Coord(int i)
+            {
+                float u = i / (float)quads * 2f - 1f;
+                if (!expanding) return u * half;
+                return Mathf.Sign(u) * radius * (Mathf.Exp(k * Mathf.Abs(u)) - 1f);
+            }
 
             for (int z = 0; z < verts; z++)
             for (int x = 0; x < verts; x++)
-                positions[z * verts + x] = new Vector3(x * step - half, 0f, z * step - half);
+                positions[z * verts + x] = new Vector3(Coord(x), 0f, Coord(z));
 
             var indices = new int[quads * quads * 6];
             int i = 0;
