@@ -179,7 +179,6 @@ namespace AKI.Water.Editor
             cam.transform.position = new Vector3(0f, 7f, -32f);
             cam.transform.rotation = Quaternion.Euler(14f, 0f, 0f);
             cam.farClipPlane = 1500f;
-            cam.gameObject.AddComponent<WaterListenerAudio>();   // muffles sound + exposes IsUnderwater for the player
             cam.gameObject.AddComponent<WaterCameraEffects>();   // wet lens + waterline
             CreatePlayer(cam);
             InstallLensFeature();
@@ -247,6 +246,7 @@ namespace AKI.Water.Editor
             swimmer.cameraPivot = pivot;
             swimmer.playerCamera = cam;
             swimmer.inputActions = AssetDatabase.LoadAssetAtPath<UnityEngine.InputSystem.InputActionAsset>("Assets/InputSystem_Actions.inputactions");
+            AKI.Weapons.Editor.SpeargunMenu.AttachToPlayer(player);
 
             Directory.CreateDirectory(Path.GetDirectoryName(PlayerPrefabPath));
             PrefabUtility.SaveAsPrefabAssetAndConnect(player, PlayerPrefabPath, InteractionMode.AutomatedAction);
@@ -270,6 +270,9 @@ namespace AKI.Water.Editor
             go.transform.position = pos;
             go.transform.localScale = scale;
             go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+            // a sphere collider stays round (radius of the largest axis) and would stick out of a stretched rock
+            Object.DestroyImmediate(go.GetComponent<SphereCollider>());
+            go.AddComponent<MeshCollider>();
         }
 
         static Mesh BuildSeabedMesh()

@@ -14,13 +14,138 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Core.Scripts.Sound.SoundConfig
   <MenuGamelan>k__BackingField:
     Clip: {fileID: 0}
-    Volume: 1
+    Is3D: 0
+    IgnoreUnderwater: 1
+    Volume: 0.3
+    Pitch: 1
+    RandomAdd: 0.1
   <FishingGamelan>k__BackingField:
     Clip: {fileID: 0}
-    Volume: 1
+    Is3D: 0
+    IgnoreUnderwater: 1
+    Volume: 0.3
+    Pitch: 1
+    RandomAdd: 0.1
+  <NagaGamelan>k__BackingField:
+    Clip: {fileID: 0}
+    Is3D: 0
+    IgnoreUnderwater: 1
+    Volume: 0.3
+    Pitch: 1
+    RandomAdd: 0.1
   <WaterAmbient>k__BackingField:
     Clip: {fileID: 0}
-    Volume: 1
+    Is3D: 0
+    IgnoreUnderwater: 0
+    Volume: 0.1
+    Pitch: 1
+    RandomAdd: 0.1
   <WavesSound>k__BackingField:
     Clip: {fileID: 0}
+    Is3D: 0
+    IgnoreUnderwater: 0
+    Volume: 0.1
+    Pitch: 1
+    RandomAdd: 0.1
+  <SeagoolSound>k__BackingField:
+    Clip: {fileID: 0}
+    Is3D: 0
+    IgnoreUnderwater: 0
     Volume: 1
+    Pitch: 0.2
+    RandomAdd: 0.1
+  <ArrowMoveSound>k__BackingField:
+    Clip: {fileID: 0}
+    Is3D: 1
+    IgnoreUnderwater: 0
+    Volume: 0.8
+    Pitch: 1
+    RandomAdd: 0.1
+  <FishSwimmingSound>k__BackingField:
+    Clip: {fileID: 0}
+    Is3D: 1
+    IgnoreUnderwater: 0
+    Volume: 1
+    Pitch: 1
+    RandomAdd: 0.1
+  <NagaSwimmingSound>k__BackingField:
+    Clip: {fileID: 0}
+    Is3D: 1
+    IgnoreUnderwater: 0
+    Volume: 1
+    Pitch: 1
+    RandomAdd: 0.1
+  <SwimmingSound>k__BackingField:
+  - Clip: {fileID: 0}
+    Is3D: 0
+    IgnoreUnderwater: 0
+    Volume: 0.2
+    Pitch: 1
+    RandomAdd: 0.1
+  - Clip: {fileID: 0}
+    Is3D: 0
+    IgnoreUnderwater: 0
+    Volume: 0.2
+    Pitch: 1
+    RandomAdd: 0.1
+  - Clip: {fileID: 0}
+    Is3D: 0
+    IgnoreUnderwater: 0
+    Volume: 0.2
+    Pitch: 1
+    RandomAdd: 0.1
+  <SplashSound>k__BackingField:
+  - Clip: {fileID: 0}
+    Is3D: 0
+    IgnoreUnderwater: 0
+    Volume: 0.8
+    Pitch: 1
+    RandomAdd: 0.1
+  - Clip: {fileID: 0}
+    Is3D: 0
+    IgnoreUnderwater: 0
+    Volume: 0.8
+    Pitch: 1
+    RandomAdd: 0.1
+  <BreatheOutSound>k__BackingField:
+  - Clip: {fileID: 0}
+    Is3D: 0
+    IgnoreUnderwater: 0
+    Volume: 1
+    Pitch: 1
+    RandomAdd: 0.1
+  - Clip: {fileID: 0}
+    Is3D: 0
+    IgnoreUnderwater: 0
+    Volume: 1
+    Pitch: 1
+    RandomAdd: 0.1
+  <TriggerSound>k__BackingField:
+  - Clip: {fileID: 0}
+    Is3D: 1
+    IgnoreUnderwater: 0
+    Volume: 1
+    Pitch: 1
+    RandomAdd: 0.1
+  <HitSound>k__BackingField:
+    Clip: {fileID: 0}
+    Is3D: 1
+    IgnoreUnderwater: 0
+    Volume: 1.4
+    Pitch: 1
+    RandomAdd: 0.1
+  <FishDeathSound>k__BackingField:
+    Clip: {fileID: 0}
+    Is3D: 1
+    IgnoreUnderwater: 0
+    Volume: 1
+    Pitch: 1
+    RandomAdd: 0.1
+  <NagaDistanceSeconds>k__BackingField: 3
+  <NagaSounds>k__BackingField:
+  - Clip: {fileID: 0}
+    Is3D: 0
+    IgnoreUnderwater: 0
+    Volume: 1.4
+    Pitch: 1
+    RandomAdd: 0.1
