@@ -79,6 +79,9 @@ namespace AKI.Player
         public float waterHopSpeed = 3.6f;
         [Tooltip("How much the water's movement (WaterCurrent: swell push and pull, drift) carries the swimmer.")]
         [Min(0f)] public float currentInfluence = 1f;
+        [Tooltip("Placed above open water (nothing to stand on below), start floating at the surface instead of " +
+                 "dropping in from a height.")]
+        public bool startAtSurface = true;
 
         [Header("Climbing out")]
         public float climbMaxHeight = 1.6f;
@@ -147,6 +150,8 @@ namespace AKI.Player
         Vector3 climbFrom, climbTo;
         float climbT;
 
+        float placeAtSurfaceUntil = -1f;   // waiting for the wave height to start floating on it (Start)
+
         void Awake()
         {
             controller = GetComponent<CharacterController>();
@@ -155,6 +160,40 @@ namespace AKI.Player
             baseFov = playerCamera != null ? playerCamera.fieldOfView : 70f;
             yaw = transform.eulerAngles.y;
             SetupInput();
+        }
+
+        void Start()
+        {
+            placeAtSurfaceUntil = startAtSurface && OverOpenWater() ? Time.time + 1f : -1f;
+        }
+
+        // Placed above the water with nothing to stand on below (a deck or a shore keeps the player on it).
+        bool OverOpenWater()
+        {
+            WaterSurface water = WaterSurface.FindAt(transform.position);
+            if (water == null) return false;
+            Vector3 feet = transform.position;
+            float floatY = water.WaterLevel + surfaceEyeHeight - eyeHeight;
+            if (feet.y <= floatY) return false;
+            return !Physics.Raycast(feet + Vector3.up * 0.1f, Vector3.down, feet.y - floatY + 0.1f, ~0, QueryTriggerInteraction.Ignore);
+        }
+
+        // Puts the eyes where floating keeps them on the wave right here, so the first look isn't down at the sea from
+        // metres above. Waits for the GPU's first wave height (a frame or two), then gives up on it and uses the mean level.
+        bool PlacingAtSurface(float surfaceY)
+        {
+            if (placeAtSurfaceUntil < 0f) return false;
+            if (!probe.HasData && Time.time < placeAtSurfaceUntil) return true;
+            placeAtSurfaceUntil = -1f;
+            WaterSurface water = probe.Water != null ? probe.Water : WaterSurface.FindAt(transform.position);
+            if (water == null) return false;
+
+            Vector3 feet = transform.position;
+            feet.y = (probe.HasData ? surfaceY : water.WaterLevel) + surfaceEyeHeight - eyeHeight;
+            controller.enabled = false;
+            transform.position = feet;
+            controller.enabled = true;
+            return false;
         }
 
         void SetupInput()
@@ -233,6 +272,7 @@ namespace AKI.Player
             probe.position = transform.position;
             float surfaceY = probe.HeightOr(float.NegativeInfinity);
             bool hasWater = probe.Water != null;
+            if (PlacingAtSurface(surfaceY)) return;
 
             if (State == MoveState.Climbing)
             {
