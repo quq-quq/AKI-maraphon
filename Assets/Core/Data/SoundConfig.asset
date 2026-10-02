@@ -51,7 +51,7 @@ MonoBehaviour:
     Clip: {fileID: 8300000, guid: 90df70ce07226c845bfb9bef5804015d, type: 3}
     Is3D: 0
     IgnoreUnderwater: 0
-    Volume: 1
+    Volume: 0.5
     Pitch: 0.2
     RandomAdd: 0.1
   <ArrowMoveSound>k__BackingField:

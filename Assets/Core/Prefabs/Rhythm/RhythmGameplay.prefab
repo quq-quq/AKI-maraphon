@@ -1,0 +1,216 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &5850830026352339529
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8913121740339199757}
+  - component: {fileID: 566345660526840624}
+  - component: {fileID: 6821533460490447493}
+  - component: {fileID: 2900648057692513017}
+  m_Layer: 0
+  m_Name: RhythmGameplay
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8913121740339199757
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5850830026352339529}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!82 &566345660526840624
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5850830026352339529}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 0
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+--- !u!114 &6821533460490447493
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5850830026352339529}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 782938a3a41a18f459c0545c8dde26e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Rhythm.RhythmConductor
+  musicSource: {fileID: 566345660526840624}
+  scheduleLeadSeconds: 0.15
+  beatPulseSeconds: 0.12
+  accentPulseSeconds: 0.1
+  inputLatencySeconds: 0
+--- !u!114 &2900648057692513017
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5850830026352339529}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 76c80582cea0fbe40b56c49802b41b9a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Rhythm.RhythmGameFlow
+  conductor: {fileID: 6821533460490447493}
+  fishingTrack: {fileID: 11400000, guid: a2321c1c5b2343b48aeab33aeb514918, type: 2}
+  nagaTrack: {fileID: 11400000, guid: d3fd66d0e993d3d4099258d7e1a22a93, type: 2}
+  swimmer: {fileID: 0}
+  breath: {fileID: 0}
+  playerWeapon: {fileID: 0}
+  fishSpawner: {fileID: 0}
+  menu: {fileID: 0}
+  oceanTerrain: {fileID: 0}
+  soundConfig: {fileID: 11400000, guid: d47b18e464caeec469ce692ed91d4f8c, type: 2}
+  goldenFishPrefab: {fileID: 4627380386268063280, guid: 8e6cdcf9b8d19b74da3cf5870a8e1193, type: 3}
+  nagaPrefab: {fileID: 903234196066297433, guid: 44f37d2bc8a46d74c86ab41decf8bc00, type: 3}
+  goldenAppearsAfterSeconds: 75
+  goldenIgnoreSeconds: 25
+  goldenDistance: 6
+  goldenOrbitDegreesPerSecond: 15
+  goldenBobMetres: 0.25
+  earlyWindowSeconds: 0.1
+  lateWindowSeconds: 0.1
+  spamQuietSeconds: 0.16
+  shotCooldownSeconds: 1.25
+  reloadMaterializeSeconds: 0.35
+  bossBreathSeconds: 30
+  nagaOrbitRadius: 12
+  nagaAngularSpeed: 55
+  nagaScale: 0.6
+  bossWaveClearanceMetres: 6.5
+  finalChargeSeconds: 1.2
+  cutToBlackDistance: 0.45
+  bossHitColour: {r: 1, g: 0.78, b: 0.12, a: 1}
+  bossHitIntensity: 0.24
+  bossHitFadeSeconds: 0.35
+  bossHitVignetteInner: 0.32
+  musicVolume: 0.75
+  musicBypassesUnderwaterFilter: 1
+  onFishingStarted:
+    m_PersistentCalls:
+      m_Calls: []
+  onGoldenAppeared:
+    m_PersistentCalls:
+      m_Calls: []
+  onBossStarted:
+    m_PersistentCalls:
+      m_Calls: []
+  onBossHit:
+    m_PersistentCalls:
+      m_Calls: []
+  onFinalCharge:
+    m_PersistentCalls:
+      m_Calls: []
+  onEnded:
+    m_PersistentCalls:
+      m_Calls: []
+  phase: 0

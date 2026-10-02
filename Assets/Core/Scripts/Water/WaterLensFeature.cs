@@ -28,6 +28,7 @@ namespace AKI.Water
 
         /// <summary>Set by Blackout while the screen fades, the eyes open and the view comes into focus.</summary>
         public static bool ScreenActive;
+        public static bool RhythmHitActive;
 
         /// <summary>Set by UnderwaterPostVolume while the diving mask's rim shows (under water).</summary>
         public static bool MaskActive;
@@ -55,7 +56,7 @@ namespace AKI.Water
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
-            if (!(Active || BreathActive || ScreenActive || MaskActive) || material == null || pass == null) return;
+            if (!(Active || BreathActive || ScreenActive || MaskActive || RhythmHitActive) || material == null || pass == null) return;
             if (renderingData.cameraData.cameraType != CameraType.Game) return;
 
             pass.material = material;

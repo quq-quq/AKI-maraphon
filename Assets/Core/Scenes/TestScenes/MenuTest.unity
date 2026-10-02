@@ -854,6 +854,123 @@ MonoBehaviour:
   maskShader: {fileID: 4800000, guid: 60fbf5a614eacd14b9e54d95ce0830b6, type: 3}
   drop: 0.03
   inset: 0.03
+--- !u!1 &1134407219
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1134407221}
+  - component: {fileID: 1134407220}
+  m_Layer: 0
+  m_Name: Sound Manager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1134407220
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1134407219}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4942ecdb01030d47b7155c7936af948, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Core.Scripts.Sound.SoundManager
+  _soundConfig: {fileID: 11400000, guid: d47b18e464caeec469ce692ed91d4f8c, type: 2}
+  _wavesTransform: {fileID: 1688107167}
+  _seagoolTransform: {fileID: 237753737}
+  _underwaterAudio:
+    _strength: 1
+--- !u!4 &1134407221
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1134407219}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &1685433926
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 5850830026352339529, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_Name
+      value: Rhythm Gameplay
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+--- !u!114 &1685433927 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6821533460490447493, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+  m_PrefabInstance: {fileID: 1685433926}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 782938a3a41a18f459c0545c8dde26e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Rhythm.RhythmConductor
 --- !u!1 &1688107159
 GameObject:
   m_ObjectHideFlags: 0
@@ -906,6 +1023,14 @@ MonoBehaviour:
   flowSpeed: 2
   wobble: 0.05
   stretch: 0.05
+  rhythm: {fileID: 1685433927}
+  beatEmission: 6
+  beatSizeBoost: 1.5
+  beatGlowColour: {r: 0.45, g: 0.85, b: 1, a: 1}
+  accentAmplitude: 0.1
+  accentFrequency: 8
+  rhythmAttackTime: 0.012
+  rhythmReleaseTime: 0.22
 --- !u!114 &1688107161
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1088,3 +1213,5 @@ SceneRoots:
   - {fileID: 501039099}
   - {fileID: 23182051}
   - {fileID: 420528236}
+  - {fileID: 1685433926}
+  - {fileID: 1134407221}

@@ -1,3 +1,4 @@
+using AKI.Rhythm;
 using UnityEngine;
 
 namespace AKI.Water
@@ -13,6 +14,7 @@ namespace AKI.Water
     public class WaterCurrentView : MonoBehaviour
     {
         const float MaxCameraSpeed = 15f;   // m/s: anything faster is a teleport
+        const float MaxScreenSize = 0.012f; // share of the screen a speck may cover between beats
 
         [Tooltip("AKI/UnderwaterParticle material, additive (M_BubbleFizz). Its colour and fade settings are used.")]
         public Material material;
@@ -53,15 +55,39 @@ namespace AKI.Water
         [Tooltip("Stretch along the motion relative to the camera (seconds of travel): swimming makes them streak.")]
         [Min(0f)] public float stretch = 0.05f;
 
+        [Header("Rhythm")]
+        [Tooltip("Music clock. Empty = the active RhythmConductor.")]
+        [SerializeField] RhythmConductor rhythm;
+        [Tooltip("Extra glow on the music's recorded rhythmic pulses (0 = no beat pulse).")]
+        [Min(0f)] public float beatEmission = 6f;
+        [Tooltip("Specks swell by this share on a beat, so the flash reads as light blooming from each mote rather than a one-pixel blink (0 = size stays).")]
+        [Min(0f)] public float beatSizeBoost = 1.5f;
+        [ColorUsage(false, true)] public Color beatGlowColour = new Color(.45f, .85f, 1f, 1f);
+        [Tooltip("Maximum vertical excursion on strong recorded music transients (m). This is visual motion only, so it cannot accumulate drift.")]
+        [Min(0f)] public float accentAmplitude = 0.1f;
+        [Tooltip("Vertical oscillations per second during an accent.")]
+        [Min(0f)] public float accentFrequency = 8f;
+        [Tooltip("Seconds for the particles to respond to a beat or accent.")]
+        [Min(0.001f)] public float rhythmAttackTime = 0.025f;
+        [Tooltip("Seconds for the rhythm glow and motion to settle when the music stops.")]
+        [Min(0.001f)] public float rhythmReleaseTime = 0.15f;
+
+        static readonly int RhythmId = Shader.PropertyToID("_CurrentRhythm");
+        static readonly int GlowId = Shader.PropertyToID("_CurrentGlowColour");
+
         Transform root;
         Material instance;
         Texture2D builtIn;
         ParticleSystem system;
+        ParticleSystemRenderer speckRenderer;
         ParticleSystem.Particle[] buffer;
         Camera cam;
         Vector3 lastCamPos;
         Vector3 camVelocity;
         bool wasUnder;
+        float rhythmBeat;
+        float rhythmAccent;
+        float rhythmPhase;
 
         void Start()
         {
@@ -74,6 +100,8 @@ namespace AKI.Water
             root = new GameObject("Water Current View").transform;
             instance = new Material(material) { name = material.name + " (current)" };
             instance.SetFloat("_FadeDensity", fadeDensity);
+            instance.SetVector(RhythmId, Vector4.zero);
+            instance.SetColor(GlowId, beatGlowColour);
             if (texture == null) texture = builtIn = BuildSpeckTexture(64);
             instance.SetTexture("_BaseMap", texture);
             system = Build();
@@ -89,8 +117,11 @@ namespace AKI.Water
 
         void LateUpdate()
         {
+            UpdateRhythm(Time.unscaledDeltaTime);
             if (cam == null || !cam.isActiveAndEnabled) cam = Camera.main;
             if (cam == null || system == null) return;
+            // Unity hot reload cannot retain ParticleSystem.Particle[]; also support live count edits safely.
+            if (buffer == null || buffer.Length < count) buffer = new ParticleSystem.Particle[count];
 
             float dt = Time.deltaTime;
             Vector3 camPos = cam.transform.position;
@@ -114,6 +145,31 @@ namespace AKI.Water
             if (!wasUnder || jumped) Fill();
             wasUnder = true;
             Steer(camPos, dt);
+        }
+
+        void UpdateRhythm(float dt)
+        {
+            if (instance == null) return;
+
+            RhythmConductor clock = rhythm != null ? rhythm : RhythmConductor.Active;
+            bool playing = clock != null && clock.isActiveAndEnabled && clock.IsPlaying;
+            float beat = playing ? Mathf.Clamp01(clock.BeatPulse) : 0f;
+            float accent = playing ? Mathf.Clamp01(clock.AccentPulse) : 0f;
+            rhythmBeat = FollowPulse(rhythmBeat, beat, dt);
+            rhythmAccent = FollowPulse(rhythmAccent, accent, dt);
+            rhythmPhase = Mathf.Repeat(rhythmPhase + dt * Mathf.Max(0f, accentFrequency) * (2f * Mathf.PI), 2f * Mathf.PI);
+
+            // Offset only the rendered vertices: the particle simulation, current sampling and stretched
+            // billboards still use the original drift. The bounded offset returns to zero as music fades.
+            instance.SetVector(RhythmId, new Vector4(rhythmBeat * Mathf.Max(0f, beatEmission),
+                rhythmAccent * Mathf.Max(0f, accentAmplitude), rhythmPhase, 0f));
+            instance.SetColor(GlowId, beatGlowColour);
+        }
+
+        float FollowPulse(float current, float target, float dt)
+        {
+            float response = target > current ? rhythmAttackTime : rhythmReleaseTime;
+            return Mathf.Lerp(current, target, 1f - Mathf.Exp(-dt / Mathf.Max(0.001f, response)));
         }
 
         void Fill()
@@ -144,6 +200,8 @@ namespace AKI.Water
             float tanX = tanY * cam.aspect;
             float far = viewDistance;
             float t = Time.time;
+            float swell = 1f + Mathf.Max(0f, beatSizeBoost) * rhythmBeat;
+            if (speckRenderer != null) speckRenderer.maxParticleSize = MaxScreenSize * swell;
 
             for (int i = 0; i < n; i++)
             {
@@ -175,6 +233,7 @@ namespace AKI.Water
                 Color c = Color.Lerp(colorA, colorB, (seed % 97u) / 96f);
                 c.a *= alpha;
                 p.startColor = c;
+                p.startSize = BaseSize(seed) * swell;
                 buffer[i] = p;
             }
             system.SetParticles(buffer, n);
@@ -201,12 +260,19 @@ namespace AKI.Water
             p.velocity = Vector3.zero;
             p.startLifetime = Random.Range(lifetime.x, lifetime.y);
             p.remainingLifetime = p.startLifetime;
-            p.startSize = Mathf.Lerp(size.x, size.y, Mathf.Pow(Random.value, smallBias));
             p.rotation = Random.Range(0f, 360f);
             p.randomSeed = (uint)Random.Range(1, int.MaxValue);
+            p.startSize = BaseSize(p.randomSeed);
             Color c = colorA;
             c.a = 0f;
             p.startColor = c;
+        }
+
+        // The speck's own size, from its seed: the beat swell can scale it every frame without storing it.
+        float BaseSize(uint seed)
+        {
+            float u = ((seed * 2654435761u) >> 8) / 16777216f;
+            return Mathf.Lerp(size.x, size.y, Mathf.Pow(u, smallBias));
         }
 
         ParticleSystem Build()
@@ -237,9 +303,10 @@ namespace AKI.Water
             r.velocityScale = stretch;
             r.lengthScale = 1f;
             r.minParticleSize = 0.0007f;   // far specks stay a pixel or so instead of flickering in and out
-            r.maxParticleSize = 0.012f;    // a speck right at the lens stays a speck
+            r.maxParticleSize = MaxScreenSize;    // a speck right at the lens stays a speck
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             r.receiveShadows = false;
+            speckRenderer = r;
             r.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
             r.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
 
