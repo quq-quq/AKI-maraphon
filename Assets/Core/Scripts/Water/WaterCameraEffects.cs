@@ -54,6 +54,9 @@ namespace AKI.Water
         /// <summary>1 right after surfacing, 0 when the lens is dry.</summary>
         public float Wetness => wetness;
 
+        /// <summary>True while the camera is under the wave right above it (same hysteresis as the lens).</summary>
+        public bool Submerged => submerged;
+
         /// <summary>Soak the lens now (e.g. a splash hits the camera).</summary>
         public void Splash(float amount = 1f)
         {

@@ -1,7 +1,7 @@
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
-using UnityEngine.Rendering.RenderGraphModule.Util;
 using UnityEngine.Rendering.Universal;
 
 namespace AKI.Water
@@ -70,6 +70,21 @@ namespace AKI.Water
         {
             public Material material;
 
+            static readonly int WetnessId = Shader.PropertyToID("_WaterLensWetness");
+            static readonly int DropsId = Shader.PropertyToID("_WaterLensDrops");
+            static readonly int FilmId = Shader.PropertyToID("_WaterLensFilm");
+            static readonly int FilmTexelId = Shader.PropertyToID("_WaterLensFilmTexel");
+
+            class FilmData { public Material material; }
+
+            class LensData
+            {
+                public Material material;
+                public TextureHandle source;
+                public TextureHandle film;
+                public Vector4 filmTexel;
+            }
+
             public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
             {
                 var resources = frameData.Get<UniversalResourceData>();
@@ -77,11 +92,53 @@ namespace AKI.Water
 
                 TextureHandle source = resources.activeColorTexture;
                 TextureDesc desc = renderGraph.GetTextureDesc(source);
+
+                // Water on the lens after surfacing: its height field is smooth, so it is worked out at half resolution
+                // (shader pass 1) and the lens pass reads it and its slope from there.
+                TextureHandle film = TextureHandle.nullHandle;
+                var filmTexel = Vector4.zero;
+                if (Shader.GetGlobalFloat(WetnessId) * Shader.GetGlobalFloat(DropsId) > 0.001f)
+                {
+                    TextureDesc filmDesc = desc;
+                    filmDesc.name = "_WaterLensFilm";
+                    filmDesc.width = Mathf.Max(1, desc.width / 2);
+                    filmDesc.height = Mathf.Max(1, desc.height / 2);
+                    filmDesc.format = GraphicsFormat.R16G16_SFloat;
+                    filmDesc.filterMode = FilterMode.Bilinear;
+                    filmDesc.wrapMode = TextureWrapMode.Clamp;
+                    filmDesc.clearBuffer = false;
+                    film = renderGraph.CreateTexture(filmDesc);
+                    filmTexel = new Vector4(1f / filmDesc.width, 1f / filmDesc.height, filmDesc.width, filmDesc.height);
+
+                    using (var builder = renderGraph.AddRasterRenderPass<FilmData>("AKI Water Lens Film", out var data))
+                    {
+                        data.material = material;
+                        builder.SetRenderAttachment(film, 0, AccessFlags.WriteAll);
+                        builder.SetRenderFunc((FilmData d, RasterGraphContext ctx) =>
+                            Blitter.BlitTexture(ctx.cmd, new Vector4(1f, 1f, 0f, 0f), d.material, 1));
+                    }
+                }
+
                 desc.name = "_WaterLensColor";
                 desc.clearBuffer = false;
                 TextureHandle destination = renderGraph.CreateTexture(desc);
 
-                renderGraph.AddBlitPass(new RenderGraphUtils.BlitMaterialParameters(source, destination, material, 0), "AKI Water Lens");
+                using (var builder = renderGraph.AddRasterRenderPass<LensData>("AKI Water Lens", out var data))
+                {
+                    data.material = material;
+                    data.source = source;
+                    data.film = film;
+                    data.filmTexel = filmTexel;
+                    builder.UseTexture(source);
+                    if (film.IsValid()) builder.UseTexture(film);
+                    builder.SetRenderAttachment(destination, 0, AccessFlags.WriteAll);
+                    builder.SetRenderFunc((LensData d, RasterGraphContext ctx) =>
+                    {
+                        d.material.SetTexture(FilmId, d.film.IsValid() ? (Texture)(RTHandle)d.film : Texture2D.blackTexture);
+                        d.material.SetVector(FilmTexelId, d.filmTexel);
+                        Blitter.BlitTexture(ctx.cmd, d.source, new Vector4(1f, 1f, 0f, 0f), d.material, 0);
+                    });
+                }
                 resources.cameraColor = destination;
             }
         }
