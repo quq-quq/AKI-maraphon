@@ -30,6 +30,9 @@ namespace AKI.Water
         public static bool ScreenActive;
         public static bool RhythmHitActive;
 
+        /// <summary>Set by RhythmBeatFX while the beat glow pulses in from the screen edges.</summary>
+        public static bool RhythmBeatActive;
+
         /// <summary>Set by UnderwaterPostVolume while the diving mask's rim shows (under water).</summary>
         public static bool MaskActive;
 
@@ -56,7 +59,7 @@ namespace AKI.Water
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
-            if (!(Active || BreathActive || ScreenActive || MaskActive || RhythmHitActive) || material == null || pass == null) return;
+            if (!(Active || BreathActive || ScreenActive || MaskActive || RhythmHitActive || RhythmBeatActive) || material == null || pass == null) return;
             if (renderingData.cameraData.cameraType != CameraType.Game) return;
 
             pass.material = material;

@@ -137,6 +137,8 @@ Shader "Hidden/AKI/WaterLens"
             float  _DivingMask;              // 0..1 the diving mask's glass under water (UnderwaterPostVolume)
             float4 _RhythmHitVignette;       // warm light colour + success pulse, no additional render pass
             float  _RhythmHitInner;
+            float4 _RhythmBeatEdge;          // the music's beat, pulsing in from the screen edges: colour + strength (RhythmBeatFX)
+            float  _RhythmBeatWidth;         // how far that glow reaches in, share of the screen height
             // set by WaterLensFeature while the lens is wet
             TEXTURE2D(_WaterLensFilm);       // FragFilm's output at half resolution: (height, sheets)
             float4 _WaterLensFilmTexel;      // 1 / its size
@@ -590,6 +592,15 @@ Shader "Hidden/AKI/WaterLens"
 
                 float hitEdge = smoothstep(_RhythmHitInner, 0.78, length((uv-0.5)*float2(1.0, 1.0)));
                 col += _RhythmHitVignette.rgb * (_RhythmHitVignette.a * hitEdge);
+
+                // ---- the music's beat: a soft glow pulsing in from all four edges of the screen
+                if (_RhythmBeatEdge.a > 0.0)
+                {
+                    float2 e = min(uv, 1.0 - uv) * float2(aspect, 1.0);         // distance to the sides, in screen heights
+                    float2 g = 1.0 - smoothstep(0.0, max(_RhythmBeatWidth, 1e-3), e);
+                    float glow = 1.0 - (1.0 - g.x * g.x) * (1.0 - g.y * g.y);   // both sides blend in the corners, no seams
+                    col += (half3)(_RhythmBeatEdge.rgb * (_RhythmBeatEdge.a * glow));
+                }
                 col *= 1.0h - (half)saturate(_ScreenFade);
                 return half4(col, 1.0h);
             }

@@ -148,6 +148,10 @@ namespace AKI.Rhythm
             breath.onOutOfAir.AddListener(OnOutOfAir);
             headPoint = new GameObject("Naga_Final_HeadPoint").transform;
             headPoint.SetParent(cameraView.transform, false);
+            // the beat is felt through the camera: a short field of view kick and a pulse from the screen edges
+            var beatFx = cameraView.GetComponent<RhythmBeatFX>();
+            if (beatFx == null) beatFx = cameraView.gameObject.AddComponent<RhythmBeatFX>();
+            if (beatFx.conductor == null) beatFx.conductor = conductor;
             if (fishSpawner != null) { fishSpawner.spawnOnStart = false; fishSpawner.StopSpawning(); }
             initialized = true;
             if (swimmer.gameObject.activeInHierarchy && swimmer.IsHeadUnderwater) OnHeadDived();
