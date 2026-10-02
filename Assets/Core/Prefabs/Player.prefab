@@ -384,7 +384,13 @@ MonoBehaviour:
   aimSteadiness: 0.35
   recoilKick: 0.07
   recoilPitch: 7
-  recoilRecovery: 9
+  recoilRandom: 3
+  recoilRecovery: 16
+  recoilDamping: 0.55
+  viewKick: 2.2
+  viewKickRandom: 0.8
+  viewShake: 0.7
+  shakeSeconds: 0.3
   sway: 0.03
   maxSway: 6
 --- !u!1001 &8194354852463936066

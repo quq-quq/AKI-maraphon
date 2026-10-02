@@ -195,12 +195,18 @@ Shader "AKI/Water"
                 float endDepth = max(waterLevel - (cam.y + viewDir.y * capDist), 0.0);
 
                 // volume haze along this view ray (same formula as the full-screen effect)
-                half3 hazeCol = WaterUnderFogColor(camDepth, endDepth, viewDir, L, scatterLight);
+                half3 rays = 0;
             #if defined(_GODRAYS)
-                hazeCol += WaterGodRays(cam, cam + viewDir * capDist, positionCS.xy, L, lightColor, waterLevel, t) * 2.0h;
+                rays = WaterGodRays(cam, cam + viewDir * capDist, positionCS.xy, L, lightColor, waterLevel, t) * 2.0h;
             #endif
-                // what the mirror part of the ceiling reflects: the horizontal water at the camera's depth
-                half3 mirrorCol = WaterUnderFogColor(camDepth, camDepth, normalize(float3(viewDir.x, 0.0, viewDir.z) + 1e-4), L, scatterLight);
+                half3 hazeCol = WaterUnderFogColor(camDepth, endDepth, viewDir, L, scatterLight) + rays;
+                // What the mirror part of the ceiling reflects: the water below, looked at along the ray mirrored
+                // down, light shafts and all. Near the horizon that is the very haze beside it, so the ceiling runs
+                // into the water below without a seam (just under the surface the ceiling is close, and a darker
+                // mirror read as a band of another material between the two).
+                float3 mirrorDir = float3(viewDir.x, -abs(viewDir.y), viewDir.z);
+                float mirrorEnd = max(waterLevel - (cam.y + mirrorDir.y * capDist), 0.0);
+                half3 mirrorCol = WaterUnderFogColor(camDepth, mirrorEnd, mirrorDir, L, scatterLight) + rays;
 
                 float3 nU = -n;
                 float3 R = refract(viewDir, nU, WATER_IOR);          // water -> air
@@ -252,7 +258,7 @@ Shader "AKI/Water"
                 {
                     float3 camFwd = -UNITY_MATRIX_V[2].xyz;
                     float3 np = WaterNearPoint(_WorldSpaceCameraPos, normalize(i.positionWS - _WorldSpaceCameraPos), camFwd, _ProjectionParams.y);
-                    camAbove = WaterSubmergedDist(np, t, waterLevel) <= 0.0;
+                    camAbove = WaterPlaneSubmergedDist(i.camPlane, np, _WorldSpaceCameraPos) <= 0.0;
                 }
                 const bool front = camAbove;
 
@@ -338,6 +344,11 @@ Shader "AKI/Water"
                 float3 bottomWS = ComputeWorldSpacePosition(uvR, rawR, UNITY_MATRIX_I_VP);
                 float depthV = sky ? 1000.0 : max(waterLevel - bottomWS.y, 0.0);
                 float pathLen = sky ? 1000.0 : distance(posWS, bottomWS);
+                // a bottom far off through the water is lost in it: treat it like open water, or the far edge of the
+                // seabed shows up as a line across the sea where the colour jumps
+                float lost = sky ? 1.0 : saturate((pathLen - 25.0) / 25.0);
+                depthV = lerp(depthV, 1000.0, lost);
+                pathLen = lerp(pathLen, 1000.0, lost);
 
                 half3 bottomColor = sky ? half3(0, 0, 0) : SampleSceneColor(uvR);
 
@@ -355,7 +366,9 @@ Shader "AKI/Water"
 
                 // ---- god rays: light shafts through the water column
             #if defined(_GODRAYS)
-                float3 endWS = sky ? posWS + Rr * _RayLength : bottomWS;
+                // always along the refracted ray, as far as the bottom: marching towards where the bottom shows on
+                // screen instead turned the shafts another way wherever the seabed ends (a line across the sea)
+                float3 endWS = posWS + Rr * (sky ? _RayLength : min(distance(posWS, bottomWS), _RayLength));
                 // far away the shafts are too small to see: skip the march
                 half3 rays = dist < 150.0 ? WaterGodRays(posWS, endWS, i.positionCS.xy, L, lightColor, waterLevel, t) : half3(0, 0, 0);
                 under += rays * (1.0 - fresnel);

@@ -144,6 +144,7 @@ Shader "AKI/WaterUnderwater"
             {
                 float4 positionCS : SV_POSITION;
                 float  mode       : TEXCOORD0;   // 1 = fully submerged, 0.5 = at the surface (per-pixel waterline)
+                nointerpolation float4 plane : TEXCOORD1;   // the surface around the camera (WaterCameraPlane)
             };
 
             Varyings vert(uint vid : SV_VertexID)
@@ -163,6 +164,8 @@ Shader "AKI/WaterUnderwater"
 
                 float band = WaterSurfaceBand();
                 o.mode = (cam.y < surfY - band) ? 1.0 : 0.5;
+                o.plane = 0;
+                if (o.mode < 0.75) o.plane = WaterCameraPlane(cam, t, waterLevel);   // (a ternary would always pay for it)
                 // camera well above the water -> collapse the triangle outside the screen (no pixels are shaded)
                 o.positionCS = (cam.y < surfY + band) ? GetFullScreenTriangleVertexPosition(vid) : float4(2, 2, 1, 1);
                 return o;
@@ -192,9 +195,11 @@ Shader "AKI/WaterUnderwater"
                 half coverage = 1.0h;
                 if (i.mode < 0.75)
                 {
+                    // the ray through this pixel, without the wobble: the split has to match the lens' waterline
                     float3 camFwd = -UNITY_MATRIX_V[2].xyz;
-                    float3 np = WaterNearPoint(cam, dir, camFwd, _ProjectionParams.y);
-                    coverage = (half)smoothstep(-0.002, 0.002, WaterSubmergedDist(np, t, waterLevel));
+                    float3 rayDir = normalize(ComputeWorldSpacePosition(uv, UNITY_RAW_FAR_CLIP_VALUE, UNITY_MATRIX_I_VP) - cam);
+                    float3 np = WaterNearPoint(cam, rayDir, camFwd, _ProjectionParams.y);
+                    coverage = (half)smoothstep(-0.0005, 0.0005, WaterPlaneSubmergedDist(i.plane, np, cam));
                     if (coverage <= 0.0h) discard;
                 }
 

@@ -8,7 +8,8 @@ namespace AKI.Player
     /// The player's speargun: held in front of the camera, fires on Attack (left mouse / gamepad) towards whatever is
     /// under the screen centre. Hold Aim (right mouse / left trigger) to bring it up: the arrow lines up with the
     /// centre of the view, the view zooms in a little and turning gets steadier.
-    /// The gun lags a little behind quick turns and kicks back on the shot.
+    /// The gun lags a little behind quick turns. On the shot it kicks back and up on a spring, twisting a little
+    /// differently every time, and the view kicks up and shakes (<see cref="CameraShake"/> on the camera).
     /// Uses the swim controller's input actions, so it is enabled and disabled together with it.
     /// </summary>
     [RequireComponent(typeof(FirstPersonSwimController))]
@@ -36,13 +37,27 @@ namespace AKI.Player
         [Tooltip("Sway and recoil while aiming, as a share of the hip ones.")]
         [Range(0f, 1f)] public float aimSteadiness = 0.35f;
 
-        [Header("Feel")]
+        [Header("Recoil")]
         [Tooltip("Metres the gun jumps back on a shot.")]
         public float recoilKick = 0.07f;
         [Tooltip("Degrees the muzzle jumps up on a shot.")]
         public float recoilPitch = 7f;
-        [Tooltip("1/s: how quickly the gun settles after a shot.")]
-        [Min(0.1f)] public float recoilRecovery = 9f;
+        [Tooltip("Random twist on top (degrees of yaw and roll; the side jump is a share of the kick): every shot is a bit different.")]
+        public float recoilRandom = 3f;
+        [Tooltip("How fast the gun springs back after a shot (rad/s of the spring).")]
+        [Min(0.1f)] public float recoilRecovery = 16f;
+        [Tooltip("1 = settles without swinging past, less = it bounces a little before it settles.")]
+        [Range(0.2f, 1.5f)] public float recoilDamping = 0.55f;
+
+        [Header("View on the shot")]
+        [Tooltip("Degrees the view kicks up (it swings back by itself).")]
+        public float viewKick = 2.2f;
+        [Tooltip("Random sideways part of the view kick (degrees).")]
+        public float viewKickRandom = 0.8f;
+        [Tooltip("Degrees of the short shake on the shot.")]
+        public float viewShake = 0.7f;
+        [Min(0.01f)] public float shakeSeconds = 0.3f;
+        [Header("Feel")]
         [Tooltip("Seconds of lag behind turning the view (0 = rigid).")]
         [Range(0f, 0.1f)] public float sway = 0.03f;
         [Tooltip("Max sway angle (degrees).")]
@@ -52,9 +67,12 @@ namespace AKI.Player
         Camera cam;
         InputAction attackAction;
         InputAction aimAction;
+        CameraShake cameraShake;
         bool wasLocked;
-        float recoil;
         float aim;
+        // the gun's recoil spring: offset (m) and angles (degrees) from its pose, and their speeds
+        Vector3 recoilOffset, recoilOffsetVelocity;
+        Vector3 recoilAngles, recoilAnglesVelocity;
         Vector3 swayAngles;
         Quaternion lastCamRotation;
 
@@ -82,7 +100,12 @@ namespace AKI.Player
                 gun.owner = transform;   // own arrows never hit the player
                 if (cam != null && gun.transform.parent != cam.transform) gun.transform.SetParent(cam.transform, false);
             }
-            if (cam != null) lastCamRotation = cam.transform.rotation;
+            if (cam != null)
+            {
+                lastCamRotation = cam.transform.rotation;
+                cameraShake = cam.GetComponent<CameraShake>();
+                if (cameraShake == null) cameraShake = cam.gameObject.AddComponent<CameraShake>();
+            }
             PlaceGun(0f);
         }
 
@@ -117,7 +140,32 @@ namespace AKI.Player
         public void Fire()
         {
             if (gun == null || cam == null) return;
-            if (gun.Shoot(AimPoint()) != null) recoil = 1f;
+            if (gun.Shoot(AimPoint()) == null) return;
+
+            // aimed shots are steadier
+            float steady = Mathf.Lerp(1f, aimSteadiness, Mathf.SmoothStep(0f, 1f, aim));
+            const float peak = 0.52f;   // a spring kicked from rest peaks at about this share of v0 / spring
+            float toSpeed = recoilRecovery / peak;
+            Vector3 kick = new Vector3(Random.Range(-0.25f, 0.25f), Random.Range(0.05f, 0.25f), -1f) * recoilKick;
+            Vector3 twist = new Vector3(-recoilPitch * Random.Range(0.8f, 1.15f),
+                                        Random.Range(-recoilRandom, recoilRandom),
+                                        Random.Range(-recoilRandom, recoilRandom));
+            recoilOffsetVelocity += kick * (toSpeed * steady);
+            recoilAnglesVelocity += twist * (toSpeed * steady);
+
+            if (cameraShake != null)
+            {
+                cameraShake.Kick(new Vector3(-viewKick, Random.Range(-viewKickRandom, viewKickRandom), Random.Range(-viewKickRandom, viewKickRandom)) * steady);
+                cameraShake.Shake(viewShake * steady, shakeSeconds);
+            }
+        }
+
+        // a damped spring pulling x back to zero
+        void Spring(ref Vector3 x, ref Vector3 v, float dt)
+        {
+            float w = recoilRecovery;
+            v += (-w * w * x - 2f * recoilDamping * w * v) * dt;
+            x += v * dt;
         }
 
         // First thing under the screen centre that isn't the player; far point along the view if nothing.
@@ -155,7 +203,8 @@ namespace AKI.Player
                 if (angle > 180f) angle -= 360f;
                 if (!float.IsNaN(axis.x)) target = Vector3.ClampMagnitude(-axis * (angle / dt * sway), maxSway);
                 swayAngles = Vector3.Lerp(swayAngles, target, 1f - Mathf.Exp(-dt * 12f));
-                recoil *= Mathf.Exp(-dt * recoilRecovery);
+                Spring(ref recoilOffset, ref recoilOffsetVelocity, dt);
+                Spring(ref recoilAngles, ref recoilAnglesVelocity, dt);
             }
             lastCamRotation = camRotation;
 
@@ -172,8 +221,8 @@ namespace AKI.Player
 
             Transform t = gun.transform;
             t.localScale = Vector3.one * gunScale;
-            t.localPosition = position + Vector3.back * (recoilKick * recoil * shake);
-            t.localRotation = rotation * Quaternion.Euler(swayAngles * shake) * Quaternion.Euler(-recoilPitch * recoil * shake, 0f, 0f);
+            t.localPosition = position + recoilOffset;
+            t.localRotation = rotation * Quaternion.Euler(swayAngles * shake) * Quaternion.Euler(recoilAngles);
         }
 
         // Pose of a gun child relative to the gun root (the muzzle may sit under other children).
