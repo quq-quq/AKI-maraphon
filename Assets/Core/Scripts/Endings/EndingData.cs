@@ -21,11 +21,15 @@ namespace AKI.Endings
             [TextArea(2, 6)] public string text;
             [Tooltip("Seconds the line stays after fading in. For the last line: before a key is accepted (or before going on by itself).")]
             [Min(0f)] public float seconds;
+            [Tooltip("Voice spoken with the line: it starts as the line fades in, and the line stays until it is over.")]
+            public AudioClip voice;
         }
 
         [Header("Subtitles")]
         [Tooltip("Shown one after another; the last one stays on the screen.")]
         public Subtitle[] subtitles = { new Subtitle { text = "Конец.", seconds = 4f } };
+        [Tooltip("Loudness of the lines' voices. They are not muffled under water.")]
+        [Range(0f, 1f)] public float voiceVolume = 1f;
         public Placement placement = Placement.Bottom;
         [Min(8)] public int fontSize = 40;
         public Color textColor = new Color(1f, 0.85f, 0.1f, 1f);

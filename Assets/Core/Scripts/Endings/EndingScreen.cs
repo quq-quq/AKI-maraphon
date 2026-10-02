@@ -30,6 +30,7 @@ namespace AKI.Endings
         Text line;
         CanvasGroup words;
         CanvasGroup hint;
+        AudioSource voice;
 
         /// <summary>Shows <paramref name="ending"/>. Ignored while another ending is on the screen.</summary>
         public static void Show(EndingData ending)
@@ -65,6 +66,13 @@ namespace AKI.Endings
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
             gameObject.AddComponent<GraphicRaycaster>();   // the black takes the clicks, nothing under it reacts
+
+            voice = gameObject.AddComponent<AudioSource>();
+            voice.playOnAwake = false;
+            voice.spatialBlend = 0f;
+            voice.bypassListenerEffects = true;   // the narrator is not under water
+            voice.ignoreListenerPause = true;
+            voice.volume = ending.voiceVolume;
 
             RectTransform background = Panel("Black", transform, Vector2.zero, Vector2.one);
             background.gameObject.AddComponent<Image>().color = Color.black;
@@ -128,8 +136,15 @@ namespace AKI.Endings
             for (int i = 0; i < subtitles.Length; i++)
             {
                 line.text = subtitles[i].text;
+                float hold = subtitles[i].seconds;
+                if (subtitles[i].voice != null)
+                {
+                    voice.clip = subtitles[i].voice;
+                    voice.Play();
+                    hold = Mathf.Max(hold, subtitles[i].voice.length - ending.textFadeSeconds);   // the line outlasts its voice
+                }
                 yield return Fade(words, 0f, 1f, ending.textFadeSeconds);
-                if (subtitles[i].seconds > 0f) yield return new WaitForSecondsRealtime(subtitles[i].seconds);
+                if (hold > 0f) yield return new WaitForSecondsRealtime(hold);
                 if (i < subtitles.Length - 1) yield return Fade(words, 1f, 0f, ending.textFadeSeconds);   // the last line stays
             }
             if (ending.after == EndingData.AfterEnding.StayOnScreen) yield break;
