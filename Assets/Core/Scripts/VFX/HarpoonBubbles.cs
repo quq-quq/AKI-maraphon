@@ -4,7 +4,8 @@ using UnityEngine;
 namespace AKI.VFX
 {
     /// <summary>
-    /// Bubbles of a harpoon shot under water: a burst of bubbles and white fizz at the moment of the shot, then a light
+    /// Bubbles of a harpoon shot under water: a burst of bubbles and white fizz at the moment of the shot (out of the
+    /// muzzle and all along the shaft, so the water by the player boils up), then a light
     /// streak of bubbles left behind while it flies. Put the VFX_HarpoonBubbles prefab at the harpoon tip and call
     /// <see cref="Fire"/> when it is shot, <see cref="Stop"/> when it hits something. Particles live in world space,
     /// so the streak stays in the water and rises after the harpoon has gone.

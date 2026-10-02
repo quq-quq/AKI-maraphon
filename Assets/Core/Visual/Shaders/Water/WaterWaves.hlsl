@@ -366,6 +366,29 @@ float WaterSubmergedDist(float3 p, float t, float waterLevel)
     return waterLevel + WaterDisplacement(xz0, t, q).y - p.y;
 }
 
+// The surface right around the camera as a plane: x, y = its slope along world x and z, z = its height under the
+// camera. The near plane is only a few centimetres across, so over it the water is as good as flat - and testing
+// each pixel against the full wave maths instead blows millimetre noise (the half-float FFT data) up into a staircase
+// across the screen. Five samples, averaged for the height: evaluate it once per vertex, the same way in every shader
+// that draws the split, so the surface, the underwater overlay and the lens all agree on one smooth line.
+float4 WaterCameraPlane(float3 cam, float t, float waterLevel)
+{
+    const float r = 0.15;
+    float hc = WaterSubmergedDist(float3(cam.x, 0.0, cam.z), t, waterLevel);   // y = 0: the surface height itself
+    float hx0 = WaterSubmergedDist(float3(cam.x - r, 0.0, cam.z), t, waterLevel);
+    float hx1 = WaterSubmergedDist(float3(cam.x + r, 0.0, cam.z), t, waterLevel);
+    float hz0 = WaterSubmergedDist(float3(cam.x, 0.0, cam.z - r), t, waterLevel);
+    float hz1 = WaterSubmergedDist(float3(cam.x, 0.0, cam.z + r), t, waterLevel);
+    float h = (2.0 * hc + hx0 + hx1 + hz0 + hz1) / 6.0;
+    return float4((hx1 - hx0) / (2.0 * r), (hz1 - hz0) / (2.0 * r), h, 0.0);
+}
+
+// Metres the near-plane point np lies under the camera's surface plane (negative = above).
+float WaterPlaneSubmergedDist(float4 plane, float3 np, float3 cam)
+{
+    return plane.z + plane.x * (np.x - cam.x) + plane.y * (np.z - cam.z) - np.y;
+}
+
 // Analytic normal + Jacobian of the horizontal Gerstner mapping (jacobian < ~0.6 means the
 // surface is pinching together -> wave crest about to break -> foam).
 // lace: 0..1, high along Voronoi cell borders (used to draw lace foam).

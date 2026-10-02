@@ -252,7 +252,7 @@ Shader "AKI/Water"
                 {
                     float3 camFwd = -UNITY_MATRIX_V[2].xyz;
                     float3 np = WaterNearPoint(_WorldSpaceCameraPos, normalize(i.positionWS - _WorldSpaceCameraPos), camFwd, _ProjectionParams.y);
-                    camAbove = WaterSubmergedDist(np, t, waterLevel) <= 0.0;
+                    camAbove = WaterPlaneSubmergedDist(i.camPlane, np, _WorldSpaceCameraPos) <= 0.0;
                 }
                 const bool front = camAbove;
 

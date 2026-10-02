@@ -178,9 +178,42 @@ namespace AKI.VFX.Editor
                 FadeOverLife(streak, 0.03f, 0.3f, 0.7f);
             }
 
-            fx.fireBurst = new[] { shot, flash };
+            fx.fireBurst = new[] { shot, flash, BuildShotCloud(root.transform, bubble) };
             fx.trail = new[] { trail, streak };
             SavePrefab(root, HarpoonPrefabPath);
+        }
+
+        /// <summary>
+        /// The water torn up all along the shaft as the harpoon leaves the gun: a cloud of bubbles of every size that
+        /// stays by the player (world space) and rises, while the harpoon flies off.
+        /// </summary>
+        internal static ParticleSystem BuildShotCloud(Transform root, Material bubble)
+        {
+            const float shaft = 0.75f;   // m behind the tip: the arrow's length
+            ParticleSystem cloud = NewSystem(root, "ShotCloud", bubble, 400);
+            var main = cloud.main;
+            main.duration = 0.3f;
+            main.startLifetime = Range(1.5f, 3.5f);
+            main.startSpeed = Range(0.1f, 0.9f);
+            main.startSize = Range(0.008f, 0.045f);
+            main.gravityModifier = Range(-0.06f, -0.16f);   // rising
+            // one burst on the very first frame: a moment later the harpoon is already a metre away
+            Bursts(cloud, new ParticleSystem.Burst(0f, 170, 230));
+
+            var shape = cloud.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Box;   // a thin box along the shaft, from the tip backwards
+            shape.scale = new Vector3(0.07f, 0.07f, shaft);
+            shape.position = new Vector3(0f, 0f, -shaft * 0.5f);
+            shape.randomDirectionAmount = 1f;                // thrown out in every direction around the shaft
+
+            InheritVelocity(cloud, 0.04f);   // a little dragged along by the leaving harpoon
+            Drag(cloud, 3.5f);
+            Wobble(cloud, 0.22f, 1.8f);
+            PopSize(cloud);
+            FadeOverLife(cloud, 0.04f, 0.85f);
+            cloud.GetComponent<ParticleSystemRenderer>().maxParticleSize = 0.04f;   // right at the lens they stay bubbles, not discs
+            return cloud;
         }
 
         // ------------------------------------------------------------------ blood
