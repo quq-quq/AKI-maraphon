@@ -8,6 +8,8 @@ namespace AKI.Water
     /// every frame with an inverse FFT, in three cascades of different size (so nothing visibly tiles):
     /// long swells, medium waves and small chop. Produces, per cascade:
     ///   displacement (xyz + "turbulence" used for foam) and slopes/derivatives (normals, choppiness).
+    /// All three cascades run side by side in two dispatches a frame (spectrum + row transforms, then column
+    /// transforms + the final textures), with the twiddle factors from a table filled once.
     /// The results are published as global shader textures that AKI/Water (keyword _FFT_WAVES), the underwater
     /// effect, the lens and the height probes read.
     /// Put it next to WaterSurface. Wind speed is the main storm control.
@@ -80,14 +82,21 @@ namespace AKI.Water
         class Cascade
         {
             public float length;
-            public RenderTexture h0k, waveData, h0, specA, specB, displacement, derivatives;
+            public RenderTexture displacement, derivatives;
             public Texture2D noise;
         }
 
+        const int Count = 3;
+        static readonly int[] DispWriteIds = { Shader.PropertyToID("_Displacement0"), Shader.PropertyToID("_Displacement1"), Shader.PropertyToID("_Displacement2") };
+        static readonly int[] DerivWriteIds = { Shader.PropertyToID("_Derivatives0"), Shader.PropertyToID("_Derivatives1"), Shader.PropertyToID("_Derivatives2") };
+
         Cascade[] cascades;
+        // shared by the cascades (a slice each): spectrum set-up and the half-transformed spectra
+        RenderTexture h0k, waveData, h0, spec;
+        ComputeBuffer twiddles;
         bool spectrumDirty = true;
         bool resetFoam = true;
-        int kInit, kPack, kTime, kFftH, kFftV, kAssemble;
+        int kInit, kPack, kRows, kColumns;
 
         public float SimulationTime => Application.isPlaying ? Time.time : (float)EditorTime();
 
@@ -96,28 +105,26 @@ namespace AKI.Water
             if (fftCompute == null || !SystemInfo.supportsComputeShaders) return;
             kInit = fftCompute.FindKernel("InitSpectrum");
             kPack = fftCompute.FindKernel("PackConjugate");
-            kTime = fftCompute.FindKernel("TimeSpectrum");
-            kFftH = fftCompute.FindKernel("IFFTHorizontal");
-            kFftV = fftCompute.FindKernel("IFFTVertical");
-            kAssemble = fftCompute.FindKernel("Assemble");
+            kRows = fftCompute.FindKernel("SpectrumRows");
+            kColumns = fftCompute.FindKernel("ColumnsAssemble");
 
             float[] lengths = { lengthScale0, lengthScale1, lengthScale2 };
-            cascades = new Cascade[3];
-            for (int i = 0; i < 3; i++)
+            cascades = new Cascade[Count];
+            for (int i = 0; i < Count; i++)
             {
                 cascades[i] = new Cascade
                 {
                     length = lengths[i],
-                    h0k = NewRT(RenderTextureFormat.RGFloat, false),
-                    waveData = NewRT(RenderTextureFormat.ARGBFloat, false),
-                    h0 = NewRT(RenderTextureFormat.ARGBFloat, false),
-                    specA = NewRT(RenderTextureFormat.ARGBFloat, false),
-                    specB = NewRT(RenderTextureFormat.ARGBFloat, false),
                     displacement = NewRT(RenderTextureFormat.ARGBHalf, true),
                     derivatives = NewRT(RenderTextureFormat.ARGBHalf, true),
                     noise = GaussianNoise(1000 + i * 77)
                 };
             }
+            h0k = NewArray(RenderTextureFormat.RGFloat, Count);
+            waveData = NewArray(RenderTextureFormat.ARGBFloat, Count);
+            h0 = NewArray(RenderTextureFormat.ARGBFloat, Count);
+            spec = NewArray(RenderTextureFormat.ARGBFloat, Count * 2);
+            twiddles = TwiddleTable();
             spectrumDirty = true;
             resetFoam = true;
             Active = this;
@@ -129,11 +136,15 @@ namespace AKI.Water
             {
                 foreach (var c in cascades)
                 {
-                    foreach (var rt in new[] { c.h0k, c.waveData, c.h0, c.specA, c.specB, c.displacement, c.derivatives })
-                        if (rt != null) rt.Release();
+                    if (c.displacement != null) c.displacement.Release();
+                    if (c.derivatives != null) c.derivatives.Release();
                     if (c.noise != null) DestroyImmediate(c.noise);
                 }
             }
+            foreach (var rt in new[] { h0k, waveData, h0, spec })
+                if (rt != null) rt.Release();
+            twiddles?.Release();
+            twiddles = null;
             cascades = null;
             if (Active == this) Active = null;
         }
@@ -166,32 +177,27 @@ namespace AKI.Water
             fftCompute.SetFloat("_Reset", resetFoam ? 1f : 0f);
             resetFoam = false;
 
-            int groups = Size / 8;
-            for (int i = 0; i < cascades.Length; i++)
+            // every row of every cascade, then every column: two dispatches for the whole sea
+            fftCompute.SetTexture(kRows, "_WaveData", waveData);
+            fftCompute.SetTexture(kRows, "_H0", h0);
+            fftCompute.SetTexture(kRows, "_Spec", spec);
+            fftCompute.SetBuffer(kRows, "_Twiddles", twiddles);
+            fftCompute.Dispatch(kRows, Size, 1, Count);
+
+            fftCompute.SetTexture(kColumns, "_Spec", spec);
+            fftCompute.SetBuffer(kColumns, "_Twiddles", twiddles);
+            for (int i = 0; i < Count; i++)
+            {
+                fftCompute.SetTexture(kColumns, DispWriteIds[i], cascades[i].displacement);
+                fftCompute.SetTexture(kColumns, DerivWriteIds[i], cascades[i].derivatives);
+            }
+            fftCompute.Dispatch(kColumns, Size, 1, Count);
+
+            for (int i = 0; i < Count; i++)
             {
                 Cascade c = cascades[i];
-                fftCompute.SetTexture(kTime, "_WaveData", c.waveData);
-                fftCompute.SetTexture(kTime, "_H0", c.h0);
-                fftCompute.SetTexture(kTime, "_SpecA", c.specA);
-                fftCompute.SetTexture(kTime, "_SpecB", c.specB);
-                fftCompute.Dispatch(kTime, groups, groups, 1);
-
-                fftCompute.SetTexture(kFftH, "_SpecA", c.specA);
-                fftCompute.SetTexture(kFftH, "_SpecB", c.specB);
-                fftCompute.Dispatch(kFftH, Size, 1, 1);
-                fftCompute.SetTexture(kFftV, "_SpecA", c.specA);
-                fftCompute.SetTexture(kFftV, "_SpecB", c.specB);
-                fftCompute.Dispatch(kFftV, Size, 1, 1);
-
-                fftCompute.SetTexture(kAssemble, "_SpecA", c.specA);
-                fftCompute.SetTexture(kAssemble, "_SpecB", c.specB);
-                fftCompute.SetTexture(kAssemble, "_Displacement", c.displacement);
-                fftCompute.SetTexture(kAssemble, "_Derivatives", c.derivatives);
-                fftCompute.Dispatch(kAssemble, groups, groups, 1);
-
                 c.displacement.GenerateMips();
                 c.derivatives.GenerateMips();
-
                 Shader.SetGlobalTexture(DispIds[i], c.displacement);
                 Shader.SetGlobalTexture(DerivIds[i], c.derivatives);
             }
@@ -227,19 +233,19 @@ namespace AKI.Water
             float[] high = { boundary1, boundary2, 9999f };
 
             int groups = Size / 8;
+            fftCompute.SetTexture(kInit, "_H0K", h0k);
+            fftCompute.SetTexture(kInit, "_WaveData", waveData);
+            fftCompute.SetTexture(kPack, "_H0K", h0k);
+            fftCompute.SetTexture(kPack, "_H0", h0);
             for (int i = 0; i < cascades.Length; i++)
             {
                 Cascade c = cascades[i];
+                fftCompute.SetInt("_Cascade", i);
                 fftCompute.SetFloat("_LengthScale", c.length);
                 fftCompute.SetFloat("_CutoffLow", low[i]);
                 fftCompute.SetFloat("_CutoffHigh", high[i]);
                 fftCompute.SetTexture(kInit, "_Noise", c.noise);
-                fftCompute.SetTexture(kInit, "_H0K", c.h0k);
-                fftCompute.SetTexture(kInit, "_WaveData", c.waveData);
                 fftCompute.Dispatch(kInit, groups, groups, 1);
-
-                fftCompute.SetTexture(kPack, "_H0K", c.h0k);
-                fftCompute.SetTexture(kPack, "_H0", c.h0);
                 fftCompute.Dispatch(kPack, groups, groups, 1);
             }
         }
@@ -258,6 +264,36 @@ namespace AKI.Water
             };
             rt.Create();
             return rt;
+        }
+
+        static RenderTexture NewArray(RenderTextureFormat format, int slices)
+        {
+            var rt = new RenderTexture(Size, Size, 0, format, RenderTextureReadWrite.Linear)
+            {
+                dimension = TextureDimension.Tex2DArray,
+                volumeDepth = slices,
+                enableRandomWrite = true,
+                useMipMap = false,
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Repeat,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            rt.Create();
+            return rt;
+        }
+
+        // e^(+i 2 pi j / Size) for j < Size / 2: the inverse transform's twiddle factors, worked out once in double
+        static ComputeBuffer TwiddleTable()
+        {
+            var table = new Vector2[Size / 2];
+            for (int j = 0; j < table.Length; j++)
+            {
+                double angle = 2.0 * System.Math.PI * j / Size;
+                table[j] = new Vector2((float)System.Math.Cos(angle), (float)System.Math.Sin(angle));
+            }
+            var buffer = new ComputeBuffer(table.Length, 8);
+            buffer.SetData(table);
+            return buffer;
         }
 
         // Two independent pairs of normally distributed random numbers per texel (Box-Muller).

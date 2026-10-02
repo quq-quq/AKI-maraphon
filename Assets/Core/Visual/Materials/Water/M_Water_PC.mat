@@ -58,14 +58,14 @@ Material:
     - _GlintCellScale: 0.07
     - _GlintCellStrength: 0.85
     - _GodRaysOn: 1
-    - _RayContrast: 2.4
-    - _RayDepthFade: 0.06
-    - _RayFade: 0.07
-    - _RayIntensity: 1.6
-    - _RayLength: 30
+    - _RayContrast: 1.9
+    - _RayDepthFade: 0.025
+    - _RayFade: 0.045
+    - _RayIntensity: 2.6
+    - _RayLength: 50
     - _RayPhase: 0.72
     - _RayScale: 0.22
-    - _RaySteps: 16
+    - _RaySteps: 8
     - _ReflectionStrength: 0.6
     - _RefractionStrength: 1.1
     - _Roughness: 0.08

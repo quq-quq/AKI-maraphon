@@ -8,9 +8,13 @@ using UnityEngine.Rendering.Universal;
 namespace AKI.Water
 {
     /// <summary>
-    /// Builds a flat grid mesh for the AKI/Water shader (all wave motion happens on the GPU) and,
+    /// Builds the flat geometry for the AKI/Water shader (all wave motion happens on the GPU) and,
     /// optionally, keeps it centred under a camera so a finite grid reads as an endless ocean.
-    /// The grid snaps to its own cell size, so vertices never "swim" over the world-space waves.
+    /// A pool / lake is one grid; the open ocean (<see cref="expandingGrid"/>) is a geometry clipmap around the camera
+    /// (<see cref="WaterClipmap"/>): fine cells by the camera, doubling level by level out to the horizon.
+    /// Everything snaps to its own cell size, so vertices never "swim" over the world-space waves.
+    /// Right before each camera renders it also works out the surface right around that camera
+    /// (_WaterCamPlane), which the surface, the underwater overlay and the lens draw the waterline from.
     ///
     /// Also owns the full-screen "under water" effect (fog, caustics, light shafts) that switches on
     /// by itself when a camera dips below the wavy surface, and swaps to a cheap material/mesh when the
@@ -25,9 +29,15 @@ namespace AKI.Water
         [Header("Mesh")]
         [Min(10f)] public float size = 400f;
         [Range(16, 512)] public int resolution = 256;
-        [Tooltip("Open ocean: cells are small near the centre (camera) and grow with distance, so the sea reaches the horizon.")]
+        [Tooltip("Open ocean: a clipmap around the camera - small cells near it, doubling level by level out to the horizon.")]
         public bool expandingGrid = false;
-        [Tooltip("Expanding grid: distance (m) over which the cell size doubles.")]
+        [Tooltip("Open ocean: cell size (m) next to the camera.")]
+        [Range(0.03f, 1f)] public float clipCell = 0.15f;
+        [Tooltip("Open ocean: vertices per level ~ (8 x this)^2. Lower = faster, coarser.")]
+        [Range(4, 40)] public int clipDensity = 20;
+        [Tooltip("Open ocean: levels, each with cells twice the size of the one inside it.")]
+        [Range(2, 10)] public int clipLevels = 8;
+        [Tooltip("Pool / lake grid only (unused by the open ocean): distance (m) over which the cell size doubles.")]
         [Min(5f)] public float detailRadius = 60f;
         [Tooltip("Grid resolution used together with the fallback material.")]
         [Range(16, 256)] public int fallbackResolution = 192;
@@ -71,6 +81,11 @@ namespace AKI.Water
         RenderPipelineAsset lastAsset;
         bool underwaterDirty = true;
 
+        WaterClipmap clipmap;
+        RenderTexture camPlane;
+        int camPlaneKernel = -1;
+        static readonly int CamPlaneId = Shader.PropertyToID("_WaterCamPlane");
+
         GameObject underwaterGo;
         MeshRenderer underwaterRenderer;
         Mesh underwaterMesh;
@@ -89,6 +104,7 @@ namespace AKI.Water
         ComputeBuffer probeResults;
         bool readbackPending;
         float readbackStart;
+        float inFlightTime;     // game time the heights being read back describe
         float readbackLatency = 0.05f;
         int probeKernel = -1;
         Shader propertyCacheShader;
@@ -153,10 +169,9 @@ namespace AKI.Water
             // results arrive a few frames later: evaluate the waves at the time they will be used
             heightCompute.SetFloat("_ProbeTime", Time.timeSinceLevelLoad + readbackLatency);
             heightCompute.SetFloat("_ProbeWaterLevel", WaterLevel);
-            heightCompute.SetFloat("_WaterMeshCell", InnerCell);
-            heightCompute.SetFloat("_WaterMeshGrowth", builtExpanding ? builtRadius : 1e9f);
-            heightCompute.SetVector("_WaterMeshCenter", transform.position);
-            SetupProbeWaves(src);
+            PublishMeshCell(heightCompute);
+            // the FFT textures hold the sea of this frame, the Gerstner maths is evaluated ahead by the latency
+            inFlightTime = Time.time + (SetupProbeWaves(src) ? 0f : readbackLatency);
             heightCompute.SetBuffer(probeKernel, "_ProbePoints", probePoints);
             heightCompute.SetBuffer(probeKernel, "_ProbeResults", probeResults);
             heightCompute.Dispatch(probeKernel, (inFlight.Count + 63) / 64, 1, 1);
@@ -167,20 +182,66 @@ namespace AKI.Water
         }
 
         // FFT ocean: the probes read the same displacement textures the surface is drawn with
-        void SetupProbeWaves(Material src)
+        bool SetupProbeWaves(Material src) => SetupComputeWaves(src, probeKernel);
+
+        bool SetupComputeWaves(Material src, int kernel)
         {
             var fftKeyword = new LocalKeyword(heightCompute, "_FFT_WAVES");
             OceanFFT ocean = OceanFFT.Active;
             bool fft = src.IsKeywordEnabled("_FFT_WAVES") && ocean != null && ocean.GetDisplacement(0) != null;
             heightCompute.SetKeyword(fftKeyword, fft);
-            if (!fft) return;
+            if (!fft) return false;
 
             for (int i = 0; i < 3; i++)
             {
-                heightCompute.SetTexture(probeKernel, "_OceanDisp" + i, ocean.GetDisplacement(i));
-                heightCompute.SetTexture(probeKernel, "_OceanDeriv" + i, ocean.GetDerivatives(i));
+                heightCompute.SetTexture(kernel, "_OceanDisp" + i, ocean.GetDisplacement(i));
+                heightCompute.SetTexture(kernel, "_OceanDeriv" + i, ocean.GetDerivatives(i));
             }
             heightCompute.SetVector("_OceanLengthScales", ocean.LengthScales);
+            return true;
+        }
+
+        // ------------------------------------------------------------------ the surface around each camera
+
+        // Right before a camera renders: the plane of the surface right where it is (WaterWaves.hlsl,
+        // WaterCameraPlane), into a 1x1 texture every shader that draws the waterline reads. Once per camera instead
+        // of in every vertex of the surface.
+        void BeforeCameraRenders(ScriptableRenderContext context, Camera cam)
+        {
+            if (cam == null || heightCompute == null || !SystemInfo.supportsComputeShaders) return;
+            Vector3 p = cam.transform.position;
+            // the water the camera is in (or the first one, if it is in none) answers for it
+            WaterSurface owner = FindAt(p);
+            if (owner == null && instances.Count > 0) owner = instances[0];
+            if (owner != this) return;
+            Material src = ActiveMaterial;
+            if (src == null) return;
+
+            if (camPlane == null)
+            {
+                camPlane = new RenderTexture(1, 1, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear)
+                {
+                    enableRandomWrite = true,
+                    filterMode = FilterMode.Point,
+                    hideFlags = HideFlags.HideAndDontSave,
+                    name = "WaterCamPlane"
+                };
+                camPlane.Create();
+            }
+            if (camPlaneKernel < 0) camPlaneKernel = heightCompute.FindKernel("CameraPlane");
+
+            CopyMaterialToCompute(src);
+            SetupComputeWaves(src, camPlaneKernel);
+            PublishMeshCell(heightCompute);
+            heightCompute.SetFloat("_ProbeWaterLevel", WaterLevel);
+            heightCompute.SetVector("_CamPlanePos", p);
+            Vector4 time = Shader.GetGlobalVector("_Time");
+            heightCompute.SetFloat("_CamPlaneTime", time.y > 0f ? time.y : Time.timeSinceLevelLoad);
+            // the clipmap's cells by the camera are tiny: the exact waves; one coarse grid: its own triangle
+            heightCompute.SetFloat("_CamPlaneExact", clipmap != null ? 1f : 0f);
+            heightCompute.SetTexture(camPlaneKernel, "_CamPlaneOut", camPlane);
+            heightCompute.Dispatch(camPlaneKernel, 1, 1, 1);
+            Shader.SetGlobalTexture(CamPlaneId, camPlane);
         }
 
         void OnProbeReadback(AsyncGPUReadbackRequest request)
@@ -194,6 +255,9 @@ namespace AKI.Water
             {
                 WaterProbe p = inFlight[i];
                 if (p.Water != this) continue;
+                float sampleDt = inFlightTime - p.SampleTime;
+                p.HeightRate = p.HasData && sampleDt > 1e-3f ? (data[i].x - p.Height) / sampleDt : 0f;
+                p.SampleTime = inFlightTime;
                 p.Height = data[i].x;
                 p.Normal = new Vector3(data[i].y, data[i].z, data[i].w);
                 p.HasData = true;
@@ -327,6 +391,7 @@ namespace AKI.Water
         void OnEnable()
         {
             if (!instances.Contains(this)) instances.Add(this);
+            RenderPipelineManager.beginCameraRendering += BeforeCameraRenders;
             Shader.SetGlobalTexture(RayTexId, WaterTextures.RayField);
             Setup();
             Rebuild(true);
@@ -337,7 +402,16 @@ namespace AKI.Water
         void OnDisable()
         {
             instances.Remove(this);
+            RenderPipelineManager.beginCameraRendering -= BeforeCameraRenders;
             ReleaseProbeBuffers();
+            clipmap?.Destroy();
+            clipmap = null;
+            if (camPlane != null)
+            {
+                camPlane.Release();
+                DestroyImmediate(camPlane);
+                camPlane = null;
+            }
             underwater = false;
             underwaterAmount = 0f;
             if (mesh != null)
@@ -354,11 +428,16 @@ namespace AKI.Water
             if (isActiveAndEnabled)
             {
                 Setup();
+                validating = true;    // no child objects can be made in here: the clipmap is rebuilt a moment later
                 Rebuild(false);
+                validating = false;
                 ApplyMaterial();
                 RequestUnderwaterSetup();
             }
         }
+
+        bool validating;
+        bool geometryDirty;
 
         // Child objects can't be created during Awake/OnValidate, so this waits for the next editor tick
         // (LateUpdate alone is not enough: in edit mode it only runs when something in the scene changes).
@@ -417,6 +496,8 @@ namespace AKI.Water
                 underwaterDirty = true;
             }
 
+            if (geometryDirty) Rebuild(false);
+
             if (underwaterDirty || (underwaterGo == null && underwaterEffect))
             {
                 underwaterDirty = false;
@@ -435,6 +516,7 @@ namespace AKI.Water
                 p.y = baseY;
                 transform.position = p;
             }
+            if (clipmap != null) clipmap.UpdatePositions(target != null ? target.position : transform.position, WaterLevel);
 
             PublishMeshCell();
             UpdateProbes();
@@ -458,10 +540,47 @@ namespace AKI.Water
             lastAsset = GraphicsSettings.currentRenderPipeline;
             Material m = ActiveMaterial;
             if (m != null && meshRenderer.sharedMaterial != m) meshRenderer.sharedMaterial = m;
+            clipmap?.SetMaterial(m);
         }
 
         void Rebuild(bool force)
         {
+            if (validating)
+            {
+                // no objects can be made or switched in OnValidate: rebuild a moment later
+                geometryDirty = true;
+            #if UNITY_EDITOR
+                UnityEditor.EditorApplication.delayCall += () => { if (this != null && isActiveAndEnabled && geometryDirty) Rebuild(false); };
+            #endif
+                return;
+            }
+            geometryDirty = false;
+            if (expandingGrid)
+            {
+                // the open ocean: the clipmap draws, the component's own renderer stays off
+                if (mesh != null)
+                {
+                    DestroyImmediate(mesh);
+                    mesh = null;
+                    meshFilter.sharedMesh = null;
+                }
+                meshRenderer.enabled = false;
+                if (clipmap != null && !force && clipmap.Matches(clipCell, clipDensity, clipLevels, size)) return;
+                if (clipmap == null) clipmap = new WaterClipmap(transform);
+                clipmap.Build(clipCell, clipDensity, clipLevels, size, ActiveMaterial);
+                builtExpanding = true;
+                builtSize = size;
+                PublishMeshCell();
+                return;
+            }
+            if (clipmap != null)
+            {
+                clipmap.Destroy();
+                clipmap = null;
+            }
+            meshRenderer.enabled = true;
+            if (meshFilter.sharedMesh == null) force = true;
+
             int res = UsingFallback ? Mathf.Min(fallbackResolution, resolution) : resolution;
             if (!force && mesh != null && res == builtResolution && Mathf.Approximately(size, builtSize)
                 && expandingGrid == builtExpanding && Mathf.Approximately(detailRadius, builtRadius)) return;
@@ -479,8 +598,11 @@ namespace AKI.Water
         bool builtExpanding;
         float builtRadius;
 
-        /// <summary>Size (m) of the grid cells at the centre of the mesh.</summary>
-        public float InnerCell => InnerCellSize(size, Mathf.Max(1, builtResolution), builtExpanding, builtRadius);
+        /// <summary>Size (m) of the grid cells at the centre of the mesh (next to the camera for the open ocean).</summary>
+        public float InnerCell => clipmap != null ? clipmap.InnerCell : InnerCellSize(size, Mathf.Max(1, builtResolution), builtExpanding, builtRadius);
+
+        // distance (m) over which the cells grow by one inner cell
+        float MeshGrowth => clipmap != null ? clipmap.Growth : builtExpanding ? builtRadius : 1e9f;
 
         static float InnerCellSize(float size, int quads, bool expanding, float radius)
         {
@@ -494,8 +616,15 @@ namespace AKI.Water
         void PublishMeshCell()
         {
             Shader.SetGlobalFloat("_WaterMeshCell", InnerCell);
-            Shader.SetGlobalFloat("_WaterMeshGrowth", builtExpanding ? builtRadius : 1e9f);
+            Shader.SetGlobalFloat("_WaterMeshGrowth", MeshGrowth);
             Shader.SetGlobalVector("_WaterMeshCenter", transform.position);
+        }
+
+        void PublishMeshCell(ComputeShader cs)
+        {
+            cs.SetFloat("_WaterMeshCell", InnerCell);
+            cs.SetFloat("_WaterMeshGrowth", MeshGrowth);
+            cs.SetVector("_WaterMeshCenter", transform.position);
         }
 
         // ------------------------------------------------------------------ underwater

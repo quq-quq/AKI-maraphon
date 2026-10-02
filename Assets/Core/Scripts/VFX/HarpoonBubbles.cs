@@ -4,7 +4,8 @@ using UnityEngine;
 namespace AKI.VFX
 {
     /// <summary>
-    /// Bubbles of a harpoon shot under water: a burst of bubbles and white fizz at the moment of the shot, then a light
+    /// Bubbles of a harpoon shot under water: a burst of bubbles and white fizz at the moment of the shot (out of the
+    /// muzzle, all along the shaft and in a ring flung out sideways, so the water by the player boils up), then a light
     /// streak of bubbles left behind while it flies. Put the VFX_HarpoonBubbles prefab at the harpoon tip and call
     /// <see cref="Fire"/> when it is shot, <see cref="Stop"/> when it hits something. Particles live in world space,
     /// so the streak stays in the water and rises after the harpoon has gone.
@@ -13,6 +14,10 @@ namespace AKI.VFX
     {
         [Tooltip("Played once on Fire(): the cloud of bubbles and white fizz at the muzzle.")]
         public ParticleSystem[] fireBurst;
+        [Tooltip("The ring of bubbles bursting out sideways on the shot (part of Fire Burst): turned and tilted at random every shot.")]
+        public Transform shotRing;
+        [Tooltip("How far the ring may tilt off square to the harpoon (degrees).")]
+        [Range(0f, 60f)] public float ringTilt = 25f;
         [Tooltip("Emit by distance while the harpoon flies: the bubble streak behind it.")]
         public ParticleSystem[] trail;
         [Tooltip("Call Fire() when the object gets enabled (for a harpoon spawned at the moment of the shot).")]
@@ -49,6 +54,8 @@ namespace AKI.VFX
                 if (ps != null && !ps.isPlaying) ps.Play(false);
 
             if (!InWater()) return;
+            if (shotRing != null)
+                shotRing.localRotation = Quaternion.Euler(Random.Range(-ringTilt, ringTilt), Random.Range(-ringTilt, ringTilt), Random.Range(0f, 360f));
             foreach (ParticleSystem ps in fireBurst)
             {
                 if (ps == null) continue;

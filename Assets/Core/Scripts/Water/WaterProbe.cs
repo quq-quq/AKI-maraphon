@@ -27,6 +27,20 @@ namespace AKI.Water
         /// <summary>True once at least one GPU result has arrived.</summary>
         public bool HasData { get; internal set; }
 
+        /// <summary>How fast <see cref="Height"/> is changing (m/s), from the last two results.</summary>
+        public float HeightRate { get; internal set; }
+
+        /// <summary>Game time (Time.time) the current <see cref="Height"/> describes.</summary>
+        public float SampleTime { get; internal set; }
+
+        /// <summary>
+        /// <see cref="Height"/> carried forward to now along <see cref="HeightRate"/>. Results only arrive every few
+        /// frames: following the raw value moves things in little steps, this one moves smoothly.
+        /// </summary>
+        public float PredictedHeight => Height + HeightRate * Mathf.Clamp(Time.time - SampleTime, -MaxPrediction, MaxPrediction);
+
+        const float MaxPrediction = 0.15f;   // s; a stalled readback must not fling the value away
+
         /// <summary>The water this probe is inside, or null.</summary>
         public WaterSurface Water { get; internal set; }
 
@@ -35,10 +49,10 @@ namespace AKI.Water
 
         public static void Unregister(WaterProbe probe) => WaterSurface.UnregisterProbe(probe);
 
-        /// <summary>Surface height if known, otherwise the mean water level (or <paramref name="fallback"/> with no water).</summary>
+        /// <summary>Surface height now (predicted) if known, otherwise the mean water level (or <paramref name="fallback"/> with no water).</summary>
         public float HeightOr(float fallback)
         {
-            if (HasData) return Height;
+            if (HasData) return PredictedHeight;
             return Water != null ? Water.WaterLevel : fallback;
         }
     }

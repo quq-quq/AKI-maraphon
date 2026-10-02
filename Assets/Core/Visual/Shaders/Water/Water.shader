@@ -75,14 +75,14 @@ Shader "AKI/Water"
         [Header(Light Shafts)]
         [Toggle(_GODRAYS)] _GodRaysOn ("Underwater Light Shafts", Float) = 1
         _RayColor          ("Colour", Color) = (0.50, 0.80, 1, 1)
-        _RayIntensity      ("Intensity", Range(0, 8)) = 1.6
+        _RayIntensity      ("Intensity", Range(0, 8)) = 2.6
         _RayScale          ("Pattern Scale", Range(0.02, 1.5)) = 0.22
-        _RaySteps          ("Steps (quality)", Range(2, 32)) = 16
-        _RayLength         ("Max Length (m)", Range(1, 60)) = 30
+        _RaySteps          ("Steps (quality)", Range(2, 12)) = 8
+        _RayLength         ("Max Length (m)", Range(1, 60)) = 50
         _RayPhase          ("Forward Scattering", Range(0, 0.9)) = 0.72
-        _RayFade           ("View Fade", Range(0, 0.5)) = 0.07
-        _RayContrast       ("Beam Contrast", Range(0.5, 8)) = 2.4
-        _RayDepthFade      ("Fade With Depth (1/m)", Range(0, 1)) = 0.06
+        _RayFade           ("View Fade", Range(0, 0.5)) = 0.045
+        _RayContrast       ("Beam Contrast", Range(0.5, 8)) = 1.9
+        _RayDepthFade      ("Fade With Depth (1/m)", Range(0, 1)) = 0.025
 
         [Header(Seen From Below)]
         _UnderFogScale     ("Underwater Fog Density", Range(0.05, 6)) = 0.6
@@ -107,6 +107,44 @@ Shader "AKI/Water"
             "IgnoreProjector" = "True"
         }
 
+        // Depth pre-pass. The surface is one big transparent mesh drawn in index order, so without depth the far
+        // side of a wave could be drawn over its own crest (straight-edged holes along the grid lines, "seeing
+        // through" waves, folded shards from below). URP draws SRPDefaultUnlit before UniversalForward for the same
+        // object: this pass leaves the nearest layer of water in the depth buffer and the colour pass shades only it.
+        Pass
+        {
+            Name "WaterDepth"
+            Tags { "LightMode" = "SRPDefaultUnlit" }
+
+            ZWrite On
+            ColorMask 0
+            Cull Off
+            Offset 0, 1   // a hair behind, so the colour pass is never rejected by its own surface
+
+            HLSLPROGRAM
+            #pragma target 3.5
+            #pragma vertex vert
+            #pragma fragment fragDepth
+
+            #pragma shader_feature_local _FFT_WAVES
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareOpaqueTexture.hlsl"
+
+            #include "WaterInput.hlsl"
+            #include "WaterWaves.hlsl"
+            #include "WaterEffects.hlsl"
+            #include "WaterSurfaceVertex.hlsl"
+
+            half4 fragDepth(Varyings i) : SV_Target
+            {
+                return 0;
+            }
+            ENDHLSL
+        }
+
         Pass
         {
             Name "ForwardLit"
@@ -114,6 +152,7 @@ Shader "AKI/Water"
 
             Blend SrcAlpha OneMinusSrcAlpha
             ZWrite Off
+            ZTest LEqual
             Cull Off      // both sides: the underside is the ceiling you see from below
 
             HLSLPROGRAM
@@ -141,51 +180,7 @@ Shader "AKI/Water"
             #include "WaterWaves.hlsl"
             #include "WaterEffects.hlsl"
 
-            struct Attributes
-            {
-                float4 positionOS : POSITION;
-            };
-
-            struct Varyings
-            {
-                float4 positionCS : SV_POSITION;
-                float3 positionWS : TEXCOORD0;
-                float2 waveXZ     : TEXCOORD1;   // undisplaced xz - what the wave functions are evaluated at
-                float  fogCoord   : TEXCOORD2;
-                float  q          : TEXCOORD3;   // Gerstner steepness factor (constant per material)
-                float4 fieldA     : TEXCOORD4;   // low-frequency wave fields, evaluated per vertex (see WaterWaves.hlsl)
-                float4 fieldB     : TEXCOORD5;
-                float4 fieldC     : TEXCOORD6;
-                float4 cellColor  : TEXCOORD7;   // large-scale colour + glint cells (xy colour, zw glints)
-            };
-
-            Varyings vert(Attributes v)
-            {
-                Varyings o;
-                float3 posWS = TransformObjectToWorld(v.positionOS.xyz);
-                o.waveXZ = posWS.xz;
-                o.q = WaterQ();
-
-                float dist = distance(posWS, _WorldSpaceCameraPos);
-                float geoFade = saturate(1.0 - (dist - _FlattenDistance * 0.6) / (_FlattenDistance * 0.4));
-                const float tt = _Time.y;
-            #if defined(_FFT_WAVES)
-                o.fieldA = 0; o.fieldB = 0; o.fieldC = 0;
-                o.cellColor = 0;
-                posWS += OceanDisplacement(posWS.xz) * geoFade;
-            #else
-                WaterWaveField field = WaterEvalField(posWS.xz, tt);
-                WaterPackField(field, o.fieldA, o.fieldB, o.fieldC);
-                o.cellColor = float4((WaterSoftCells(posWS.xz * _ColorCellScale, tt * 0.04) - 0.5) * 1.8,
-                                     WaterSoftCells(posWS.xz * _GlintCellScale, tt * 0.08));
-                posWS += WaterDisplacementF(field, posWS.xz, tt, o.q) * geoFade;
-            #endif
-
-                o.positionWS = posWS;
-                o.positionCS = TransformWorldToHClip(posWS);
-                o.fogCoord = ComputeFogFactor(o.positionCS.z);
-                return o;
-            }
+            #include "WaterSurfaceVertex.hlsl"
 
             // The water surface as seen from below: Snell's window onto the sky, mirror outside it.
             // It is fogged (and lit by the same light shafts) exactly like the rest of the volume, so at a distance
@@ -200,12 +195,18 @@ Shader "AKI/Water"
                 float endDepth = max(waterLevel - (cam.y + viewDir.y * capDist), 0.0);
 
                 // volume haze along this view ray (same formula as the full-screen effect)
-                half3 hazeCol = WaterUnderFogColor(camDepth, endDepth, viewDir, L, scatterLight);
+                half3 rays = 0;
             #if defined(_GODRAYS)
-                hazeCol += WaterGodRays(cam, cam + viewDir * capDist, positionCS.xy, L, lightColor, waterLevel, t) * 2.0h;
+                rays = WaterGodRays(cam, cam + viewDir * capDist, positionCS.xy, L, lightColor, waterLevel, t) * 2.0h;
             #endif
-                // what the mirror part of the ceiling reflects: the horizontal water at the camera's depth
-                half3 mirrorCol = WaterUnderFogColor(camDepth, camDepth, normalize(float3(viewDir.x, 0.0, viewDir.z) + 1e-4), L, scatterLight);
+                half3 hazeCol = WaterUnderFogColor(camDepth, endDepth, viewDir, L, scatterLight) + rays;
+                // What the mirror part of the ceiling reflects: the water below, looked at along the ray mirrored
+                // down, light shafts and all. Near the horizon that is the very haze beside it, so the ceiling runs
+                // into the water below without a seam (just under the surface the ceiling is close, and a darker
+                // mirror read as a band of another material between the two).
+                float3 mirrorDir = float3(viewDir.x, -abs(viewDir.y), viewDir.z);
+                float mirrorEnd = max(waterLevel - (cam.y + mirrorDir.y * capDist), 0.0);
+                half3 mirrorCol = WaterUnderFogColor(camDepth, mirrorEnd, mirrorDir, L, scatterLight) + rays;
 
                 float3 nU = -n;
                 float3 R = refract(viewDir, nU, WATER_IOR);          // water -> air
@@ -257,7 +258,7 @@ Shader "AKI/Water"
                 {
                     float3 camFwd = -UNITY_MATRIX_V[2].xyz;
                     float3 np = WaterNearPoint(_WorldSpaceCameraPos, normalize(i.positionWS - _WorldSpaceCameraPos), camFwd, _ProjectionParams.y);
-                    camAbove = WaterSubmergedDist(np, t, waterLevel) <= 0.0;
+                    camAbove = WaterPlaneSubmergedDist(WaterCameraPlaneLoad(), np, _WorldSpaceCameraPos) <= 0.0;
                 }
                 const bool front = camAbove;
 
@@ -343,6 +344,11 @@ Shader "AKI/Water"
                 float3 bottomWS = ComputeWorldSpacePosition(uvR, rawR, UNITY_MATRIX_I_VP);
                 float depthV = sky ? 1000.0 : max(waterLevel - bottomWS.y, 0.0);
                 float pathLen = sky ? 1000.0 : distance(posWS, bottomWS);
+                // a bottom far off through the water is lost in it: treat it like open water, or the far edge of the
+                // seabed shows up as a line across the sea where the colour jumps
+                float lost = sky ? 1.0 : saturate((pathLen - 25.0) / 25.0);
+                depthV = lerp(depthV, 1000.0, lost);
+                pathLen = lerp(pathLen, 1000.0, lost);
 
                 half3 bottomColor = sky ? half3(0, 0, 0) : SampleSceneColor(uvR);
 
@@ -360,9 +366,12 @@ Shader "AKI/Water"
 
                 // ---- god rays: light shafts through the water column
             #if defined(_GODRAYS)
-                float3 endWS = sky ? posWS + Rr * _RayLength : bottomWS;
-                // far away the shafts are too small to see: skip the march
-                half3 rays = dist < 150.0 ? WaterGodRays(posWS, endWS, i.positionCS.xy, L, lightColor, waterLevel, t) : half3(0, 0, 0);
+                // always along the refracted ray, as far as the bottom: marching towards where the bottom shows on
+                // screen instead turned the shafts another way wherever the seabed ends (a line across the sea)
+                float3 endWS = posWS + Rr * (sky ? _RayLength : min(distance(posWS, bottomWS), _RayLength));
+                half3 rays = 0;
+                [branch] if (dist < 80.0)   // further out the shafts are too small to see: skip the march
+                    rays = WaterGodRays(posWS, endWS, i.positionCS.xy, L, lightColor, waterLevel, t) * saturate((80.0 - dist) / 20.0);
                 under += rays * (1.0 - fresnel);
             #endif
 
