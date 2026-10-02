@@ -165,29 +165,110 @@ Shader "Hidden/AKI/WaterLens"
                 return SAMPLE_TEXTURE2D_X_LOD(_BlitTexture, sampler_LinearClamp, saturate(uv), 0).rgb;
             }
 
-            // ---------------------------------------------------------------- water film after surfacing
-            // Thickness of the water film on the lens (in screen-height units). The image is bent by the slope of the
-            // film's surface, like through real running water: no separate drops, just one draining, wavering layer.
-            //  - right after the head breaks the surface the film covers everything and is thick and lumpy,
-            //  - it drains from the top down; behind the draining edge a thin uneven residue stays and dries off.
-            float FilmHeight(float2 q, float since)
+            // ---------------------------------------------------------------- water on the lens after surfacing
+            // A height field of water on the glass (q: x scaled by the aspect, y = 0 bottom .. 1 top; heights in
+            // screen-height units). The view is bent by its slope. Three things, like water poured over glass:
+            //  - a sheet that covers the whole lens the moment the head breaks the surface, then runs off downwards,
+            //    slow at first and faster and faster, with a fat bead of water piled up along its trailing edge,
+            //    torn into tongues that hang back,
+            //  - streams that keep running down where the sheet has gone: broad, soft-sided, meandering, with ripples
+            //    flowing inside, thinning out and stopping one by one,
+            //  - a thin streaky wet layer behind it all, drying off. No separate drops: they read as cartoon beads.
+
+            // height of the sheet's trailing edge (it drains from the top): gravity, so slow start, then it runs off
+            float SheetFall(float since)
             {
-                const float DrainSeconds = 1.5;
-                float flow = since * 1.1;                                    // the water slides down
-                float drain = since / DrainSeconds;
-                float edge = 1.12 - drain * 1.35 + 0.08 * (LensNoise(float2(q.x * 2.5, since * 0.8)) - 0.5);
-                float body = smoothstep(edge + 0.18, edge - 0.1, q.y);
+                return 1.15 - since * 0.3 - since * since * 0.62;
+            }
 
-                // lumps and ripples in the film, stretched downwards as it runs
-                // (long in y, narrow in x: the film runs in streaks, so it bends the view sideways, not up and down)
-                float warp = LensNoise(q * float2(2.0, 0.6) + float2(0.0, flow * 0.7));
-                float lumps = LensNoise(float2(q.x * 3.0 + warp * 1.6, q.y * 0.7 + flow * 1.3));
-                float fine = LensNoise(float2(q.x * 8.0 - warp * 2.0, q.y * 1.1 + flow * 2.2));
-                float thickness = body * (0.35 + 0.55 * lumps + 0.1 * fine) * saturate(1.15 - drain * 0.35);
+            float SheetEdge(float x, float since)
+            {
+                // tongues hang back from the edge, uneven in width and length; they get longer as it drains
+                float wobble = LensNoise(float2(x * 2.3, 3.7)) * 0.08 + LensNoise(float2(x * 7.0, 5.3)) * 0.03;
+                float n = LensNoise(float2(x * 4.1 + LensNoise(float2(x * 1.7, 1.3)) * 2.0, 9.1));
+                float tongues = pow(saturate(n * 1.25 - 0.25), 4.0) * 0.35 * saturate(since * 1.6);
+                return SheetFall(since) + wobble + tongues;
+            }
 
-                // behind the edge a thin, uneven residue of water stays and dries off
-                float residue = 0.3 * (1.0 - body) * saturate(1.0 - (since - 0.3) / 2.0) * (0.4 + 0.6 * lumps);
-                return thickness + residue;
+            float Sheet(float2 q, float since, float flow)
+            {
+                float inside = SheetEdge(q.x, since) - q.y;                  // > 0 below the trailing edge
+                if (inside < -0.04) return 0.0;
+                float body = smoothstep(-0.03, 0.04, inside);
+                // water piles up along the edge, more in some places than others
+                float bead = exp(-max(inside, 0.0) / 0.045) * (0.15 + 0.3 * LensNoise(float2(q.x * 6.0, 2.0)));
+
+                // lumps in the sheet, sliding down with it and stretched into streaks as it runs
+                float warp = LensNoise(q * float2(3.0, 1.2) + float2(0.0, flow));
+                float lumps = LensNoise(float2(q.x * 4.0 + warp * 1.5, q.y * (1.8 - 0.8 * saturate(since)) + flow * 1.6));
+                float fine = LensNoise(float2(q.x * 11.0 - warp * 2.0, q.y * 3.0 + flow * 2.5));
+                float thick = (0.5 + 0.38 * lumps + 0.12 * fine) * saturate(1.0 - since * 0.4);
+                // running ripples on its surface: these bend the view the most, a wavering, swimming picture
+                float ripples = LensNoise(float2(q.x * 6.0 + warp * 3.0, q.y * 5.0 + flow * 4.0)) * 0.55
+                              + LensNoise(float2(q.x * 12.0 - warp * 2.0, q.y * 10.0 + flow * 6.0)) * 0.2;
+                return (thick + bead) * body * 0.045 + ripples * body * 0.022 * saturate(1.0 - since * 0.5);
+            }
+
+            // One layer of streams: water still running down from where the sheet was, at most one per column of
+            // width cellW. Wide and shallow with soft sides (a gaussian cross-section, so nothing reads as a bead or a
+            // thread), meandering, with ripples running down inside it. Each one starts behind the draining sheet,
+            // flows for a while and then thins out and stops.
+            float StreamInColumn(float2 q, float c, float since, float cellW, float seed, float density)
+            {
+                float3 r = LensHash32(float2(c, seed));
+                if (r.x > density) return 0.0;
+                r.x /= density;
+
+                float start = 0.1 + 0.5 * r.y;                               // when it is left behind by the sheet
+                float tt = since - start;
+                if (tt <= 0.0) return 0.0;
+                float top = SheetFall(start) + 0.1;                           // where it comes from
+                float front = top - tt * (0.25 + 0.35 * r.z) - tt * tt * 0.5; // its leading end runs down
+                if (q.y > top || q.y < front - 0.1) return 0.0;
+
+                float flow = since * (1.2 + 0.8 * r.z);
+                // the path wanders, and slowly shifts sideways as water finds a new way down
+                float cx = (c + 0.5 + 0.3 * (r.y - 0.5)) * cellW
+                         + (LensNoise(float2(q.y * 2.5 + r.z * 13.0, c)) - 0.5) * cellW * 0.5
+                         + (LensNoise(float2(q.y * 4.0 - flow * 0.3, c + 5.0)) - 0.5) * cellW * 0.06;
+                float w = cellW * (0.12 + 0.12 * r.z)                         // width, pulsing as more water comes
+                        * (0.75 + 0.5 * LensNoise(float2(q.y * 3.0 + flow * 1.5, c + 9.0)));
+                float dx = (q.x - cx) / w;
+                float profile = exp(-dx * dx * 2.0);
+
+                // the leading end is a rounded, slightly thicker tongue, not a separate drop
+                float ahead = (q.y - front) / 0.05;
+                float tip = smoothstep(-1.0, 0.6, ahead) * (1.0 + 0.35 * exp(-ahead * ahead * 2.0));
+                // the water running inside it: broad, gentle surges (fine ones turn the picture into stairs)
+                float ripple = 0.85 + 0.15 * LensNoise(float2(c * 3.1, q.y * 4.0 + flow * 2.5));
+                // thins out and stops after a while, from the top down
+                float life = 1.2 + 1.8 * r.x;
+                float fade = saturate(1.0 - tt / life) * smoothstep(top, top - 0.08, q.y);
+
+                // shallow: a stream on glass bends the view a few pixels, it is not a lens
+                return profile * tip * ripple * fade * w * 0.12;
+            }
+
+            // a stream can wander over its column's border: add up the neighbours too, or the borders show as seams
+            float Streams(float2 q, float since, float cellW, float seed, float density)
+            {
+                float c = floor(q.x / cellW);
+                return StreamInColumn(q, c - 1.0, since, cellW, seed, density)
+                     + StreamInColumn(q, c,       since, cellW, seed, density)
+                     + StreamInColumn(q, c + 1.0, since, cellW, seed, density);
+            }
+
+            float FilmHeight(float2 q, float since, float wet)
+            {
+                float flow = since * 0.9;
+                float h = Sheet(q, since, flow);
+                // a thin streaky wet layer behind the sheet, running down and drying off
+                float behind = saturate((q.y - SheetEdge(q.x, since)) / 0.05);
+                h += behind * saturate(1.0 - since / 2.5) * 0.003
+                   * LensNoise(float2(q.x * 9.0 + LensNoise(q * float2(3.0, 1.0)) * 2.0, q.y * 1.2 + flow * 1.2));
+                // streams still running down where the sheet has gone: a broad layer and a finer one
+                h += Streams(q, since, 0.16, 17.0, 0.5) + Streams(q + float2(0.05, 0.0), since * 0.95, 0.09, 53.0, 0.3);
+                return h * saturate(wet * 1.5);
             }
 
             half3 SampleBlur(float2 uv, float radius)
@@ -250,31 +331,45 @@ Shader "Hidden/AKI/WaterLens"
                     blur += band * 0.004;
                 }
 
-                // ---- water film on the glass after surfacing
+                // ---- water on the glass after surfacing
                 float film = 0;
                 float2 filmOffset = 0;
                 float filmDefocus = 0;
+                half3 filmTint = 1;
                 float wet = _WaterLensWetness * _WaterLensDrops;
                 if (wet > 0.001)
                 {
                     float since = _WaterLensSinceExit;
-                    float h0 = FilmHeight(q, since) * wet;
-                    if (h0 > 0.0005)
+                    float h0 = FilmHeight(q, since, wet);                    if (h0 > 1e-5)
                     {
-                        const float e = 0.006;
-                        float hx = FilmHeight(q + float2(e, 0), since) * wet;
-                        float hy = FilmHeight(q + float2(0, e), since) * wet;
+                        const float e = 0.0025;
+                        float hx = FilmHeight(q + float2(e, 0), since, wet);
+                        float hy = FilmHeight(q + float2(0, e), since, wet);
                         float2 grad = float2(hx - h0, hy - h0) / e;
-                        // the film's slope refracts the view; streaks running down bend it mostly sideways
-                        float splash = 1.0 + 0.5 * saturate(1.0 - since / 0.7);       // the first moment out of the water is the wildest
-                        filmOffset = -grad * float2(1.0, 0.3) * (0.02 * splash * _WaterLensDistortion);
+                        float slope = length(grad);
+
+                        // the slope of the water refracts the view
+                        // (while the view is fully out of focus the fine ripples would only add a screen-door pattern)
+                        float first = saturate(1.0 - since / 0.5);
+                        filmOffset = -grad * (0.035 * (1.0 - 0.6 * first * first) * _WaterLensDistortion);
+                        float len = length(filmOffset);
+                        if (len > 0.06) filmOffset *= 0.06 / len;
                         offset += filmOffset;
-                        blur += saturate(h0) * 0.003;
-                        float3 nrm = normalize(float3(-grad * 0.5, 1.0));
-                        light += pow(saturate(dot(nrm, normalize(float3(-0.3, 0.6, 1.0)))), 30.0) * 0.08 * saturate(h0 * 3.0);   // faint sheen, no white lines
-                        film = saturate(h0 * 1.6);
-                        // looking through the water layer is also out of focus: much at first, clearing as it thins
-                        filmDefocus = saturate(h0 * 1.4) * (0.004 + 0.012 * saturate(1.0 - since / 0.8));
+
+                        // only a faint sheen and a slight darkening where the water is steep: clear running water,
+                        // not glossy beads with outlines
+                        dark += saturate((slope - 0.5) * 0.5) * 0.12;
+                        float3 nrm = normalize(float3(-grad * 1.5, 1.0));
+                        float3 H = normalize(normalize(float3(-0.45, 0.7, 0.55)) + float3(0, 0, 1));
+                        light += pow(saturate(dot(nrm, H)), 40.0) * 0.08 * saturate(slope * 2.0);
+
+                        film = saturate(h0 * 30.0);
+                        filmTint = lerp(half3(1, 1, 1), half3(0.86, 0.95, 1.02), (half)film);   // through water: a touch bluer
+
+                        // Looking through the sheet is out of focus: strongly the instant the head leaves the water (that
+                        // hides the jump from the underwater view), clearing as the sheet runs off.
+                        float sheet = saturate(Sheet(q, since, since * 0.9) * 25.0);
+                        filmDefocus = 0.035 * first * first + 0.006 * sheet;
                     }
                 }
 
@@ -285,13 +380,15 @@ Shader "Hidden/AKI/WaterLens"
                 if (film > 0.001)
                 {
                     // water splits the colours where it bends the view most (more where it is thick)
-                    float split = 0.06 + 0.12 * film;
-                    col.r = lerp(col.r, FragBlitSample(uv + offset + filmOffset * split).r, (half)film);
-                    col.b = lerp(col.b, FragBlitSample(uv + offset - filmOffset * split).b, (half)film);
+                    // (only where the view is sharp: sharp colour fringes over a blurred picture look like a glitch)
+                    float split = 0.04 + 0.06 * film;
+                    half fringe = (half)(film * saturate(1.0 - filmDefocus / 0.008));
+                    col.r = lerp(col.r, FragBlitSample(uv + offset + filmOffset * split).r, fringe);
+                    col.b = lerp(col.b, FragBlitSample(uv + offset - filmOffset * split).b, fringe);
                 }
                 col *= 1.0h - saturate(dark);
                 col += light;
-                col = lerp(col, col * half3(0.82, 0.93, 1.03), (half)(0.4 * film));   // seen through water: a bit darker and bluer
+                col *= filmTint;
 
                 // ---- running out of air: a dark vignette closes in, then the whole view fades towards black
                 float suff = saturate(_BreathEffect);
