@@ -82,6 +82,9 @@ namespace AKI.Player
 
         public bool IsAiming { get; private set; }
 
+        /// <summary>The trigger was pulled, whether or not an arrow left the gun (not loaded, off the beat...).</summary>
+        public static event System.Action TriggerPulled;
+
         /// <summary>0 = at the hip, 1 = fully aimed.</summary>
         public float Aim01 => aim;
 
@@ -140,7 +143,10 @@ namespace AKI.Player
             swimmer.LookScale = Mathf.Lerp(1f, aimLookScale, s);
 
             if (canUse && gun != null && attackAction != null && attackAction.WasPressedThisFrame())
+            {
+                TriggerPulled?.Invoke();
                 Fire();
+            }
         }
 
         public void Fire()

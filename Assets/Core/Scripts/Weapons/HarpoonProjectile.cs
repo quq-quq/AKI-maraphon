@@ -1,3 +1,4 @@
+using System;
 using AKI.VFX;
 using AKI.Water;
 using UnityEngine;
@@ -40,8 +41,16 @@ namespace AKI.Weapons
         [Min(0.5f)] public float lifetime = 3.5f;
         [Min(0.1f)] public float vanishSeconds = 1f;
 
+        /// <summary>An arrow left a gun (its transform; it carries any sound that follows it).</summary>
+        public static event Action<Transform> Launched;
+        /// <summary>An arrow starts melting away or is removed (with a caught fish, or with the scene).</summary>
+        public static event Action Vanished;
+        /// <summary>An arrow stuck into a target (fish, golden fish, Naga): the target's transform.</summary>
+        public static event Action<Transform> TargetHit;
+
         Vector3 velocity;
         float age;
+        bool reportedGone;
         bool flying;
         Speargun gun;
         Transform ignoreRoot;
@@ -82,6 +91,16 @@ namespace AKI.Weapons
 
             tailLocal = TailLocal();
             if (from != null && from.RopeAnchor != null) rope = HarpoonRope.Create(from, this, tailLocal);
+            Launched?.Invoke(transform);
+        }
+
+        void OnDestroy() => ReportGone();
+
+        void ReportGone()
+        {
+            if (reportedGone) return;
+            reportedGone = true;
+            Vanished?.Invoke();
         }
 
         /// <summary>Leaves the bubbles already in the water behind (the arrow is about to disappear).</summary>
@@ -179,7 +198,11 @@ namespace AKI.Weapons
             if (blood == null) blood = hit.collider.GetComponentInChildren<TunaBlood>();
             if (blood != null) blood.Hit(point, dir);
 
-            if (target != null) target.OnHarpoonHit(this, point, dir);
+            if (target != null)
+            {
+                target.OnHarpoonHit(this, point, dir);
+                TargetHit?.Invoke(((Component)target).transform);
+            }
 
             Catchable prey = hit.collider.GetComponentInParent<Catchable>();
             if (prey != null && !prey.IsCaught && !vanishing)
@@ -200,6 +223,7 @@ namespace AKI.Weapons
         void Vanish()
         {
             vanishing = true;
+            ReportGone();
             DetachEffects();
             Shader shader = gun != null ? gun.dissolveShader : null;
             float scale = gun != null ? gun.dissolveNoiseScale : 9f;

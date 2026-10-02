@@ -61,6 +61,7 @@ namespace AKI.Fish
 
         public void OnHarpoonHit(HarpoonProjectile arrow, Vector3 point, Vector3 direction)
         {
+            if (!IsHit) FishAI.ReportHarpooned(transform);
             IsHit = true;
             ai.Stop();
             woundLocal = transform.InverseTransformPoint(point);

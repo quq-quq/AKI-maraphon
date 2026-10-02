@@ -109,6 +109,12 @@ namespace AKI.Player
         public UnityEvent<float> onLand = new UnityEvent<float>();          // fall speed
         public UnityEvent onClimbOut = new UnityEvent();
 
+        /// <summary>Scene-independent mirrors of the head and stroke events (for listeners that outlive the scene).
+        /// Surfacing is not reported while the surface is cursed shut (<see cref="SurfaceBlocked"/>).</summary>
+        public static event System.Action HeadUnderwater;
+        public static event System.Action HeadAboveWater;
+        public static event System.Action SwimStroke;
+
         // ------------------------------------------------------------------ state (read-only for other scripts)
         public MoveState State { get; private set; }
         public bool IsSwimming => State == MoveState.SurfaceSwimming || State == MoveState.Underwater;
@@ -400,8 +406,12 @@ namespace AKI.Player
             bool under = IsHeadUnderwater ? EyeDepth > -0.03f : EyeDepth > 0.03f;
             if (under == IsHeadUnderwater) return;
             IsHeadUnderwater = under;
-            if (under) onHeadUnderwater.Invoke();
-            else onHeadAboveWater.Invoke();
+            if (under) { onHeadUnderwater.Invoke(); HeadUnderwater?.Invoke(); }
+            else
+            {
+                onHeadAboveWater.Invoke();
+                if (!SurfaceBlocked) HeadAboveWater?.Invoke();
+            }
         }
 
         // ------------------------------------------------------------------ land
@@ -514,6 +524,7 @@ namespace AKI.Player
                 {
                     strokeKick = 1f;
                     onSwimStroke.Invoke();
+                    SwimStroke?.Invoke();
                 }
                 float wave = 0.5f + 0.5f * Mathf.Sin(strokePhase);
                 pulse = Mathf.Lerp(1f, 0.3f + 1.45f * wave * wave, strokePulse);
