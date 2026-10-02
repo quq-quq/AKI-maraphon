@@ -6,10 +6,10 @@ namespace AKI.Water
     /// <summary>
     /// Put on the player camera. Drives the lens effects of <see cref="WaterLensFeature"/>:
     ///  - when the camera's head breaks the surface (measured against the real wave above it, not the mean level)
-    ///    the lens is soaked: a sheet of water drains down, smearing the view into wavy runnels, then streams and
-    ///    drops run down and evaporate over <see cref="dryTime"/> seconds - differently every time,
+    ///    the lens is soaked: a sheet of water drains down, smearing the view into wavy runnels, then streams run
+    ///    down and dry up over <see cref="dryTime"/> seconds - differently every time,
     ///  - going under, the water swirls over the lens for a moment,
-    ///  - near the surface the waterline is drawn across the lens.
+    ///  - half in the water, the waterline crosses the lens like on a diving mask: a sloshing meniscus edge.
     /// Requires the renderer feature (menu AKI/Water/Install Lens Effect).
     /// </summary>
     [ExecuteAlways]
@@ -19,7 +19,7 @@ namespace AKI.Water
     {
         [Tooltip("Seconds until the lens is completely dry after surfacing.")]
         [Range(0.5f, 20f)] public float dryTime = 6f;
-        [Tooltip("Amount of water (streams, drops) left on the lens.")]
+        [Tooltip("Amount of water left running down the lens.")]
         [Range(0f, 1.5f)] public float drops = 1f;
         [Tooltip("How strongly water on the lens bends the image.")]
         [Range(0f, 2f)] public float distortion = 1f;
