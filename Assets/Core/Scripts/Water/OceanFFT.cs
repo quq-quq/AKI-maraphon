@@ -74,6 +74,18 @@ namespace AKI.Water
             spectrumDirty = true;
         }
 
+        /// <summary>
+        /// Sets <see cref="waveScale"/> (how high the sea runs). Like <see cref="SetWindDirection"/> the wave phases stay,
+        /// so a sea that is turned up grows out of the one that was there.
+        /// </summary>
+        public void SetWaveScale(float scale)
+        {
+            scale = Mathf.Clamp(scale, 0f, 3f);
+            if (Mathf.Abs(scale - waveScale) < 0.002f) return;
+            waveScale = scale;
+            spectrumDirty = true;
+        }
+
         /// <summary>Direction the waves run in, on the XZ plane (same angle the spectrum uses).</summary>
         public Vector2 WaveDirection => new Vector2(Mathf.Cos(windDirection * Mathf.Deg2Rad), Mathf.Sin(windDirection * Mathf.Deg2Rad));
         public RenderTexture GetDisplacement(int cascade) => cascades != null ? cascades[cascade].displacement : null;

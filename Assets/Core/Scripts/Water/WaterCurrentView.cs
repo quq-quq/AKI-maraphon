@@ -24,20 +24,20 @@ namespace AKI.Water
 
         [Header("Where")]
         [Tooltip("Specks live in the camera's view from this distance (m)...")]
-        [Min(0.05f)] public float nearDistance = 0.2f;
+        [Min(0.05f)] public float nearDistance = 0.45f;
         [Tooltip("...up to this one (m); they fade out towards it.")]
-        [Min(1f)] public float viewDistance = 8f;
+        [Min(1f)] public float viewDistance = 10f;
         [Tooltip("The view is widened by this share, so turning the head doesn't show empty edges.")]
         [Range(0f, 0.6f)] public float margin = 0.2f;
         [Tooltip("How quickly they fade with distance (1/m); lower than the bubbles', so the flow reads further out.")]
         [Min(0f)] public float fadeDensity = 0.06f;
 
         [Header("Specks")]
-        [Min(0)] public int count = 650;
+        [Min(0)] public int count = 1100;
         [Tooltip("Size range (m). Most are small, a few big.")]
-        public Vector2 size = new Vector2(0.008f, 0.04f);
+        public Vector2 size = new Vector2(0.016f, 0.028f);
         [Tooltip("How strongly small specks outnumber big ones (1 = evenly spread).")]
-        [Min(1f)] public float smallBias = 2.5f;
+        [Min(1f)] public float smallBias = 1.5f;
         [Tooltip("Colours they are picked between: bright plankton and duller sediment.")]
         public Color colorA = new Color(0.8f, 0.95f, 1f, 0.75f);
         public Color colorB = new Color(0.62f, 0.72f, 0.62f, 0.55f);
@@ -46,7 +46,7 @@ namespace AKI.Water
         [Tooltip("Seconds a new speck takes to fade in.")]
         [Min(0.05f)] public float fadeIn = 0.5f;
         [Tooltip("Specks catching the light: how much their brightness flickers (0 = steady).")]
-        [Range(0f, 1f)] public float twinkle = 0.3f;
+        [Range(0f, 1f)] public float twinkle = 0.1f;
 
         [Header("Motion")]
         [Tooltip("Speed of the specks as a multiple of the water's. The swimmer drifts with the water, so at 1 they'd seem to stand still beside them; at 2 they pass by at the current's own speed.")]

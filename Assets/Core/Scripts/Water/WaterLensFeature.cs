@@ -10,7 +10,8 @@ namespace AKI.Water
     /// URP renderer feature: the "camera lens" of the water effects, drawn over the finished frame.
     ///  - a sheet of water sliding off the lens right after surfacing, then drops that run down and dry up,
     ///  - the waterline (meniscus) crossing the lens when the camera is half in the water,
-    ///  - running out of air (vignette), passing out (fade to black) and coming to (eyelids, blur).
+    ///  - running out of air (vignette), passing out (fade to black) and coming to (eyelids, blur),
+    ///  - under water, the rim of the diving mask's glass.
     /// The pass is only added while <see cref="Active"/> is set (by <see cref="WaterCameraEffects"/>),
     /// so a dry camera away from the surface pays nothing.
     /// Install via the menu AKI/Water/Install Lens Effect.
@@ -28,6 +29,9 @@ namespace AKI.Water
         /// <summary>Set by Blackout while the screen fades, the eyes open and the view comes into focus.</summary>
         public static bool ScreenActive;
         public static bool RhythmHitActive;
+
+        /// <summary>Set by UnderwaterPostVolume while the diving mask's rim shows (under water).</summary>
+        public static bool MaskActive;
 
         /// <summary>The material the pass draws with; WaterCameraEffects copies the water's settings into it.</summary>
         public static Material SharedMaterial { get; private set; }
@@ -52,7 +56,7 @@ namespace AKI.Water
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
-            if (!(Active || BreathActive || ScreenActive || RhythmHitActive) || material == null || pass == null) return;
+            if (!(Active || BreathActive || ScreenActive || MaskActive || RhythmHitActive) || material == null || pass == null) return;
             if (renderingData.cameraData.cameraType != CameraType.Game) return;
 
             pass.material = material;
