@@ -190,11 +190,6 @@ Shader "AKI/WaterUnderwater"
                 float3 dir = toPix / max(dist, 1e-4);
                 dist = min(dist, _UnderMaxDistance);
 
-                // A ray going up into the open (nothing in the scene in the way) runs into the water's surface, and
-                // that is drawn over this pixel with its own haze and light shafts: nothing to do here. (Looking up,
-                // that is half the screen that used to be worked out twice.)
-                if (i.mode > 0.75 && sky && dir.y * 2000.0 > max(waterLevel - cam.y, 0.0)) discard;
-
                 // per-pixel waterline when the camera is at the surface
                 half coverage = 1.0h;
                 if (i.mode < 0.75)
