@@ -573,6 +573,7 @@ GameObject:
   - component: {fileID: 8546200670089918104}
   - component: {fileID: 1061537911927120286}
   - component: {fileID: 1814609501035579349}
+  - component: {fileID: 4131188610311505856}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -594,6 +595,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 5039913243124035252}
+  - {fileID: 5948472714788200491}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!143 &5127874268717475519
@@ -705,6 +707,7 @@ MonoBehaviour:
   onClimbOut:
     m_PersistentCalls:
       m_Calls: []
+  cursedHeadDepth: 1.25
 --- !u!114 &1061537911927120286
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -743,14 +746,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AKI.Player.PlayerSpeargun
   gun: {fileID: 6555896830646697917}
-  holdPosition: {x: 0.14, y: -0.16, z: 0.7}
+  holdPosition: {x: 0.17, y: -0.116, z: 1.09}
   holdRotation: {x: 0, y: 0, z: 0}
   gunScale: 1.35
   aimDistance: 40
   aimMask:
     serializedVersion: 2
     m_Bits: 4294967291
-  aimTipPosition: {x: 0, y: -0.05, z: 0.95}
+  aimTipPosition: {x: 0.03, y: -0.09, z: 1.43}
   aimTime: 0.18
   aimZoom: 0.8
   aimLookScale: 0.6
@@ -767,6 +770,113 @@ MonoBehaviour:
   fovPunch: 0.03
   sway: 0.03
   maxSway: 6
+--- !u!114 &4131188610311505856
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9182919468106720292}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2dc25c9289890440a5d459bbdbfa108, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Player.PlayerBody
+  body: {fileID: 2395243459827546962}
+  swimClip: {fileID: -3270216999272073514, guid: 37c7b1aa1c2516343ac7682dadc0093c, type: 3}
+  headOffset: {x: 0, y: -0.08, z: -0.04}
+  swimLean: 30
+  fullSpeed: 3
+  speargun: {fileID: 1814609501035579349}
+  gripPoint: {x: 0, y: -0.055, z: -0.585}
+  gripPointing: {x: 0, y: -0.45, z: 1}
+  rightElbowHint: {x: 0.7, y: -1, z: -0.3}
+  strokePath:
+  - {x: -0.08, y: -0.11, z: 0.31}
+  - {x: -0.16, y: -0.12, z: 0.31}
+  - {x: -0.36, y: -0.16, z: 0.24}
+  - {x: -0.32, y: -0.44, z: 0.02}
+  - {x: -0.14, y: -0.3, z: 0.12}
+  leftElbowHint: {x: -1, y: -0.6, z: -0.3}
+  strokeRate: {x: 0.9, y: 0.35}
+  treadSize: 0.3
+  handPointAxis: {x: 0, y: 1, z: 0}
+  handPalmAxis: {x: 1, y: 0, z: 0}
+--- !u!1001 &2715087961179854863
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 868813301614671140}
+    m_Modifications:
+    - target: {fileID: 6194282705104551106, guid: 88b7737121dccf54e8c53510cb466eed, type: 3}
+      propertyPath: m_Name
+      value: Body
+      objectReference: {fileID: 0}
+    - target: {fileID: 8584096698054047780, guid: 88b7737121dccf54e8c53510cb466eed, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8584096698054047780, guid: 88b7737121dccf54e8c53510cb466eed, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.04
+      objectReference: {fileID: 0}
+    - target: {fileID: 8584096698054047780, guid: 88b7737121dccf54e8c53510cb466eed, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -0.52
+      objectReference: {fileID: 0}
+    - target: {fileID: 8584096698054047780, guid: 88b7737121dccf54e8c53510cb466eed, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8584096698054047780, guid: 88b7737121dccf54e8c53510cb466eed, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8584096698054047780, guid: 88b7737121dccf54e8c53510cb466eed, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8584096698054047780, guid: 88b7737121dccf54e8c53510cb466eed, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8584096698054047780, guid: 88b7737121dccf54e8c53510cb466eed, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8584096698054047780, guid: 88b7737121dccf54e8c53510cb466eed, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8584096698054047780, guid: 88b7737121dccf54e8c53510cb466eed, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 9203803580387268624, guid: 88b7737121dccf54e8c53510cb466eed, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 9203803580387268624, guid: 88b7737121dccf54e8c53510cb466eed, type: 3}
+      propertyPath: m_UpdateWhenOffscreen
+      value: 1
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 88b7737121dccf54e8c53510cb466eed, type: 3}
+--- !u!95 &2395243459827546962 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 328889362153055069, guid: 88b7737121dccf54e8c53510cb466eed, type: 3}
+  m_PrefabInstance: {fileID: 2715087961179854863}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &5948472714788200491 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8584096698054047780, guid: 88b7737121dccf54e8c53510cb466eed, type: 3}
+  m_PrefabInstance: {fileID: 2715087961179854863}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &8194354852463936066
 PrefabInstance:
   m_ObjectHideFlags: 0
