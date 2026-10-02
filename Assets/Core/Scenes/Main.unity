@@ -382147,24 +382147,24 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AKI.Water.WaterCurrentView
   material: {fileID: 2100000, guid: a12aeb61d0ad6468ca76fcceb1228d8e, type: 2}
   texture: {fileID: 0}
-  nearDistance: 0.2
+  nearDistance: 0.45
   viewDistance: 10
   margin: 0.2
   fadeDensity: 0.06
   count: 1100
-  size: {x: 0.006, y: 0.05}
-  smallBias: 2.2
+  size: {x: 0.016, y: 0.028}
+  smallBias: 1.5
   colorA: {r: 0.8, g: 0.95, b: 1, a: 0.75}
-  colorB: {r: 0.62, g: 0.72, b: 0.62, a: 0.55}
+  colorB: {r: 0.72, g: 0.85, b: 0.88, a: 0.65}
   lifetime: {x: 5, y: 10}
   fadeIn: 0.5
-  twinkle: 0.3
+  twinkle: 0.1
   flowSpeed: 2
   wobble: 0.05
   stretch: 0.05
   rhythm: {fileID: 1685433927}
-  beatEmission: 6
-  beatSizeBoost: 1.5
+  beatEmission: 2.5
+  beatSizeBoost: 0.4
   beatGlowColour: {r: 0.45, g: 0.85, b: 1, a: 1}
   accentAmplitude: 0.1
   accentFrequency: 8

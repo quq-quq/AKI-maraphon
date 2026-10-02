@@ -23,7 +23,7 @@ namespace AKI.Water
 
         [Header("Where")]
         [Tooltip("Specks live in the camera's view from this distance (m)...")]
-        [Min(0.05f)] public float nearDistance = 0.2f;
+        [Min(0.05f)] public float nearDistance = 0.45f;
         [Tooltip("...up to this one (m); they fade out towards it.")]
         [Min(1f)] public float viewDistance = 10f;
         [Tooltip("The view is widened by this share, so turning the head doesn't show empty edges.")]
@@ -34,9 +34,9 @@ namespace AKI.Water
         [Header("Specks")]
         [Min(0)] public int count = 1100;
         [Tooltip("Size range (m). Most are small, a few big.")]
-        public Vector2 size = new Vector2(0.006f, 0.05f);
+        public Vector2 size = new Vector2(0.016f, 0.028f);
         [Tooltip("How strongly small specks outnumber big ones (1 = evenly spread).")]
-        [Min(1f)] public float smallBias = 2.2f;
+        [Min(1f)] public float smallBias = 1.5f;
         [Tooltip("Colours they are picked between: bright plankton and duller sediment.")]
         public Color colorA = new Color(0.8f, 0.95f, 1f, 0.75f);
         public Color colorB = new Color(0.62f, 0.72f, 0.62f, 0.55f);
@@ -45,7 +45,7 @@ namespace AKI.Water
         [Tooltip("Seconds a new speck takes to fade in.")]
         [Min(0.05f)] public float fadeIn = 0.5f;
         [Tooltip("Specks catching the light: how much their brightness flickers (0 = steady).")]
-        [Range(0f, 1f)] public float twinkle = 0.3f;
+        [Range(0f, 1f)] public float twinkle = 0.1f;
 
         [Header("Motion")]
         [Tooltip("Speed of the specks as a multiple of the water's. The swimmer drifts with the water, so at 1 they'd seem to stand still beside them; at 2 they pass by at the current's own speed.")]
