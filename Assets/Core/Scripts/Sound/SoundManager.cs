@@ -36,6 +36,12 @@ namespace Core.Scripts.Sound
 
         private void OnEnable()
         {
+            if (_soundConfig == null)
+            {
+                Debug.LogWarning("SoundManager: no SoundConfig assigned, sounds are off.", this);
+                return;
+            }
+
             OnMenuStarted();
             OnStartGame(_wavesTransform, _seagoolTransform);
         }
@@ -194,6 +200,10 @@ namespace Core.Scripts.Sound
 
         private AudioSource PlayLoopSound(AudioClipConfig clipConfig, Transform parentTransform)
         {
+            // not wired in this scene (no camera yet, no waves / seagull anchor)
+            if (clipConfig == null || clipConfig.Clip == null || parentTransform == null)
+                return null;
+
             GameObject sourceObj = new GameObject($"LoopAudio{clipConfig.Clip.name}");
             sourceObj.transform.position = parentTransform.position;
 

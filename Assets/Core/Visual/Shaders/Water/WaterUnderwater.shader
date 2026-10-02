@@ -206,8 +206,16 @@ Shader "AKI/WaterUnderwater"
 
                 half3 sceneCol = sky ? half3(0, 0, 0) : SampleSceneColor(uvD);
             #if defined(_CAUSTICS)
-                if (!sky && worldPos.y < waterLevel)
-                    sceneCol = WaterApplyCaustics(sceneCol, worldPos, waterLevel, L, lightColor, t);
+                // under the real waves, not under the flat mean level (that cut objects in a crest along a straight line);
+                // the exact test only near the surface, where a crest or trough can make a difference
+                if (!sky)
+                {
+                    float band = WaterSurfaceBand();
+                    bool submerged = worldPos.y < waterLevel - band
+                                  || (worldPos.y < waterLevel + band && WaterSubmergedDist(worldPos, t, waterLevel) > 0.0);
+                    if (submerged)
+                        sceneCol = WaterApplyCaustics(sceneCol, worldPos, waterLevel, L, lightColor, t);
+                }
             #endif
 
                 sceneCol *= lerp(half3(1, 1, 1), saturate(_ShallowColor.rgb * 1.25h), _ToonAmount * 0.75);   // cartoon: tint instead of grey-out

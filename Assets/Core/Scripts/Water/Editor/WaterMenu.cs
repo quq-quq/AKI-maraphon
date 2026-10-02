@@ -294,13 +294,20 @@ namespace AKI.Water.Editor
             go.AddComponent<MeshCollider>();
         }
 
+        [MenuItem("AKI/Water/Rebuild Demo Seabed")]
+        static void RebuildSeabed() => BuildSeabedMesh();
+
         static Mesh BuildSeabedMesh()
         {
             const int quads = 200;
             const float size = 240f;
+            const float shelfStart = 80f;     // distance from the centre where the island starts sinking into the sea
+            const float edgeDepth = -14f;     // height of the plate's rim, well under the waves
+            const float skirtDepth = -60f;    // walls hanging from the rim, so nobody can look under the plate
             int verts = quads + 1;
-            var pos = new Vector3[verts * verts];
-            var uv = new Vector2[verts * verts];
+            int skirtVerts = quads * 4 * 4;
+            var pos = new Vector3[verts * verts + skirtVerts];
+            var uv = new Vector2[pos.Length];
 
             for (int z = 0; z < verts; z++)
             for (int x = 0; x < verts; x++)
@@ -313,11 +320,15 @@ namespace AKI.Water.Editor
                 float dunes = (Mathf.PerlinNoise(wx * 0.05f + 20f, wz * 0.05f) - 0.5f) * 3.0f
                             + (Mathf.PerlinNoise(wx * 0.3f, wz * 0.3f) - 0.5f) * 0.3f
                             + Mathf.Sin(wx * 0.8f + wz * 0.25f) * 0.05f;
-                pos[z * verts + x] = new Vector3(wx, slope + dunes, wz);
+                // the beach must not run off the edge of the plate: seen from the sea outside, an open edge above
+                // the water shows the culled underside (sky with floating slivers of sand)
+                float rim = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(shelfStart, size * 0.5f, Mathf.Max(Mathf.Abs(wx), Mathf.Abs(wz))));
+                float h = Mathf.Lerp(slope + dunes, edgeDepth + dunes * 0.3f, rim);
+                pos[z * verts + x] = new Vector3(wx, h, wz);
                 uv[z * verts + x] = new Vector2(wx, wz) * 0.1f;
             }
 
-            var tris = new int[quads * quads * 6];
+            var tris = new int[quads * quads * 6 + quads * 4 * 6];
             int i = 0;
             for (int z = 0; z < quads; z++)
             for (int x = 0; x < quads; x++)
@@ -327,17 +338,64 @@ namespace AKI.Water.Editor
                 tris[i++] = b; tris[i++] = c; tris[i++] = d;
             }
 
-            var mesh = new Mesh { name = "DemoSeabed", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+            // skirt: walk the rim counter-clockwise (seen from above) and hang an outward-facing wall from it.
+            // Own vertices, so the wall's hard normals do not bend the shading of the sea bed.
+            int s = verts * verts;
+            for (int side = 0; side < 4; side++)
+            for (int k = 0; k < quads; k++)
+            {
+                int i0 = RimIndex(side, k, quads), i1 = RimIndex(side, k + 1, quads);
+                Vector3 p0 = pos[i0], p1 = pos[i1];
+                pos[s] = p0; pos[s + 1] = new Vector3(p0.x, skirtDepth, p0.z);
+                pos[s + 2] = p1; pos[s + 3] = new Vector3(p1.x, skirtDepth, p1.z);
+                float u0 = (side * quads + k) * size / quads * 0.1f, u1 = u0 + size / quads * 0.1f;
+                uv[s] = new Vector2(u0, p0.y * 0.1f); uv[s + 1] = new Vector2(u0, skirtDepth * 0.1f);
+                uv[s + 2] = new Vector2(u1, p1.y * 0.1f); uv[s + 3] = new Vector2(u1, skirtDepth * 0.1f);
+                tris[i++] = s; tris[i++] = s + 2; tris[i++] = s + 1;
+                tris[i++] = s + 2; tris[i++] = s + 3; tris[i++] = s + 1;
+                s += 4;
+            }
+
+            const string meshPath = "Assets/Core/Visual/Models/DemoSeabed.asset";
+            // update an existing asset in place, so the scenes that use it keep their reference
+            var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(meshPath);
+            bool isNew = mesh == null;
+            if (isNew) mesh = new Mesh { name = "DemoSeabed" };
+            mesh.Clear();
+            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             mesh.vertices = pos;
             mesh.uv = uv;
             mesh.triangles = tris;
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
 
-            const string meshPath = "Assets/Core/Visual/Models/DemoSeabed.asset";
-            Directory.CreateDirectory(Path.GetDirectoryName(meshPath));
-            AssetDatabase.CreateAsset(mesh, meshPath);
+            if (isNew)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(meshPath));
+                AssetDatabase.CreateAsset(mesh, meshPath);
+            }
+            else
+            {
+                EditorUtility.SetDirty(mesh);
+                AssetDatabase.SaveAssets();
+                // mesh colliders cook their data once: hand them the new shape
+                foreach (var col in Object.FindObjectsByType<MeshCollider>(FindObjectsSortMode.None))
+                    if (col.sharedMesh == mesh) { col.sharedMesh = null; col.sharedMesh = mesh; }
+            }
             return mesh;
+        }
+
+        // grid index of the k-th rim vertex on a side, walking the rim counter-clockwise seen from above
+        static int RimIndex(int side, int k, int quads)
+        {
+            int verts = quads + 1;
+            switch (side)
+            {
+                case 0: return k;                                  // -z edge, x rising
+                case 1: return k * verts + quads;                  // +x edge, z rising
+                case 2: return quads * verts + (quads - k);        // +z edge, x falling
+                default: return (quads - k) * verts;               // -x edge, z falling
+            }
         }
     }
 }
