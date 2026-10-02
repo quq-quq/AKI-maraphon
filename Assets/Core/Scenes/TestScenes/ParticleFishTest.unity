@@ -404727,12 +404727,12 @@ MonoBehaviour:
   material: {fileID: 2100000, guid: a12aeb61d0ad6468ca76fcceb1228d8e, type: 2}
   texture: {fileID: 0}
   nearDistance: 0.2
-  viewDistance: 8
+  viewDistance: 10
   margin: 0.2
   fadeDensity: 0.06
-  count: 650
-  size: {x: 0.008, y: 0.04}
-  smallBias: 2.5
+  count: 1100
+  size: {x: 0.006, y: 0.05}
+  smallBias: 2.2
   colorA: {r: 0.8, g: 0.95, b: 1, a: 0.75}
   colorB: {r: 0.62, g: 0.72, b: 0.62, a: 0.55}
   lifetime: {x: 5, y: 10}
