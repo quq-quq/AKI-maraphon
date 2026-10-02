@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AKI.Endings;
 using AKI.Fish;
 using AKI.Menu;
 using AKI.Player;
@@ -69,6 +70,13 @@ namespace AKI.Rhythm
         [Header("Music fallback (SoundConfig wins when present)")]
         [Range(0f,1f)] public float musicVolume = .75f;
         public bool musicBypassesUnderwaterFilter = true;
+        [Header("Endings: black screen with subtitles (empty = the old behaviour)")]
+        [Tooltip("The golden fish was let go: the view slowly goes black. Empty = the scene restarts.")]
+        public EndingData goldenIgnoredEnding;
+        [Tooltip("Out of air in the Naga fight. Empty = passing out and coming to.")]
+        public EndingData drownedEnding;
+        [Tooltip("The Naga track was survived and the Naga swallows the player, after the cut to black.")]
+        public EndingData eatenEnding;
         [Header("Events")]
         public UnityEvent onFishingStarted = new UnityEvent();
         public UnityEvent onGoldenAppeared = new UnityEvent();
@@ -177,6 +185,7 @@ namespace AKI.Rhythm
                 bossHitMaskPower, bossHitMaskInvert ? 1f : 0f, Mathf.Max(bossHitVignetteInner+.01f,bossHitVignetteOuter)));
             Shader.SetGlobalFloat("_RhythmHitGlow", bossHitGlow);
             WaterLensFeature.RhythmHitActive = bossHitPulse > .001f;
+            if (phase == GamePhase.Ended) return;   // nothing may restart the scene under an ending
             if(naga!=null)
             {
                 var guard=naga.GetComponent<NagaEnvironmentSafety>();
@@ -191,7 +200,11 @@ namespace AKI.Rhythm
             else if (phase == GamePhase.GoldenFish)
             {
                 // FishAI and FishAnimation own swimming, just as on an ordinary tuna.
-                if (elapsed >= goldenIgnoreSeconds) RestartGame();
+                if (elapsed >= goldenIgnoreSeconds)
+                {
+                    if (goldenIgnoredEnding != null) ShowEnding(goldenIgnoredEnding);
+                    else RestartGame();
+                }
             }
             else if (phase == GamePhase.FinalCharge && naga != null)
             {
@@ -370,13 +383,26 @@ namespace AKI.Rhythm
             SetPhase(GamePhase.Ended); naga.StopMotion(false);
             if (nagaAmbient != null) nagaAmbient.Stop();
             ownsEndFade = true; Shader.SetGlobalFloat("_ScreenFade", 1f); WaterLensFeature.ScreenActive = true;
+            if (eatenEnding != null) EndingScreen.Show(eatenEnding);
             onEnded.Invoke();
         }
         void OnOutOfAir()
         {
             if (phase == GamePhase.Failed || phase == GamePhase.Ended) return;
+            if (phase == GamePhase.BossFight && drownedEnding != null) { ShowEnding(drownedEnding); return; }
             SetPhase(GamePhase.Failed); conductor.StopMusic(); fishSpawner?.StopSpawning();
             naga?.StopMotion(false);
+        }
+        // The game is over for good: no music, no shooting, no passing out (BreathHolding reads that flag right
+        // after its out-of-air event, so the ending replaces the reload), and the ending's subtitles on black.
+        void ShowEnding(EndingData ending)
+        {
+            SetPhase(GamePhase.Ended); conductor.StopMusic(); fishSpawner?.StopSpawning();
+            naga?.StopMotion(false);
+            if (nagaAmbient != null) nagaAmbient.Stop();
+            breath.passOutWhenOutOfAir = false; playerWeapon.enabled = false;
+            EndingScreen.Show(ending);
+            onEnded.Invoke();
         }
         [ContextMenu("Restart game")]
         public void RestartGame()

@@ -200,6 +200,9 @@ MonoBehaviour:
   bossHitGlow: 0.15
   musicVolume: 0.75
   musicBypassesUnderwaterFilter: 1
+  goldenIgnoredEnding: {fileID: 11400000, guid: 5699539e1fca4737a879a4910baf87d7, type: 2}
+  drownedEnding: {fileID: 11400000, guid: a9d29be8a27f4b8097230cb09285e718, type: 2}
+  eatenEnding: {fileID: 11400000, guid: 0ccacbdb3f0a48319ef12afceb3ea2d2, type: 2}
   onFishingStarted:
     m_PersistentCalls:
       m_Calls: []
