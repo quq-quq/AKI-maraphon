@@ -15,7 +15,6 @@ GameObject:
   - component: {fileID: 1888779596029478606}
   - component: {fileID: 464959624463116848}
   - component: {fileID: 847683172401169754}
-  - component: {fileID: 6303402867902492464}
   m_Layer: 0
   m_Name: Tuna
   m_TagString: Untagged
@@ -38,6 +37,7 @@ Transform:
   m_Children:
   - {fileID: 9204559009292632143}
   - {fileID: 818218909764220570}
+  - {fileID: 9108537317261046405}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!136 &5453269603050214423
@@ -220,28 +220,6 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
---- !u!114 &6303402867902492464
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6819945141867718893}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 38e38febce78643deae9600a8dc4e4ab, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AKI.Fish.FishTrail
-  material: {fileID: 2100000, guid: a12aeb61d0ad6468ca76fcceb1228d8e, type: 2}
-  tail: {fileID: 0}
-  fullSpeed: 2
-  ribbonSeconds: 0.7
-  ribbonWidth: 0.22
-  ribbonColor: {r: 0.7, g: 0.9, b: 1, a: 0.14}
-  specksPerMetre: 14
-  speckSize: {x: 0.008, y: 0.025}
-  speckLifetime: {x: 0.6, y: 1.6}
-  speckColor: {r: 0.8, g: 0.95, b: 1, a: 0.55}
 --- !u!1001 &1197064576726191474
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -374,4 +352,66 @@ PrefabInstance:
 Transform:
   m_CorrespondingSourceObject: {fileID: 4831559153705305447, guid: 94f24d6ab58d0428baf954794f56f2f4, type: 3}
   m_PrefabInstance: {fileID: 5212846959926490109}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1001 &7688601318914354006
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 3356949628624022865}
+    m_Modifications:
+    - target: {fileID: 1502900761733274067, guid: e46b3e519db494d6a9841b12beca6590, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1502900761733274067, guid: e46b3e519db494d6a9841b12beca6590, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1502900761733274067, guid: e46b3e519db494d6a9841b12beca6590, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1502900761733274067, guid: e46b3e519db494d6a9841b12beca6590, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1502900761733274067, guid: e46b3e519db494d6a9841b12beca6590, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1502900761733274067, guid: e46b3e519db494d6a9841b12beca6590, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1502900761733274067, guid: e46b3e519db494d6a9841b12beca6590, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1502900761733274067, guid: e46b3e519db494d6a9841b12beca6590, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1502900761733274067, guid: e46b3e519db494d6a9841b12beca6590, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1502900761733274067, guid: e46b3e519db494d6a9841b12beca6590, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8111022411039378780, guid: e46b3e519db494d6a9841b12beca6590, type: 3}
+      propertyPath: m_Name
+      value: VFX_FishTrail
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: e46b3e519db494d6a9841b12beca6590, type: 3}
+--- !u!4 &9108537317261046405 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1502900761733274067, guid: e46b3e519db494d6a9841b12beca6590, type: 3}
+  m_PrefabInstance: {fileID: 7688601318914354006}
   m_PrefabAsset: {fileID: 0}

@@ -366,21 +366,76 @@ float WaterSubmergedDist(float3 p, float t, float waterLevel)
     return waterLevel + WaterDisplacement(xz0, t, q).y - p.y;
 }
 
+// ---- the grid the surface is drawn with (WaterSurface.BuildGrid): vertex n cells from the centre sits at
+// growth * (e^(n cell / growth) - 1) (an expanding grid; a plain one when growth is huge), the centre at
+// _WaterMeshCenter, each cell split along its (x+1, z) - (x, z+1) diagonal.
+float WaterGridCoord(float n)
+{
+    float cell = max(_WaterMeshCell, 1e-3);
+    if (_WaterMeshGrowth > 1e7) return n * cell;
+    return sign(n) * _WaterMeshGrowth * (exp(abs(n) * cell / _WaterMeshGrowth) - 1.0);
+}
+
+float WaterGridIndex(float x)
+{
+    float cell = max(_WaterMeshCell, 1e-3);
+    if (_WaterMeshGrowth > 1e7) return x / cell;
+    return sign(x) * _WaterMeshGrowth * log(1.0 + abs(x) / _WaterMeshGrowth) / cell;
+}
+
+// a vertex of the surface as drawn (WaterSurfaceVertex.hlsl): its grid point, displaced by the waves
+float3 WaterGridVertex(float2 n, float t, float q, float waterLevel)
+{
+    float2 xz = _WaterMeshCenter.xz + float2(WaterGridCoord(n.x), WaterGridCoord(n.y));
+    return float3(xz.x, waterLevel, xz.y) + WaterDisplacement(xz, t, q);
+}
+
 // The surface right around the camera as a plane: x, y = its slope along world x and z, z = its height under the
-// camera. The near plane is only a few centimetres across, so over it the water is as good as flat - and testing
-// each pixel against the full wave maths instead blows millimetre noise (the half-float FFT data) up into a staircase
-// across the screen. Five samples, averaged for the height: evaluate it once per vertex, the same way in every shader
-// that draws the split, so the surface, the underwater overlay and the lens all agree on one smooth line.
+// camera. It is the very triangle of the drawn surface the camera is in - not the exact wave maths: between its
+// vertices the drawn surface is flat and can be centimetres off the waves, and over the near plane (a few
+// centimetres across) that showed as a band of the wrong world between the two (a strip of "sky" seen from under
+// the water, the underside seen from above). The waves also move the grid sideways, so first find the grid point
+// that ends up under the camera. Evaluate it once per vertex, the same way in every shader that draws the split, so
+// the surface, the underwater overlay and the lens all agree on one smooth line.
 float4 WaterCameraPlane(float3 cam, float t, float waterLevel)
 {
-    const float r = 0.15;
-    float hc = WaterSubmergedDist(float3(cam.x, 0.0, cam.z), t, waterLevel);   // y = 0: the surface height itself
-    float hx0 = WaterSubmergedDist(float3(cam.x - r, 0.0, cam.z), t, waterLevel);
-    float hx1 = WaterSubmergedDist(float3(cam.x + r, 0.0, cam.z), t, waterLevel);
-    float hz0 = WaterSubmergedDist(float3(cam.x, 0.0, cam.z - r), t, waterLevel);
-    float hz1 = WaterSubmergedDist(float3(cam.x, 0.0, cam.z + r), t, waterLevel);
-    float h = (2.0 * hc + hx0 + hx1 + hz0 + hz1) / 6.0;
-    return float4((hx1 - hx0) / (2.0 * r), (hz1 - hz0) / (2.0 * r), h, 0.0);
+    float q = WaterQ();
+    float2 local = cam.xz - _WaterMeshCenter.xz;   // undisplaced grid point, refined below
+    float3 p0 = 0, p1 = 0, p2 = 0;
+    [unroll]
+    for (int k = 0; k < 3; k++)
+    {
+        float2 n = float2(WaterGridIndex(local.x), WaterGridIndex(local.y));
+        float2 c = floor(n);
+        float2 lo = float2(WaterGridCoord(c.x), WaterGridCoord(c.y));
+        float2 hi = float2(WaterGridCoord(c.x + 1.0), WaterGridCoord(c.y + 1.0));
+        float2 f = (local - lo) / max(hi - lo, 1e-4);   // where in the cell, 0..1
+        float3 w;
+        if (f.x + f.y < 1.0)
+        {
+            p0 = WaterGridVertex(c, t, q, waterLevel);                       // (x, z)
+            p1 = WaterGridVertex(c + float2(1, 0), t, q, waterLevel);        // (x+1, z)
+            p2 = WaterGridVertex(c + float2(0, 1), t, q, waterLevel);        // (x, z+1)
+            w = float3(1.0 - f.x - f.y, f.x, f.y);
+        }
+        else
+        {
+            p0 = WaterGridVertex(c + float2(1, 1), t, q, waterLevel);        // (x+1, z+1)
+            p1 = WaterGridVertex(c + float2(0, 1), t, q, waterLevel);        // (x, z+1)
+            p2 = WaterGridVertex(c + float2(1, 0), t, q, waterLevel);        // (x+1, z)
+            w = float3(f.x + f.y - 1.0, 1.0 - f.x, 1.0 - f.y);
+        }
+        // where that grid point is drawn; step the grid point by what is left over
+        float2 drawn = w.x * p0.xz + w.y * p1.xz + w.z * p2.xz;
+        local += cam.xz - drawn;
+    }
+
+    float3 nrm = cross(p2 - p0, p1 - p0);
+    if (nrm.y < 0.0) nrm = -nrm;
+    nrm.y = max(nrm.y, 1e-4);
+    float2 slope = -nrm.xz / nrm.y;
+    float height = p0.y + slope.x * (cam.x - p0.x) + slope.y * (cam.z - p0.z);
+    return float4(slope, height, 0.0);
 }
 
 // Metres the near-plane point np lies under the camera's surface plane (negative = above).

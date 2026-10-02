@@ -11,7 +11,7 @@ using Object = UnityEngine.Object;
 namespace AKI.VFX.Editor
 {
     /// <summary>
-    /// Builds the underwater particle effects: harpoon bubbles and tuna blood (textures, materials, prefabs),
+    /// Builds the underwater particle effects: harpoon bubbles, tuna blood and the fish's wake (textures, materials, prefabs),
     /// and a test bench in the open scene to look at them (the speargun itself comes from <see cref="SpeargunMenu"/>).
     /// Textures and materials are only created when missing (so tweaks survive); prefabs are rebuilt every time.
     /// </summary>
@@ -22,6 +22,7 @@ namespace AKI.VFX.Editor
         const string PrefabDir = "Assets/Core/Prefabs/VFX";
         public const string HarpoonPrefabPath = PrefabDir + "/VFX_HarpoonBubbles.prefab";
         const string BloodPrefabPath = PrefabDir + "/VFX_TunaBlood.prefab";
+        public const string FishTrailPrefabPath = PrefabDir + "/VFX_FishTrail.prefab";
         const string ShaderName = "AKI/UnderwaterParticle";
 
         // water absorbs red first (same idea as the water material's Absorption, a bit weaker)
@@ -41,6 +42,7 @@ namespace AKI.VFX.Editor
 
             BuildHarpoonPrefab(bubble, fizz);
             BuildBloodPrefab(cloud, speck);
+            BuildFishTrailPrefab(fizz);
             AssetDatabase.SaveAssets();
         }
 
@@ -178,7 +180,9 @@ namespace AKI.VFX.Editor
                 FadeOverLife(streak, 0.03f, 0.3f, 0.7f);
             }
 
-            fx.fireBurst = new[] { shot, flash, BuildShotCloud(root.transform, bubble) };
+            ParticleSystem[] ring = BuildShotRing(root.transform, bubble, fizz, out Transform ringRoot);
+            fx.fireBurst = new[] { shot, flash, BuildShotCloud(root.transform, bubble), ring[0], ring[1] };
+            fx.shotRing = ringRoot;
             fx.trail = new[] { trail, streak };
             SavePrefab(root, HarpoonPrefabPath);
         }
@@ -187,6 +191,52 @@ namespace AKI.VFX.Editor
         /// The water torn up all along the shaft as the harpoon leaves the gun: a cloud of bubbles of every size that
         /// stays by the player (world space) and rises, while the harpoon flies off.
         /// </summary>
+        /// <summary>
+        /// A ring of bubbles and fizz bursting out sideways around the harpoon as it leaves the gun (the water
+        /// pushed aside). <see cref="HarpoonBubbles"/> turns and tilts the ring at random on every shot, and how
+        /// many fly and how fast is random too.
+        /// </summary>
+        internal static ParticleSystem[] BuildShotRing(Transform root, Material bubble, Material fizz, out Transform ringRoot)
+        {
+            ringRoot = new GameObject("ShotRing").transform;
+            ringRoot.SetParent(root, false);
+
+            ParticleSystem bubbles = NewSystem(ringRoot, "RingBubbles", bubble, 200);
+            {
+                var main = bubbles.main;
+                main.duration = 0.2f;
+                main.startLifetime = Range(1.2f, 3f);
+                main.startSpeed = Range(0.8f, 4.5f);
+                main.startSize = Range(0.008f, 0.04f);
+                main.gravityModifier = Range(-0.06f, -0.15f);   // rising
+                Bursts(bubbles, new ParticleSystem.Burst(0f, 45, 110));
+                Ring(bubbles, 0.035f);
+                Drag(bubbles, 4.5f);
+                Wobble(bubbles, 0.25f, 1.8f);
+                PopSize(bubbles);
+                FadeOverLife(bubbles, 0.04f, 0.85f);
+                bubbles.GetComponent<ParticleSystemRenderer>().maxParticleSize = 0.04f;
+            }
+
+            ParticleSystem spray = NewSystem(ringRoot, "RingFizz", fizz, 400);
+            {
+                var main = spray.main;
+                main.duration = 0.2f;
+                main.startLifetime = Range(0.2f, 0.8f);
+                main.startSpeed = Range(2f, 8f);
+                main.startSize = Range(0.005f, 0.018f);
+                main.startColor = new Color(0.88f, 0.96f, 1f, 0.6f);
+                main.gravityModifier = -0.04f;
+                Bursts(spray, new ParticleSystem.Burst(0f, 80, 200));
+                Ring(spray, 0.025f);
+                Drag(spray, 7f);
+                Wobble(spray, 0.12f, 3f);
+                Stretch(spray, 0.03f);
+                FadeOverLife(spray, 0.02f, 0.35f, 0.8f);
+            }
+            return new[] { bubbles, spray };
+        }
+
         internal static ParticleSystem BuildShotCloud(Transform root, Material bubble)
         {
             const float shaft = 0.75f;   // m behind the tip: the arrow's length
@@ -290,6 +340,60 @@ namespace AKI.VFX.Editor
             SavePrefab(root, BloodPrefabPath);
         }
 
+        // ------------------------------------------------------------------ fish wake
+
+        internal static GameObject BuildFishTrailPrefab(Material fizz)
+        {
+            Material wake = EnsureMaterial("M_Wake", EnsureTexture("T_Wake", WakePixel), additive: 1f, fade: 0.12f, soft: false);
+
+            var root = new GameObject("VFX_FishTrail");
+            var fx = root.AddComponent<FishTrail>();
+
+            // a soft ribbon from the tail, narrowing to nothing
+            var ribbonGo = new GameObject("Ribbon");
+            ribbonGo.transform.SetParent(root.transform, false);
+            var ribbon = ribbonGo.AddComponent<TrailRenderer>();
+            ribbon.sharedMaterial = wake;
+            ribbon.time = 0.7f;
+            ribbon.minVertexDistance = 0.08f;
+            ribbon.widthCurve = new AnimationCurve(new Keyframe(0f, 0.5f), new Keyframe(0.12f, 1f), new Keyframe(1f, 0f));
+            ribbon.widthMultiplier = 0.22f;
+            ribbon.startColor = new Color(0.7f, 0.9f, 1f, 0.14f);
+            ribbon.endColor = new Color(0.7f, 0.9f, 1f, 0f);
+            ribbon.textureMode = LineTextureMode.Stretch;
+            ribbon.alignment = LineAlignment.View;
+            ribbon.numCapVertices = 2;
+            ribbon.shadowCastingMode = ShadowCastingMode.Off;
+            ribbon.receiveShadows = false;
+            ribbon.lightProbeUsage = LightProbeUsage.Off;
+            ribbon.reflectionProbeUsage = ReflectionProbeUsage.Off;
+            ribbon.emitting = false;   // FishTrail switches it on while the fish swims
+
+            // specks of stirred-up water swirling off the tail
+            ParticleSystem specks = NewSystem(root.transform, "Specks", fizz, 200, looping: true);
+            {
+                var main = specks.main;
+                main.playOnAwake = true;
+                main.startLifetime = Range(0.6f, 1.6f);
+                main.startSpeed = Range(0.05f, 0.35f);
+                main.startSize = Range(0.008f, 0.025f);
+                main.startColor = new ParticleSystem.MinMaxGradient(new Color(0.8f, 0.95f, 1f, 0.22f), new Color(0.8f, 0.95f, 1f, 0.55f));
+                main.gravityModifier = -0.01f;
+                var emission = specks.emission;
+                emission.rateOverDistance = 14f;   // at full speed; FishTrail scales it
+                Sphere(specks, 0.08f);
+                Wobble(specks, 0.25f, 2f, 0.6f);
+                Drag(specks, 3f);
+                Stretch(specks, 0.05f);
+                specks.GetComponent<ParticleSystemRenderer>().maxParticleSize = 0.012f;
+                FadeOverLife(specks, 0.1f, 0.5f, 0.6f);
+            }
+
+            fx.ribbon = ribbon;
+            fx.specks = specks;
+            return SavePrefab(root, FishTrailPrefabPath);
+        }
+
         // ------------------------------------------------------------------ particle system helpers
 
         static ParticleSystem NewSystem(Transform parent, string name, Material material, int maxParticles, bool looping = false)
@@ -333,6 +437,19 @@ namespace AKI.VFX.Editor
             shape.shapeType = ParticleSystemShapeType.Cone;   // opens along +Z: the harpoon's / spurt's forward
             shape.angle = angle;
             shape.radius = radius;
+        }
+
+        // a circle across the harpoon (the shape's XY plane, the harpoon flies along +Z), throwing particles outwards,
+        // unevenly round the ring
+        static void Ring(ParticleSystem ps, float radius)
+        {
+            var shape = ps.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Circle;
+            shape.radius = radius;
+            shape.radiusThickness = 0.3f;
+            shape.arcMode = ParticleSystemShapeMultiModeValue.Random;
+            shape.randomDirectionAmount = 0.25f;
         }
 
         static void Sphere(ParticleSystem ps, float radius)
@@ -502,6 +619,14 @@ namespace AKI.VFX.Editor
             float glint = 0.35f * Mathf.Exp(-Sq(Dist(u, v, 0.38f, -0.4f) / 0.09f));
             float a = Mathf.Max(film, rim) + highlight + glint;
             return a * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.92f, 1f, r)));
+        }
+
+        // the wake ribbon: soft across (v), a soft start right at the tail (u = -1 is the tail end of the trail)
+        static float WakePixel(float u, float v)
+        {
+            float across = Mathf.Exp(-v * v * 4f) * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.8f, 1f, Mathf.Abs(v))));
+            float along = Mathf.SmoothStep(0f, 1f, (u + 1f) * 0.5f / 0.05f);
+            return across * along;
         }
 
         static float SoftDotPixel(float u, float v)
