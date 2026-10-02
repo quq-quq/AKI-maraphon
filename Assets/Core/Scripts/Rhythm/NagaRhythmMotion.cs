@@ -193,6 +193,8 @@ namespace AKI.Rhythm
 
         /// <summary>A brief local swim ripple; scoring, damage, audio and VFX belong to the controller.</summary>
         public void PlayHitReaction(float strength = 1f) => hitPulse = Mathf.Max(hitPulse, Mathf.Clamp01(strength));
+        /// <summary>1 right after a hit, fading to 0 (PlayHitReaction).</summary>
+        public float HitPulse => hitPulse;
 
         public void StopMotion(bool restorePose = true)
         {
