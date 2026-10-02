@@ -43,14 +43,15 @@ namespace Core.Scripts.Sound
         [Tooltip("The trigger and the shot happen in the player's hands and reach the ear through the body: under water " +
                  "they skip the water's muffling (which leaves nothing of a click) and are only softened to this cutoff (Hz).")]
         [SerializeField, Min(500f)] private float _inHandsUnderwaterCutoff = 3500f;
-        [Tooltip("The player's own strokes under water: a soft swish around him, softened to this cutoff (Hz) " +
-                 "instead of the listener's heavy muffling.")]
+        [Tooltip("The player's own strokes under water: a soft swish around him, muffled to this cutoff (Hz) with a " +
+                 "light watery reverb instead of the listener's heavy muffling.")]
         [SerializeField, Min(300f)] private float _strokesUnderwaterCutoff = 1400f;
 
         [Header("Creatures under water")]
         [Tooltip("The tuna and the Naga are in the water with the player: their sounds skip the listener's muffling " +
-                 "(which leaves only a hum at 450 Hz) and are only softened to this cutoff (Hz): a swish lives in the highs.")]
-        [SerializeField, Min(500f)] private float _creaturesUnderwaterCutoff = 5000f;
+                 "(which leaves only a hum at 450 Hz) and get their own gentler one: muffled to this cutoff (Hz) with a " +
+                 "light watery reverb, so they sound under water and still carry.")]
+        [SerializeField, Min(500f)] private float _creaturesUnderwaterCutoff = 1800f;
         [Tooltip("A tuna is heard at full volume up to X metres and fades out linearly to Y metres.")]
         [SerializeField] private Vector2 _fishHearing = new Vector2(8f, 45f);
         [Tooltip("The Naga is far bigger and louder: full volume up to X metres, silent at Y metres.")]
@@ -311,7 +312,8 @@ namespace Core.Scripts.Sound
 
         private void OnSwimming()
         {
-            Softened(PlayRandom(_soundConfig.SwimmingSound, Listener.position), _strokesUnderwaterCutoff);
+            AudioSource stroke = PlayRandom(_soundConfig.SwimmingSound, Listener.position);
+            if (_headUnderwater) Underwater(stroke, _strokesUnderwaterCutoff);
         }
 
         private void OnHarpoomTrigger()
@@ -334,18 +336,15 @@ namespace Core.Scripts.Sound
         }
 
         // A sound made in the player's hands: under water it skips the listener's water filter, only softened.
-        private void InHands(AudioSource source) => Softened(source, _inHandsUnderwaterCutoff);
-
-        // Under water: skips the listener's water filter and is only softened to the cutoff.
-        private void Softened(AudioSource source, float cutoff)
+        private void InHands(AudioSource source)
         {
             if (source == null || !_headUnderwater || source.bypassListenerEffects) return;
             source.bypassListenerEffects = true;
-            source.gameObject.AddComponent<AudioLowPassFilter>().cutoffFrequency = cutoff;
+            source.gameObject.AddComponent<AudioLowPassFilter>().cutoffFrequency = _inHandsUnderwaterCutoff;
         }
 
-        // A creature in the water with the player: carries through it (only softened) and is heard over the given
-        // distances. Linear: Unity's default curve leaves a tenth of the volume at 10 m.
+        // A creature in the water with the player: sounds under water without losing itself in the listener's
+        // muffling, and is heard over the given distances. Linear: Unity's default curve leaves a tenth at 10 m.
         private void InWater(AudioSource source, Vector2 hearing)
         {
             if (source == null) return;
@@ -353,9 +352,31 @@ namespace Core.Scripts.Sound
             source.minDistance = Mathf.Max(0.1f, hearing.x);
             source.maxDistance = Mathf.Max(source.minDistance + 0.1f, hearing.y);
             source.dopplerLevel = 0f;   // a darting tuna must not warble
-            if (source.bypassListenerEffects) return;
+            Underwater(source, _creaturesUnderwaterCutoff);
+        }
+
+        // Its own water instead of the listener's: muffled to the cutoff, then a light watery reverb (the listener's
+        // Underwater-based settings, quieter), so the sound keeps its volume.
+        private static void Underwater(AudioSource source, float cutoff)
+        {
+            if (source == null || source.bypassListenerEffects) return;
             source.bypassListenerEffects = true;
-            source.gameObject.AddComponent<AudioLowPassFilter>().cutoffFrequency = _creaturesUnderwaterCutoff;
+            source.gameObject.AddComponent<AudioLowPassFilter>().cutoffFrequency = cutoff;
+            AudioReverbFilter reverb = source.gameObject.AddComponent<AudioReverbFilter>();
+            reverb.reverbPreset = AudioReverbPreset.User;
+            reverb.dryLevel = 0f;
+            reverb.room = -1600f;
+            reverb.roomHF = -4000f;
+            reverb.roomLF = 0f;
+            reverb.decayTime = 1.1f;
+            reverb.decayHFRatio = 0.1f;
+            reverb.reflectionsLevel = -449f;
+            reverb.reflectionsDelay = 0.007f;
+            reverb.reverbLevel = 600f;
+            reverb.reverbDelay = 0.011f;
+            reverb.diffusion = 100f;
+            reverb.density = 100f;
+            reverb.hfReference = 5000f;
         }
 
         private void FadeIn(AudioSource source)
