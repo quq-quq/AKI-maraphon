@@ -265,7 +265,7 @@ namespace AKI.Water.Editor
             AddCurrent(surface.gameObject);
         }
 
-        /// <summary>The turning wind, the sea's current and the drifting specks / streaks that show it (once).</summary>
+        /// <summary>The turning wind, the sea's current and the drifting specks that show it (once).</summary>
         [MenuItem("AKI/Water/Add Current To Selected Water")]
         static void AddCurrentToSelection()
         {

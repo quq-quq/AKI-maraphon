@@ -27,7 +27,8 @@ MonoBehaviour:
   m_RendererFeatures:
   - {fileID: 7833122117494664109}
   - {fileID: 4878063445643462791}
-  m_RendererFeatureMap: ad6b866f10d7b46c878865d5db5cb243
+  - {fileID: 5087898234925701703}
+  m_RendererFeatureMap: ad6b866f10d7b46c878865d5db5cb243475a15e27cd89b46
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -70,6 +71,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AKI.Water.WaterLensFeature
   m_Active: 1
   shader: {fileID: 4800000, guid: ef5aeb4fa8608e6488f63eb7b2a58ffa, type: 3}
+--- !u!114 &5087898234925701703
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf13aa4331e46d64b96208a41ea2a88d, type: 3}
+  m_Name: Optimized Volumetric Clouds
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Clouds.OptimizedCloudsFeature
+  m_Active: 1
+  shader: {fileID: 4800000, guid: a1f0ee13fdf0eab4e9f5a4e7d11ea2b8, type: 3}
 --- !u!114 &7833122117494664109
 MonoBehaviour:
   m_ObjectHideFlags: 0

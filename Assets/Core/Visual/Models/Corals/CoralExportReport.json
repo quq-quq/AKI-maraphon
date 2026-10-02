@@ -1,0 +1,350 @@
+[
+  {
+    "name": "Coral_01",
+    "source": "Object_4",
+    "sourceMaterial": "default.001",
+    "textures": {
+      "base": "Coral_01_BaseColor.png",
+      "normal": "Coral_01_Normal.png",
+      "orm": "Coral_01_ORM.png",
+      "metallicSmoothness": "Coral_01_MetallicSmoothness.png"
+    },
+    "baseColor": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "triangles": [
+      998,
+      498
+    ],
+    "decimateAdded": false,
+    "sourceSize": [
+      0.17147523164749146,
+      0.09864620864391327,
+      0.13809168338775635
+    ],
+    "uvLayers": [
+      "UVMap",
+      "UVMap.001",
+      "UVMap.002"
+    ]
+  },
+  {
+    "name": "Coral_02",
+    "source": "Object_4.001",
+    "sourceMaterial": "default.002",
+    "textures": {
+      "normal": "Coral_02_Normal.png",
+      "orm": "Coral_02_ORM.png",
+      "metallicSmoothness": "Coral_02_MetallicSmoothness.png"
+    },
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "triangles": [
+      1729,
+      1715
+    ],
+    "decimateAdded": false,
+    "sourceSize": [
+      0.12388067692518234,
+      0.0930389016866684,
+      0.04766037315130234
+    ],
+    "uvLayers": [
+      "UVMap",
+      "UVMap.001"
+    ]
+  },
+  {
+    "name": "Coral_03",
+    "source": "Object_4.002",
+    "sourceMaterial": "default.003",
+    "textures": {
+      "base": "Coral_03_BaseColor.png",
+      "normal": "Coral_03_Normal.png",
+      "orm": "Coral_03_ORM.png",
+      "metallicSmoothness": "Coral_03_MetallicSmoothness.png"
+    },
+    "baseColor": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "triangles": [
+      998,
+      498
+    ],
+    "decimateAdded": false,
+    "sourceSize": [
+      0.1341450810432434,
+      0.16341806948184967,
+      0.06011485308408737
+    ],
+    "uvLayers": [
+      "UVMap",
+      "UVMap.001",
+      "UVMap.002"
+    ]
+  },
+  {
+    "name": "Coral_04",
+    "source": "Object_4.003",
+    "sourceMaterial": "default.004",
+    "textures": {
+      "base": "Coral_04_BaseColor.png",
+      "normal": "Coral_04_Normal.png",
+      "orm": "Coral_04_ORM.png",
+      "metallicSmoothness": "Coral_04_MetallicSmoothness.png"
+    },
+    "baseColor": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "triangles": [
+      998,
+      498
+    ],
+    "decimateAdded": false,
+    "sourceSize": [
+      0.09728270769119263,
+      0.10566725581884384,
+      0.09783591330051422
+    ],
+    "uvLayers": [
+      "UVMap",
+      "UVMap.001",
+      "UVMap.002"
+    ]
+  },
+  {
+    "name": "Coral_05",
+    "source": "Object_4.004",
+    "sourceMaterial": "default.005",
+    "textures": {
+      "base": "Coral_05_BaseColor.png",
+      "normal": "Coral_05_Normal.png",
+      "orm": "Coral_05_ORM.png",
+      "metallicSmoothness": "Coral_05_MetallicSmoothness.png"
+    },
+    "baseColor": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "triangles": [
+      998,
+      498
+    ],
+    "decimateAdded": false,
+    "sourceSize": [
+      0.14810490608215332,
+      0.09333037585020065,
+      0.20658355951309204
+    ],
+    "uvLayers": [
+      "UVMap",
+      "UVMap.001",
+      "UVMap.002"
+    ]
+  },
+  {
+    "name": "Coral_06",
+    "source": "Object_4.005",
+    "sourceMaterial": "default.006",
+    "textures": {
+      "base": "Coral_06_BaseColor.png",
+      "normal": "Coral_06_Normal.png",
+      "orm": "Coral_06_ORM.png",
+      "metallicSmoothness": "Coral_06_MetallicSmoothness.png"
+    },
+    "baseColor": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "triangles": [
+      997,
+      497
+    ],
+    "decimateAdded": false,
+    "sourceSize": [
+      0.20498111844062805,
+      0.09844077378511429,
+      0.2085670828819275
+    ],
+    "uvLayers": [
+      "UVMap",
+      "UVMap.001",
+      "UVMap.002"
+    ]
+  },
+  {
+    "name": "Coral_07",
+    "source": "Object_4.006",
+    "sourceMaterial": "default.007",
+    "textures": {
+      "base": "Coral_07_BaseColor.png",
+      "normal": "Coral_07_Normal.png",
+      "orm": "Coral_07_ORM.png",
+      "metallicSmoothness": "Coral_07_MetallicSmoothness.png"
+    },
+    "baseColor": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "triangles": [
+      998,
+      498
+    ],
+    "decimateAdded": false,
+    "sourceSize": [
+      0.11599790304899216,
+      0.10457134246826172,
+      0.1364147812128067
+    ],
+    "uvLayers": [
+      "UVMap",
+      "UVMap.001",
+      "UVMap.002"
+    ]
+  },
+  {
+    "name": "Coral_08",
+    "source": "Object_4.007",
+    "sourceMaterial": "default.008",
+    "textures": {
+      "normal": "Coral_08_Normal.png",
+      "orm": "Coral_08_ORM.png",
+      "metallicSmoothness": "Coral_08_MetallicSmoothness.png"
+    },
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "triangles": [
+      867,
+      859
+    ],
+    "decimateAdded": false,
+    "sourceSize": [
+      0.11911951005458832,
+      0.07642226666212082,
+      0.05709636211395264
+    ],
+    "uvLayers": [
+      "UVMap",
+      "UVMap.001"
+    ]
+  },
+  {
+    "name": "Coral_09",
+    "source": "Object_4.008",
+    "sourceMaterial": "default.009",
+    "textures": {
+      "base": "Coral_09_BaseColor.png",
+      "normal": "Coral_09_Normal.png",
+      "orm": "Coral_09_ORM.png",
+      "metallicSmoothness": "Coral_09_MetallicSmoothness.png"
+    },
+    "baseColor": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "triangles": [
+      998,
+      498
+    ],
+    "decimateAdded": false,
+    "sourceSize": [
+      0.12829440832138062,
+      0.11563321948051453,
+      0.03627655282616615
+    ],
+    "uvLayers": [
+      "UVMap",
+      "UVMap.001",
+      "UVMap.002"
+    ]
+  },
+  {
+    "name": "Coral_10",
+    "source": "Object_4.009",
+    "sourceMaterial": "default.010",
+    "textures": {
+      "base": "Coral_10_BaseColor.png",
+      "normal": "Coral_10_Normal.png",
+      "orm": "Coral_10_ORM.png",
+      "metallicSmoothness": "Coral_10_MetallicSmoothness.png"
+    },
+    "baseColor": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "triangles": [
+      998,
+      498
+    ],
+    "decimateAdded": false,
+    "sourceSize": [
+      0.15651696920394897,
+      0.1070789098739624,
+      0.22483044862747192
+    ],
+    "uvLayers": [
+      "UVMap",
+      "UVMap.001",
+      "UVMap.002"
+    ]
+  },
+  {
+    "name": "Coral_11",
+    "source": "Object_4.010",
+    "sourceMaterial": "default.011",
+    "textures": {
+      "base": "Coral_11_BaseColor.png",
+      "normal": "Coral_11_Normal.png",
+      "orm": "Coral_11_ORM.png",
+      "metallicSmoothness": "Coral_11_MetallicSmoothness.png"
+    },
+    "baseColor": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "triangles": [
+      498,
+      248
+    ],
+    "decimateAdded": false,
+    "sourceSize": [
+      0.0948781669139862,
+      0.09855033457279205,
+      0.058836087584495544
+    ],
+    "uvLayers": [
+      "UVMap",
+      "UVMap.001",
+      "UVMap.002"
+    ]
+  }
+]

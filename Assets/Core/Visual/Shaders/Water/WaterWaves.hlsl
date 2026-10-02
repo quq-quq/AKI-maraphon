@@ -50,13 +50,31 @@ float OceanCellAt(float2 xz)
     return max(_WaterMeshCell, 1e-3) * (1.0 + length(xz - _WaterMeshCenter.xz) / max(_WaterMeshGrowth, 1e-3));
 }
 
+// How much of the two smaller cascades still counts at xz (x = 17 m patch, y = 5 m patch), from the distance to the
+// camera, as in gasgiant's FFT-Ocean: a cascade is whole up to OCEAN_LOD_SCALE patch sizes away and gone at twice
+// that. Further out its waves are smaller than the grid and the pixels anyway, and skipping them saves the fetches.
+// Compute shaders have no camera (WATER_NO_VIEW_LOD): always everything.
+#define OCEAN_LOD_SCALE 8.0
+float2 OceanCascadeWeights(float2 xz)
+{
+#if defined(WATER_NO_VIEW_LOD)
+    return 1.0;
+#else
+    float d = length(float3(xz.x - _WorldSpaceCameraPos.x, _WorldSpaceCameraPos.y - _WaterMeshCenter.y, xz.y - _WorldSpaceCameraPos.z));
+    return saturate(2.0 - d / (OCEAN_LOD_SCALE * _OceanLengthScales.yz));
+#endif
+}
+
 // displacement (xyz, metres) of the undisplaced point xz; mesh-matched mip levels
 float3 OceanDisplacement(float2 xz)
 {
     float cell = OceanCellAt(xz);
+    float2 w = OceanCascadeWeights(xz);
     float3 d = SAMPLE_TEXTURE2D_LOD(_OceanDisp0, ocean_trilinear_repeat_sampler, xz / _OceanLengthScales.x, OceanLod(_OceanLengthScales.x, cell)).xyz;
-    d += SAMPLE_TEXTURE2D_LOD(_OceanDisp1, ocean_trilinear_repeat_sampler, xz / _OceanLengthScales.y, OceanLod(_OceanLengthScales.y, cell)).xyz;
-    d += SAMPLE_TEXTURE2D_LOD(_OceanDisp2, ocean_trilinear_repeat_sampler, xz / _OceanLengthScales.z, OceanLod(_OceanLengthScales.z, cell)).xyz;
+    [branch] if (w.x > 0.0)
+        d += w.x * SAMPLE_TEXTURE2D_LOD(_OceanDisp1, ocean_trilinear_repeat_sampler, xz / _OceanLengthScales.y, OceanLod(_OceanLengthScales.y, cell)).xyz;
+    [branch] if (w.y > 0.0)
+        d += w.y * SAMPLE_TEXTURE2D_LOD(_OceanDisp2, ocean_trilinear_repeat_sampler, xz / _OceanLengthScales.z, OceanLod(_OceanLengthScales.z, cell)).xyz;
     return d;
 }
 
@@ -66,14 +84,24 @@ void OceanSurface(float2 xz, out float3 normal, out float turbulence)
     float2 uv0 = xz / _OceanLengthScales.x;
     float2 uv1 = xz / _OceanLengthScales.y;
     float2 uv2 = xz / _OceanLengthScales.z;
-    float4 deriv = SAMPLE_TEXTURE2D(_OceanDeriv0, ocean_trilinear_repeat_sampler, uv0)
-                 + SAMPLE_TEXTURE2D(_OceanDeriv1, ocean_trilinear_repeat_sampler, uv1)
-                 + SAMPLE_TEXTURE2D(_OceanDeriv2, ocean_trilinear_repeat_sampler, uv2);
+    float2 w = OceanCascadeWeights(xz);
+    // gradients taken out here: the hardware's own would break inside the branches (keeps the anisotropic filtering)
+    float2 dx = ddx(xz), dy = ddy(xz);
+
+    float4 deriv = SAMPLE_TEXTURE2D_GRAD(_OceanDeriv0, ocean_trilinear_repeat_sampler, uv0, dx / _OceanLengthScales.x, dy / _OceanLengthScales.x);
+    float t1 = 1.0;
+    [branch] if (w.x > 0.0)
+    {
+        float2 gx = dx / _OceanLengthScales.y, gy = dy / _OceanLengthScales.y;
+        deriv += w.x * SAMPLE_TEXTURE2D_GRAD(_OceanDeriv1, ocean_trilinear_repeat_sampler, uv1, gx, gy);
+        t1 = lerp(1.0, SAMPLE_TEXTURE2D_GRAD(_OceanDisp1, ocean_trilinear_repeat_sampler, uv1, gx, gy).w, w.x);
+    }
+    [branch] if (w.y > 0.0)
+        deriv += w.y * SAMPLE_TEXTURE2D_GRAD(_OceanDeriv2, ocean_trilinear_repeat_sampler, uv2, dx / _OceanLengthScales.z, dy / _OceanLengthScales.z);
     float2 slope = float2(deriv.x / (1.0 + deriv.z), deriv.y / (1.0 + deriv.w));
     normal = normalize(float3(-slope.x, 1.0, -slope.y));
 
-    float t0 = SAMPLE_TEXTURE2D(_OceanDisp0, ocean_trilinear_repeat_sampler, uv0).w;
-    float t1 = SAMPLE_TEXTURE2D(_OceanDisp1, ocean_trilinear_repeat_sampler, uv1).w;
+    float t0 = SAMPLE_TEXTURE2D_GRAD(_OceanDisp0, ocean_trilinear_repeat_sampler, uv0, dx / _OceanLengthScales.x, dy / _OceanLengthScales.x).w;
     turbulence = min(t0, lerp(1.0, t1, 0.6));
 }
 
@@ -364,6 +392,108 @@ float WaterSubmergedDist(float3 p, float t, float waterLevel)
     for (int k = 0; k < 3; k++)
         xz0 = p.xz - WaterDisplacement(xz0, t, q).xz;
     return waterLevel + WaterDisplacement(xz0, t, q).y - p.y;
+}
+
+// ---- the grid the surface is drawn with (WaterSurface.BuildGrid): vertex n cells from the centre sits at
+// growth * (e^(n cell / growth) - 1) (an expanding grid; a plain one when growth is huge), the centre at
+// _WaterMeshCenter, each cell split along its (x+1, z) - (x, z+1) diagonal.
+float WaterGridCoord(float n)
+{
+    float cell = max(_WaterMeshCell, 1e-3);
+    float g = _WaterMeshGrowth;
+    return g > 1e7 ? n * cell : sign(n) * g * (exp(abs(n) * cell / g) - 1.0);
+}
+
+float WaterGridIndex(float x)
+{
+    float cell = max(_WaterMeshCell, 1e-3);
+    float g = _WaterMeshGrowth;
+    return g > 1e7 ? x / cell : sign(x) * g * log(1.0 + abs(x) / g) / cell;
+}
+
+// a vertex of the surface as drawn (WaterSurfaceVertex.hlsl): its grid point, displaced by the waves
+float3 WaterGridVertex(float2 n, float t, float q, float waterLevel)
+{
+    float2 xz = _WaterMeshCenter.xz + float2(WaterGridCoord(n.x), WaterGridCoord(n.y));
+    return float3(xz.x, waterLevel, xz.y) + WaterDisplacement(xz, t, q);
+}
+
+// The surface right around the camera as a plane: x, y = its slope along world x and z, z = its height under the
+// camera. WaterSurface works it out once per camera, right before the camera renders (WaterHeight.compute,
+// CameraPlane), and every shader that draws the waterline reads it from here.
+TEXTURE2D(_WaterCamPlane);
+
+float4 WaterCameraPlaneLoad()
+{
+    return LOAD_TEXTURE2D(_WaterCamPlane, int2(0, 0));
+}
+
+// The plane from the exact wave maths, for a fine grid (the clipmap's cells by the camera are centimetres: it
+// follows the waves). Five samples, averaged for the height: the half-float FFT data is only good to a millimetre,
+// and over the near plane (a few centimetres) that would show as a staircase.
+float4 WaterCameraPlaneExact(float3 cam, float t, float waterLevel)
+{
+    const float r = 0.15;
+    float hc = WaterSubmergedDist(float3(cam.x, 0.0, cam.z), t, waterLevel);   // y = 0: the surface height itself
+    float hx0 = WaterSubmergedDist(float3(cam.x - r, 0.0, cam.z), t, waterLevel);
+    float hx1 = WaterSubmergedDist(float3(cam.x + r, 0.0, cam.z), t, waterLevel);
+    float hz0 = WaterSubmergedDist(float3(cam.x, 0.0, cam.z - r), t, waterLevel);
+    float hz1 = WaterSubmergedDist(float3(cam.x, 0.0, cam.z + r), t, waterLevel);
+    float h = (2.0 * hc + hx0 + hx1 + hz0 + hz1) / 6.0;
+    return float4((hx1 - hx0) / (2.0 * r), (hz1 - hz0) / (2.0 * r), h, 0.0);
+}
+
+// The plane for one coarse grid (a pool / lake): the very triangle of the drawn surface the camera is in - not the exact wave maths: between its
+// vertices the drawn surface is flat and can be centimetres off the waves, and over the near plane (a few
+// centimetres across) that showed as a band of the wrong world between the two (a strip of "sky" seen from under
+// the water, the underside seen from above). The waves also move the grid sideways, so first find the grid point
+// that ends up under the camera. Evaluate it once per vertex, the same way in every shader that draws the split, so
+// the surface, the underwater overlay and the lens all agree on one smooth line.
+float4 WaterCameraPlane(float3 cam, float t, float waterLevel)
+{
+    float q = WaterQ();
+    float2 local = cam.xz - _WaterMeshCenter.xz;   // undisplaced grid point, refined below
+    float3 p0 = 0, p1 = 0, p2 = 0;
+    [unroll]
+    for (int k = 0; k < 3; k++)
+    {
+        float2 n = float2(WaterGridIndex(local.x), WaterGridIndex(local.y));
+        float2 c = floor(n);
+        float2 lo = float2(WaterGridCoord(c.x), WaterGridCoord(c.y));
+        float2 hi = float2(WaterGridCoord(c.x + 1.0), WaterGridCoord(c.y + 1.0));
+        float2 f = (local - lo) / max(hi - lo, 1e-4);   // where in the cell, 0..1
+        float3 w;
+        if (f.x + f.y < 1.0)
+        {
+            p0 = WaterGridVertex(c, t, q, waterLevel);                       // (x, z)
+            p1 = WaterGridVertex(c + float2(1, 0), t, q, waterLevel);        // (x+1, z)
+            p2 = WaterGridVertex(c + float2(0, 1), t, q, waterLevel);        // (x, z+1)
+            w = float3(1.0 - f.x - f.y, f.x, f.y);
+        }
+        else
+        {
+            p0 = WaterGridVertex(c + float2(1, 1), t, q, waterLevel);        // (x+1, z+1)
+            p1 = WaterGridVertex(c + float2(0, 1), t, q, waterLevel);        // (x, z+1)
+            p2 = WaterGridVertex(c + float2(1, 0), t, q, waterLevel);        // (x+1, z)
+            w = float3(f.x + f.y - 1.0, 1.0 - f.x, 1.0 - f.y);
+        }
+        // where that grid point is drawn; step the grid point by what is left over
+        float2 drawn = w.x * p0.xz + w.y * p1.xz + w.z * p2.xz;
+        local += cam.xz - drawn;
+    }
+
+    float3 nrm = cross(p2 - p0, p1 - p0);
+    if (nrm.y < 0.0) nrm = -nrm;
+    nrm.y = max(nrm.y, 1e-4);
+    float2 slope = -nrm.xz / nrm.y;
+    float height = p0.y + slope.x * (cam.x - p0.x) + slope.y * (cam.z - p0.z);
+    return float4(slope, height, 0.0);
+}
+
+// Metres the near-plane point np lies under the camera's surface plane (negative = above).
+float WaterPlaneSubmergedDist(float4 plane, float3 np, float3 cam)
+{
+    return plane.z + plane.x * (np.x - cam.x) + plane.y * (np.z - cam.z) - np.y;
 }
 
 // Analytic normal + Jacobian of the horizontal Gerstner mapping (jacobian < ~0.6 means the
