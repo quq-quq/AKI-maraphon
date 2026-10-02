@@ -13,129 +13,141 @@ MonoBehaviour:
   m_Name: SoundConfig
   m_EditorClassIdentifier: Assembly-CSharp::Core.Scripts.Sound.SoundConfig
   <MenuGamelan>k__BackingField:
-    Clip: {fileID: 0}
+    Clip: {fileID: 8300000, guid: c35d8ea63c2a876479402095c9d14a69, type: 3}
     Is3D: 0
     IgnoreUnderwater: 1
     Volume: 0.3
     Pitch: 1
     RandomAdd: 0.1
   <FishingGamelan>k__BackingField:
-    Clip: {fileID: 0}
+    Clip: {fileID: 8300000, guid: ae64435bfdf0ba24c8dc79c7534d9ec7, type: 3}
     Is3D: 0
     IgnoreUnderwater: 1
     Volume: 0.3
     Pitch: 1
     RandomAdd: 0.1
   <NagaGamelan>k__BackingField:
-    Clip: {fileID: 0}
+    Clip: {fileID: 8300000, guid: de70db910254a804d8c2f52fbd33efef, type: 3}
     Is3D: 0
     IgnoreUnderwater: 1
     Volume: 0.3
     Pitch: 1
     RandomAdd: 0.1
   <WaterAmbient>k__BackingField:
-    Clip: {fileID: 0}
+    Clip: {fileID: 8300000, guid: 229149d2f775bb2439230e9a0d0f182c, type: 3}
     Is3D: 0
     IgnoreUnderwater: 0
     Volume: 0.1
     Pitch: 1
     RandomAdd: 0.1
   <WavesSound>k__BackingField:
-    Clip: {fileID: 0}
+    Clip: {fileID: 8300000, guid: 1b9d7614014d1284fab50cafc34e605d, type: 3}
     Is3D: 0
     IgnoreUnderwater: 0
     Volume: 0.1
     Pitch: 1
     RandomAdd: 0.1
   <SeagoolSound>k__BackingField:
-    Clip: {fileID: 0}
+    Clip: {fileID: 8300000, guid: 90df70ce07226c845bfb9bef5804015d, type: 3}
     Is3D: 0
     IgnoreUnderwater: 0
     Volume: 1
     Pitch: 0.2
     RandomAdd: 0.1
   <ArrowMoveSound>k__BackingField:
-    Clip: {fileID: 0}
+    Clip: {fileID: 8300000, guid: 42dec77c674bf7a4c89b2b9787554725, type: 3}
     Is3D: 1
     IgnoreUnderwater: 0
     Volume: 0.8
     Pitch: 1
     RandomAdd: 0.1
   <FishSwimmingSound>k__BackingField:
-    Clip: {fileID: 0}
+    Clip: {fileID: 8300000, guid: 50da547e46b94a34b8041f020226bbfa, type: 3}
     Is3D: 1
     IgnoreUnderwater: 0
     Volume: 1
     Pitch: 1
     RandomAdd: 0.1
   <NagaSwimmingSound>k__BackingField:
-    Clip: {fileID: 0}
+    Clip: {fileID: 8300000, guid: 6c36f0debad96064a8796fac83525c1e, type: 3}
     Is3D: 1
     IgnoreUnderwater: 0
     Volume: 1
     Pitch: 1
     RandomAdd: 0.1
   <SwimmingSound>k__BackingField:
-  - Clip: {fileID: 0}
+  - Clip: {fileID: 8300000, guid: f9131bab2b9dea841ab1313644f92ebc, type: 3}
     Is3D: 0
     IgnoreUnderwater: 0
     Volume: 0.2
     Pitch: 1
     RandomAdd: 0.1
-  - Clip: {fileID: 0}
+  - Clip: {fileID: 8300000, guid: 86fb5f2f6bf55e549afde903f8ffe09f, type: 3}
     Is3D: 0
     IgnoreUnderwater: 0
     Volume: 0.2
     Pitch: 1
     RandomAdd: 0.1
-  - Clip: {fileID: 0}
+  - Clip: {fileID: 8300000, guid: 277fc9dc5e45b834caa8c30ac384bed7, type: 3}
     Is3D: 0
     IgnoreUnderwater: 0
     Volume: 0.2
     Pitch: 1
     RandomAdd: 0.1
   <SplashSound>k__BackingField:
-  - Clip: {fileID: 0}
+  - Clip: {fileID: 8300000, guid: f12e227108872bd4ca76c59084486b2b, type: 3}
     Is3D: 0
     IgnoreUnderwater: 0
     Volume: 0.8
     Pitch: 1
     RandomAdd: 0.1
-  - Clip: {fileID: 0}
+  - Clip: {fileID: 8300000, guid: c2690709f27e17446aa59b9b58fae9c6, type: 3}
+    Is3D: 0
+    IgnoreUnderwater: 0
+    Volume: 0.8
+    Pitch: 1
+    RandomAdd: 0.1
+  - Clip: {fileID: 8300000, guid: 3f14fd4bd7f670844ae060c5dafa3167, type: 3}
     Is3D: 0
     IgnoreUnderwater: 0
     Volume: 0.8
     Pitch: 1
     RandomAdd: 0.1
   <BreatheOutSound>k__BackingField:
-  - Clip: {fileID: 0}
+  - Clip: {fileID: 8300000, guid: 65f46de0ab2f8f546a742c6bb102a4f1, type: 3}
     Is3D: 0
     IgnoreUnderwater: 0
     Volume: 1
     Pitch: 1
     RandomAdd: 0.1
-  - Clip: {fileID: 0}
+  - Clip: {fileID: 8300000, guid: 55a6ca16159e1d54291569a37085ee57, type: 3}
+    Is3D: 0
+    IgnoreUnderwater: 0
+    Volume: 1
+    Pitch: 1
+    RandomAdd: 0.1
+  - Clip: {fileID: 8300000, guid: f67f69c35e064154f966aa3e6d330592, type: 3}
     Is3D: 0
     IgnoreUnderwater: 0
     Volume: 1
     Pitch: 1
     RandomAdd: 0.1
   <TriggerSound>k__BackingField:
-  - Clip: {fileID: 0}
+  - Clip: {fileID: 8300000, guid: 1a13efab66659c648ac2fe9f553941ab, type: 3}
     Is3D: 1
     IgnoreUnderwater: 0
     Volume: 1
     Pitch: 1
     RandomAdd: 0.1
   <HitSound>k__BackingField:
-    Clip: {fileID: 0}
+    Clip: {fileID: 8300000, guid: 640c6b34ad108ff41b37d55de63120d2, type: 3}
     Is3D: 1
     IgnoreUnderwater: 0
     Volume: 1.4
     Pitch: 1
     RandomAdd: 0.1
   <FishDeathSound>k__BackingField:
-    Clip: {fileID: 0}
+    Clip: {fileID: 8300000, guid: 900e954bd2608814ba096e7d8a76c3d8, type: 3}
     Is3D: 1
     IgnoreUnderwater: 0
     Volume: 1
@@ -143,7 +155,25 @@ MonoBehaviour:
     RandomAdd: 0.1
   <NagaDistanceSeconds>k__BackingField: 3
   <NagaSounds>k__BackingField:
-  - Clip: {fileID: 0}
+  - Clip: {fileID: 8300000, guid: b036177edd02f994ebe6efa814eeb1c2, type: 3}
+    Is3D: 1
+    IgnoreUnderwater: 0
+    Volume: 1.4
+    Pitch: 1
+    RandomAdd: 0.1
+  - Clip: {fileID: 8300000, guid: f71d68e5fcb206d4580e0bbddb543e39, type: 3}
+    Is3D: 1
+    IgnoreUnderwater: 0
+    Volume: 1.4
+    Pitch: 1
+    RandomAdd: 0.1
+  - Clip: {fileID: 8300000, guid: b4c5676d651a32440a40759384b6cc4b, type: 3}
+    Is3D: 1
+    IgnoreUnderwater: 0
+    Volume: 1.4
+    Pitch: 1
+    RandomAdd: 0.1
+  - Clip: {fileID: 8300000, guid: d38e346118c902642bb8860584bad5bd, type: 3}
     Is3D: 1
     IgnoreUnderwater: 0
     Volume: 1.4
