@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AKI.Endings;
 using AKI.Fish;
 using AKI.Menu;
 using AKI.Player;
@@ -69,6 +70,13 @@ namespace AKI.Rhythm
         [Header("Music fallback (SoundConfig wins when present)")]
         [Range(0f,1f)] public float musicVolume = .75f;
         public bool musicBypassesUnderwaterFilter = true;
+        [Header("Endings: black screen with subtitles (empty = the old behaviour)")]
+        [Tooltip("The golden fish was let go: the view slowly goes black. Empty = the scene restarts.")]
+        public EndingData goldenIgnoredEnding;
+        [Tooltip("Out of air in the Naga fight. Empty = passing out and coming to.")]
+        public EndingData drownedEnding;
+        [Tooltip("The Naga track was survived and the Naga swallows the player, after the cut to black.")]
+        public EndingData eatenEnding;
         [Header("Events")]
         public UnityEvent onFishingStarted = new UnityEvent();
         public UnityEvent onGoldenAppeared = new UnityEvent();
@@ -76,14 +84,6 @@ namespace AKI.Rhythm
         public UnityEvent onBossHit = new UnityEvent();
         public UnityEvent onFinalCharge = new UnityEvent();
         public UnityEvent onEnded = new UnityEvent();
-
-        /// <summary>Scene-independent phase moments for listeners that outlive the scene (sound).</summary>
-        public static event System.Action FishingStarted;
-        /// <summary>The golden fish appeared: the fishing music is over.</summary>
-        public static event System.Action FishingEnded;
-        public static event System.Action<Transform> NagaAppeared;
-        /// <summary>The fight is over: the player ran out of air against the Naga, or it swallowed them.</summary>
-        public static event System.Action NagaDisappeared;
         [SerializeField, HideInInspector] GamePhase phase;
         public GamePhase Phase => phase;
         public bool CanShoot => phase == GamePhase.Fishing || phase == GamePhase.GoldenFish || phase == GamePhase.BossFight;
@@ -101,6 +101,7 @@ namespace AKI.Rhythm
         float originalBreathSeconds;
         bool initialized, ownsEndFade;
         float bossHitPulse;
+        AudioSource nagaAmbient;
         Vector3 lastDeepBossPosition;
         bool hasDeepBossPosition;
 
@@ -134,8 +135,12 @@ namespace AKI.Rhythm
             gate.game = this; gate.conductor = conductor;
             gate.earlyWindowSeconds = earlyWindowSeconds; gate.lateWindowSeconds = lateWindowSeconds; gate.spamQuietSeconds = spamQuietSeconds;
             gun.cooldown = shotCooldownSeconds; gun.materializeSeconds = reloadMaterializeSeconds;
+            gun.onShoot.AddListener(PlayShotSound);
             swimmer.onHeadUnderwater.AddListener(OnHeadDived);
+            swimmer.onHeadAboveWater.AddListener(OnHeadSurfaced);
+            swimmer.onSwimStroke.AddListener(PlayStrokeSound);
             if (menu != null) menu.onEnteredWater.AddListener(BeginFishing);
+            else SoundManager.Instance?.TakeRhythmMusicControl(); // WaterTest must not play menu music on top
             conductor.Completed += OnMusicFinished;
             breath.onOutOfAir.AddListener(OnOutOfAir);
             headPoint = new GameObject("Naga_Final_HeadPoint").transform;
@@ -147,15 +152,19 @@ namespace AKI.Rhythm
 
         void OnHeadDived()
         {
+            SoundManager.Instance?.SetHeadUnderwater(true);
             if (phase == GamePhase.AwaitDive) BeginFishing();
         }
+        void OnHeadSurfaced() { if (!swimmer.SurfaceBlocked) SoundManager.Instance?.SetHeadUnderwater(false); }
         [ContextMenu("Debug/Begin fishing")]
         public void BeginFishing()
         {
             if (!initialized || phase != GamePhase.AwaitDive) return;
+            SoundManager.Instance?.TakeRhythmMusicControl();
+            SoundManager.Instance?.SetHeadUnderwater(true);
             if (!StartTrack(fishingTrack, true, soundConfig != null ? soundConfig.FishingGamelan : null)) return;
             SetPhase(GamePhase.Fishing);
-            fishSpawner?.StartSpawning(); onFishingStarted.Invoke(); FishingStarted?.Invoke();
+            fishSpawner?.StartSpawning(); onFishingStarted.Invoke();
         }
         bool StartTrack(RhythmTrack track, bool loop, AudioClipConfig config)
         {
@@ -176,6 +185,7 @@ namespace AKI.Rhythm
                 bossHitMaskPower, bossHitMaskInvert ? 1f : 0f, Mathf.Max(bossHitVignetteInner+.01f,bossHitVignetteOuter)));
             Shader.SetGlobalFloat("_RhythmHitGlow", bossHitGlow);
             WaterLensFeature.RhythmHitActive = bossHitPulse > .001f;
+            if (phase == GamePhase.Ended) return;   // nothing may restart the scene under an ending
             if(naga!=null)
             {
                 var guard=naga.GetComponent<NagaEnvironmentSafety>();
@@ -190,7 +200,11 @@ namespace AKI.Rhythm
             else if (phase == GamePhase.GoldenFish)
             {
                 // FishAI and FishAnimation own swimming, just as on an ordinary tuna.
-                if (elapsed >= goldenIgnoreSeconds) RestartGame();
+                if (elapsed >= goldenIgnoreSeconds)
+                {
+                    if (goldenIgnoredEnding != null) ShowEnding(goldenIgnoredEnding);
+                    else RestartGame();
+                }
             }
             else if (phase == GamePhase.FinalCharge && naga != null)
             {
@@ -204,7 +218,6 @@ namespace AKI.Rhythm
         public void SpawnGoldenFish()
         {
             if (!initialized || phase != GamePhase.Fishing) return;
-            FishingEnded?.Invoke(); // before the music stops, so listeners can still fade it out
             conductor.StopMusic(); fishSpawner?.StopSpawning();
             Vector3 goldCentre = cameraView.transform.position;
             Vector3 forward = Vector3.ProjectOnPlane(cameraView.transform.forward, Vector3.up).normalized;
@@ -248,6 +261,7 @@ namespace AKI.Rhythm
             if (!StartTrack(nagaTrack, false, soundConfig != null ? soundConfig.NagaGamelan : null)) { RestartGame(); return; }
             SetPhase(GamePhase.BossFight); rewardedBeats.Clear(); SuccessfulBossHits = 0;
             swimmer.SurfaceBlocked = true; breath.SurfaceRefillBlocked = true;
+            SoundManager.Instance?.SetHeadUnderwater(true);
             hasDeepBossPosition = false;
             if (!EnsureBossDepth(true))
             { swimmer.SurfaceBlocked = false; breath.SurfaceRefillBlocked = false; RestartGame(); return; }
@@ -292,7 +306,8 @@ namespace AKI.Rhythm
                 Debug.LogWarning("RhythmGameFlow: no room for the whole Naga below water and above the seabed; restarting safely.",this);
                 RestartGame();return;
             }
-            onBossStarted.Invoke(); NagaAppeared?.Invoke(monster.transform);
+            PlayBossAmbient(monster.transform);
+            onBossStarted.Invoke();
         }
         static Transform FindBone(GameObject root, string name)
         { foreach (var t in root.GetComponentsInChildren<Transform>(true)) if (t.name == name) return t; return null; }
@@ -348,6 +363,7 @@ namespace AKI.Rhythm
             if (!rewardedBeats.Add(arrow.RhythmBeat)) return;
             SuccessfulBossHits++; breath.RestoreFullBreath(); naga?.PlayHitReaction();
             bossHitPulse = 1f;
+            PlayConfig(soundConfig != null ? soundConfig.HitSound : null, arrow.transform.position);
             onBossHit.Invoke();
         }
         void OnMusicFinished()
@@ -365,16 +381,28 @@ namespace AKI.Rhythm
         void EndInBlack()
         {
             SetPhase(GamePhase.Ended); naga.StopMotion(false);
-            NagaDisappeared?.Invoke();
+            if (nagaAmbient != null) nagaAmbient.Stop();
             ownsEndFade = true; Shader.SetGlobalFloat("_ScreenFade", 1f); WaterLensFeature.ScreenActive = true;
+            if (eatenEnding != null) EndingScreen.Show(eatenEnding);
             onEnded.Invoke();
         }
         void OnOutOfAir()
         {
             if (phase == GamePhase.Failed || phase == GamePhase.Ended) return;
-            if (naga != null) NagaDisappeared?.Invoke(); // before the music stops, so listeners can still fade it out
+            if (phase == GamePhase.BossFight && drownedEnding != null) { ShowEnding(drownedEnding); return; }
             SetPhase(GamePhase.Failed); conductor.StopMusic(); fishSpawner?.StopSpawning();
             naga?.StopMotion(false);
+        }
+        // The game is over for good: no music, no shooting, no passing out (BreathHolding reads that flag right
+        // after its out-of-air event, so the ending replaces the reload), and the ending's subtitles on black.
+        void ShowEnding(EndingData ending)
+        {
+            SetPhase(GamePhase.Ended); conductor.StopMusic(); fishSpawner?.StopSpawning();
+            naga?.StopMotion(false);
+            if (nagaAmbient != null) nagaAmbient.Stop();
+            breath.passOutWhenOutOfAir = false; playerWeapon.enabled = false;
+            EndingScreen.Show(ending);
+            onEnded.Invoke();
         }
         [ContextMenu("Restart game")]
         public void RestartGame()
@@ -397,14 +425,26 @@ namespace AKI.Rhythm
             else p.y = Mathf.Min(p.y,top);
             return p;
         }
+        void PlayBossAmbient(Transform monster)
+        {
+            AudioClipConfig config = soundConfig != null ? soundConfig.NagaSwimmingSound : null;
+            if (config == null || config.Clip == null) return;
+            nagaAmbient = monster.gameObject.AddComponent<AudioSource>();
+            nagaAmbient.clip = config.Clip; nagaAmbient.loop = true; nagaAmbient.volume = config.Volume;
+            nagaAmbient.spatialBlend = config.Is3D ? 1f : 0f; nagaAmbient.maxDistance = 35f; nagaAmbient.Play();
+        }
+        void PlayShotSound() { if (soundConfig != null && soundConfig.TriggerSound.Count > 0) PlayConfig(soundConfig.TriggerSound[Random.Range(0,soundConfig.TriggerSound.Count)], cameraView.transform.position); }
+        void PlayStrokeSound() { if (soundConfig != null && soundConfig.SwimmingSound.Count > 0) PlayConfig(soundConfig.SwimmingSound[Random.Range(0,soundConfig.SwimmingSound.Count)], cameraView.transform.position); }
+        void PlayConfig(AudioClipConfig config, Vector3 p) { if (config != null && config.Clip != null) SoundManager.Instance?.PlaySound(config,p); }
         void OnDestroy()
         {
             Shader.SetGlobalVector("_RhythmHitVignette", Vector4.zero); WaterLensFeature.RhythmHitActive = false;
             if (!initialized) return;
             conductor.Completed -= OnMusicFinished;
             if (menu != null) menu.onEnteredWater.RemoveListener(BeginFishing);
-            if (swimmer != null) { swimmer.onHeadUnderwater.RemoveListener(OnHeadDived); swimmer.SurfaceBlocked = false; }
+            if (swimmer != null) { swimmer.onHeadUnderwater.RemoveListener(OnHeadDived); swimmer.onHeadAboveWater.RemoveListener(OnHeadSurfaced); swimmer.onSwimStroke.RemoveListener(PlayStrokeSound); swimmer.SurfaceBlocked = false; }
             if (breath != null) { breath.onOutOfAir.RemoveListener(OnOutOfAir); breath.maxBreathSeconds = originalBreathSeconds; breath.SurfaceRefillBlocked = false; }
+            if (playerWeapon != null && playerWeapon.gun != null) playerWeapon.gun.onShoot.RemoveListener(PlayShotSound);
             if (ownsEndFade && !Blackout.IsRunning) { Shader.SetGlobalFloat("_ScreenFade",0f); WaterLensFeature.ScreenActive = false; }
         }
     }
