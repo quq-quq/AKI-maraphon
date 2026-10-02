@@ -44,8 +44,8 @@ namespace AKI.Endings
         [Min(0f)] public float textFadeSeconds = 0.6f;
 
         [Header("After the subtitles")]
-        [Tooltip("What happens once the last line has been read.")]
-        public AfterEnding after = AfterEnding.StayOnScreen;
+        [Tooltip("What happens once the last line has been read. Reload Scene = the game starts over from the menu.")]
+        public AfterEnding after = AfterEnding.ReloadScene;
         [Tooltip("Scene to load for Load Scene (it must be in the build settings).")]
         public string sceneName;
         [Tooltip("On: waits for any key or click. Off: goes on by itself after the last line's seconds.")]
