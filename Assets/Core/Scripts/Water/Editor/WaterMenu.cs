@@ -144,7 +144,7 @@ namespace AKI.Water.Editor
             SetToggle(m, "_CausticsOn", "_CAUSTICS", true);
             SetToggle(m, "_GodRaysOn", "_GODRAYS", true);
             SetToggle(m, "_FFTWaves", "_FFT_WAVES", true);
-            m.SetFloat("_CrestFoamThreshold", 0.86f);   // FFT foam: share of breaking crests
+            m.SetFloat("_CrestFoamThreshold", 0.75f);   // FFT foam: share of breaking crests
             m.SetFloat("_SpecularIntensity", 0.25f);
         }
 

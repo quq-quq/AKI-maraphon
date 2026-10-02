@@ -44,7 +44,7 @@ Material:
     - _CellWaveSpeed: 0.7
     - _ColorCellScale: 0.03
     - _ColorVariation: 0.15
-    - _CrestFoamThreshold: 0.86
+    - _CrestFoamThreshold: 0.75
     - _DepthDistance: 3.5
     - _DetailFade: 90
     - _DetailStrength: 0.8
