@@ -419,13 +419,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 237753733}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.14985679, y: 0.7823361, z: -0.20630766, w: 0.56826967}
-  m_LocalPosition: {x: -14.13, y: 7.1700025, z: -57.53}
+  m_LocalRotation: {x: 0.04267106, y: 0.83732915, z: -0.059772633, w: 0.54174393}
+  m_LocalPosition: {x: -13.78, y: 3.91, z: -55.97}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 29.546, y: 108.013, z: 0}
+  m_LocalEulerAnglesHint: {x: 8.414, y: 114.224, z: 0.388}
 --- !u!114 &237753738
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -832,10 +832,12 @@ MonoBehaviour:
   heave: 1
   tilt: 1
   maxTiltDegrees: 35
-  heavePeriod: 1
-  tiltPeriod: 1
-  damping: 0.6
-  draft: 0
+  heavePeriod: 0.45
+  tiltPeriod: 0.65
+  damping: 1
+  draft: -0.14
+  maxHeightLag: 0.04
+  maxTiltLagDegrees: 1.5
 --- !u!114 &999013470
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -960,7 +962,7 @@ MonoBehaviour:
   windSpeed: 24
   windDirection: 30
   fetchKm: 300
-  waveScale: 1
+  waveScale: 0.2
   choppiness: 1.3
   spreadBlend: 0.85
   swell: 0.2
@@ -1068,7 +1070,7 @@ Transform:
   m_GameObject: {fileID: 1688107159}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -14.1, y: 0, z: -57.600002}
+  m_LocalPosition: {x: -13.8, y: 0, z: -55.95}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
