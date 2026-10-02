@@ -175,8 +175,6 @@ MonoBehaviour:
   goldenAppearsAfterSeconds: 75
   goldenIgnoreSeconds: 25
   goldenDistance: 6
-  goldenOrbitDegreesPerSecond: 15
-  goldenBobMetres: 0.25
   earlyWindowSeconds: 0.1
   lateWindowSeconds: 0.1
   spamQuietSeconds: 0.16
@@ -189,10 +187,17 @@ MonoBehaviour:
   bossWaveClearanceMetres: 6.5
   finalChargeSeconds: 1.2
   cutToBlackDistance: 0.45
-  bossHitColour: {r: 1, g: 0.78, b: 0.12, a: 1}
-  bossHitIntensity: 0.24
+  bossHitColour: {r: 1, g: 0.055, b: 0.42, a: 1}
+  bossHitIntensity: 0.58
+  bossHitAttackSeconds: 0
   bossHitFadeSeconds: 0.35
   bossHitVignetteInner: 0.32
+  bossHitVignetteOuter: 0.78
+  bossHitMask: {fileID: 2800000, guid: cb928429735d4fc469c57f785ef83432, type: 3}
+  bossHitMaskStrength: 1
+  bossHitMaskPower: 0.8
+  bossHitMaskInvert: 0
+  bossHitGlow: 0.15
   musicVolume: 0.75
   musicBypassesUnderwaterFilter: 1
   onFishingStarted:

@@ -36,6 +36,11 @@ namespace AKI.Player
         [Range(0.1f, 1f)] public float aimLookScale = 0.6f;
         [Tooltip("Sway and recoil while aiming, as a share of the hip ones.")]
         [Range(0f, 1f)] public float aimSteadiness = 0.35f;
+        [Header("First-person visibility")]
+        public bool preventNearPlaneClipping = true;
+        [Tooltip("Minimum space between the weapon mesh and the camera near plane. Keeps ADS and recoil visible without changing the ocean camera.")]
+        [Min(0f)] public float nearPlaneMargin = .035f;
+        public bool weaponCastsShadows;
 
         [Header("Recoil")]
         [Tooltip("Metres the gun jumps back on a shot.")]
@@ -75,6 +80,7 @@ namespace AKI.Player
         Vector3 recoilAngles, recoilAnglesVelocity;
         Vector3 swayAngles;
         Quaternion lastCamRotation;
+        Renderer[] weaponRenderers;
 
         public bool IsAiming { get; private set; }
 
@@ -99,6 +105,9 @@ namespace AKI.Player
             {
                 gun.owner = transform;   // own arrows never hit the player
                 if (cam != null && gun.transform.parent != cam.transform) gun.transform.SetParent(cam.transform, false);
+                weaponRenderers = gun.GetComponentsInChildren<Renderer>(true);
+                foreach (Renderer r in weaponRenderers)
+                    r.shadowCastingMode = weaponCastsShadows ? UnityEngine.Rendering.ShadowCastingMode.On : UnityEngine.Rendering.ShadowCastingMode.Off;
             }
             if (cam != null)
             {
@@ -140,6 +149,7 @@ namespace AKI.Player
         public void Fire()
         {
             if (gun == null || cam == null) return;
+            gun.transform.localScale = Vector3.one * gunScale;
             if (gun.Shoot(AimPoint()) == null) return;
 
             // aimed shots are steadier
@@ -191,6 +201,7 @@ namespace AKI.Player
         void PlaceGun(float dt)
         {
             if (gun == null || cam == null) return;
+            gun.transform.localScale = Vector3.one * gunScale;
             float s = Mathf.SmoothStep(0f, 1f, aim);
             float shake = Mathf.Lerp(1f, aimSteadiness, s);
 
@@ -223,6 +234,26 @@ namespace AKI.Player
             t.localScale = Vector3.one * gunScale;
             t.localPosition = position + recoilOffset;
             t.localRotation = rotation * Quaternion.Euler(swayAngles * shake) * Quaternion.Euler(recoilAngles);
+            if (preventNearPlaneClipping) KeepWeaponBeyondNearPlane();
+        }
+
+        void KeepWeaponBeyondNearPlane()
+        {
+            if (weaponRenderers == null) return;
+            float nearest = float.PositiveInfinity;
+            Matrix4x4 worldToCamera = cam.transform.worldToLocalMatrix;
+            foreach (Renderer r in weaponRenderers)
+            {
+                if (r == null || !r.enabled || !r.gameObject.activeInHierarchy || !(r is MeshRenderer || r is SkinnedMeshRenderer)) continue;
+                Bounds b = r.localBounds;
+                Matrix4x4 m = worldToCamera * r.localToWorldMatrix;
+                float centreZ = m.MultiplyPoint3x4(b.center).z;
+                float extentZ = Mathf.Abs(m.m20) * b.extents.x + Mathf.Abs(m.m21) * b.extents.y + Mathf.Abs(m.m22) * b.extents.z;
+                nearest = Mathf.Min(nearest, centreZ - extentZ);
+            }
+            float shift = cam.nearClipPlane + nearPlaneMargin - nearest;
+            if (shift > 0f && !float.IsInfinity(shift))
+                gun.transform.position += cam.transform.forward * shift;
         }
 
         // Pose of a gun child relative to the gun root (the muzzle may sit under other children).

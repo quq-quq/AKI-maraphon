@@ -48,12 +48,19 @@ namespace AKI.Rhythm
         [Min(0f)] [SerializeField] private float waveFrequency = 0.65f;
         [Min(0.1f)] [SerializeField] private float waveLength = 10f;
 
+        [Header("Slow swimming jaw")]
+        [SerializeField] private bool swimmingJawMotion = true;
+        [Range(0f,15f)] [SerializeField] private float swimJawDegrees = 5f;
+        [Min(.02f)] [SerializeField] private float swimJawFrequency = .18f;
+
         [Header("Final charge")]
         [Min(0.1f)] [SerializeField] private float chargeDuration = 1.05f;
         [Tooltip("Mouth stops this far in front of the target head, rather than putting the root pivot inside the player.")]
         [Min(0f)] [SerializeField] private float chargeStopDistance = 0.2f;
         [SerializeField] private Vector3 jawLocalAxis = Vector3.right;
         [Range(-90f, 90f)] [SerializeField] private float jawOpenDegrees = 38f;
+        [Tooltip("Raise the head relative to the neck during the final bite; the mouth still reaches the camera anchor.")]
+        [Range(0f,25f)] [SerializeField] private float chargeHeadLiftDegrees = 9f;
 
         private MotionState state;
         private Transform orbitTarget;
@@ -64,6 +71,8 @@ namespace AKI.Rhythm
         private Quaternion jawRestRotation;
         private Vector3 headForwardInBone;
         private Vector3 headUpInBone;
+        private Quaternion headRestRotation;
+        private Vector3 headLiftAxis;
         private Vector3 originalLocalPosition;
         private Quaternion originalLocalRotation;
         private Vector3 originalLocalScale;
@@ -205,6 +214,7 @@ namespace AKI.Rhythm
             float dt = Time.deltaTime;
             motionTime += dt;
             hitPulse = Mathf.MoveTowards(hitPulse, 0f, dt * 3.5f);
+            if (headBone != null) headBone.localRotation = headRestRotation;
 
             if (state == MotionState.Orbit)
             {
@@ -237,6 +247,11 @@ namespace AKI.Rhythm
                 forward.y=Mathf.Clamp(forward.y,-Mathf.Sin(maximumPitchDegrees*Mathf.Deg2Rad),Mathf.Sin(maximumPitchDegrees*Mathf.Deg2Rad));
                 forward=Vector3.RotateTowards(lastDirection,forward.normalized,headingDegreesPerSecond*Mathf.Deg2Rad*dt,0f).normalized;
                 PlaceHead(anchor,forward);
+                if (jawBone != null)
+                {
+                    float opening = swimmingJawMotion ? swimJawDegrees * (.5f - .5f * Mathf.Cos(motionTime * swimJawFrequency * 2f * Mathf.PI + irregularPhase)) : 0f;
+                    jawBone.localRotation = jawRestRotation * Quaternion.AngleAxis(opening * Mathf.Sign(jawOpenDegrees), SafeDirection(jawLocalAxis, Vector3.right));
+                }
                 if(safety!=null&&!safety.Constrain())
                 {
                     orbitAngle-=step;
@@ -268,6 +283,13 @@ namespace AKI.Rhythm
                 float turn = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(chargeElapsed / Mathf.Min(.18f, chargeDuration * .3f)));
                 Vector3 levelApproach=SafeDirection(Vector3.ProjectOnPlane(approach,Vector3.up),lastDirection);
                 PlaceHead(anchor, SafeDirection(Vector3.Slerp(chargeInitialDirection,levelApproach,turn),levelApproach));
+                if (headBone != null)
+                {
+                    float lift = chargeHeadLiftDegrees * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(ChargeProgress * 2f));
+                    headBone.localRotation = headRestRotation * Quaternion.AngleAxis(-lift, headLiftAxis);
+                    // Raising the skull must not change where the mouth arrives.
+                    transform.position += anchor - HeadWorldPosition;
+                }
                 if (jawBone != null)
                     jawBone.localRotation = jawRestRotation * Quaternion.AngleAxis(jawOpenDegrees * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(ChargeProgress * 2.5f)), SafeDirection(jawLocalAxis, Vector3.right));
                 if(safety!=null)safety.Constrain();
@@ -337,6 +359,8 @@ namespace AKI.Rhythm
             Transform head = headBone != null ? headBone : transform;
             headForwardInBone = head.InverseTransformDirection(transform.TransformDirection(modelForwardAxis));
             headUpInBone = head.InverseTransformDirection(transform.TransformDirection(modelUpAxis));
+            headRestRotation = head.localRotation;
+            headLiftAxis = head.InverseTransformDirection(transform.TransformDirection(Vector3.Cross(modelUpAxis, modelForwardAxis))).normalized;
             if (jawBone != null) jawRestRotation = jawBone.localRotation;
 
             var selected = new List<Transform>();
@@ -410,6 +434,7 @@ namespace AKI.Rhythm
                 poses[i].bone.localScale = poses[i].scale;
             }
             if (jawBone != null) jawBone.localRotation = jawRestRotation;
+            if (headBone != null) headBone.localRotation = headRestRotation;
         }
 
         private void ExpandRendererBounds()

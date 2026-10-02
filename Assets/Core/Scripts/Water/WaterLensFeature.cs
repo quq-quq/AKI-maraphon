@@ -97,7 +97,8 @@ namespace AKI.Water
                 // (shader pass 1) and the lens pass reads it and its slope from there.
                 TextureHandle film = TextureHandle.nullHandle;
                 var filmTexel = Vector4.zero;
-                if (Shader.GetGlobalFloat(WetnessId) * Shader.GetGlobalFloat(DropsId) > 0.001f)
+                // Single-pass lens variants calculate the film inline; only the two-pass variant has a film pass.
+                if (material.passCount > 1 && Shader.GetGlobalFloat(WetnessId) * Shader.GetGlobalFloat(DropsId) > 0.001f)
                 {
                     TextureDesc filmDesc = desc;
                     filmDesc.name = "_WaterLensFilm";

@@ -40,7 +40,7 @@ SkinnedMeshRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1540794320177567719}
   m_Enabled: 1
-  m_CastShadows: 1
+  m_CastShadows: 0
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
   m_StaticShadowCaster: 0
@@ -142,6 +142,7 @@ MonoBehaviour:
   speed: 20
   waterDrag: 0.55
   waterGravityScale: 0.8
+  currentInfluence: 1
   airDrag: 0.02
   airGravityScale: 1
   hitRadius: 0.02

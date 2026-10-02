@@ -150,14 +150,26 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -6604808434580257704, guid: 884044b6dd9d4c247a2e94f1497f13ed, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 884044b6dd9d4c247a2e94f1497f13ed, type: 3}
       propertyPath: m_Name
       value: harpoon_with_anim
+      objectReference: {fileID: 0}
+    - target: {fileID: 3706387499455070791, guid: 884044b6dd9d4c247a2e94f1497f13ed, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5866666021909216657, guid: 884044b6dd9d4c247a2e94f1497f13ed, type: 3}
       propertyPath: m_Controller
       value: 
       objectReference: {fileID: 9100000, guid: dd78e405fbd2445e7a0292b63646ecc2, type: 2}
+    - target: {fileID: 8171744566247260186, guid: 884044b6dd9d4c247a2e94f1497f13ed, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

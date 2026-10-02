@@ -480,6 +480,7 @@ MonoBehaviour:
   onClimbOut:
     m_PersistentCalls:
       m_Calls: []
+  cursedHeadDepth: 1.25
 --- !u!114 &1061537911927120286
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -530,6 +531,9 @@ MonoBehaviour:
   aimZoom: 0.8
   aimLookScale: 0.6
   aimSteadiness: 0.35
+  preventNearPlaneClipping: 1
+  nearPlaneMargin: 0.035
+  weaponCastsShadows: 0
   recoilKick: 0.07
   recoilPitch: 7
   recoilRandom: 3

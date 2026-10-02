@@ -50,10 +50,20 @@ namespace AKI.Rhythm
         [Min(.2f)] public float finalChargeSeconds = 1.2f;
         [Range(.05f,1f)] public float cutToBlackDistance = .45f;
         [Header("Successful boss hit: light vignette")]
-        public Color bossHitColour = new Color(1f, .78f, .12f, 1f);
-        [Range(0f,1f)] public float bossHitIntensity = .24f;
+        public Color bossHitColour = new Color(1f, .055f, .42f, 1f);
+        [Range(0f,1f)] public float bossHitIntensity = .58f;
+        [Tooltip("Appearance time. Zero applies the hit flash immediately in the hit callback.")]
+        [Range(0f,.1f)] public float bossHitAttackSeconds;
+        [Tooltip("Disappearance time after reaching full strength (unchanged by the attack setting).")]
         [Min(.05f)] public float bossHitFadeSeconds = .35f;
         [Range(.1f,.9f)] public float bossHitVignetteInner = .32f;
+        [Range(.15f,1f)] public float bossHitVignetteOuter = .78f;
+        [Tooltip("White areas show the hit colour, black areas stay clear.")]
+        public Texture2D bossHitMask;
+        [Range(0f,1f)] public float bossHitMaskStrength = 1f;
+        [Range(.25f,4f)] public float bossHitMaskPower = .8f;
+        public bool bossHitMaskInvert;
+        [Range(0f,1f)] public float bossHitGlow = .15f;
         [Header("Music fallback (SoundConfig wins when present)")]
         [Range(0f,1f)] public float musicVolume = .75f;
         public bool musicBypassesUnderwaterFilter = true;
@@ -81,6 +91,7 @@ namespace AKI.Rhythm
         float originalBreathSeconds;
         bool initialized, ownsEndFade;
         float bossHitPulse;
+        float bossHitAttackRemaining;
         AudioSource nagaAmbient;
         Vector3 lastDeepBossPosition;
         bool hasDeepBossPosition;
@@ -155,10 +166,13 @@ namespace AKI.Rhythm
         void Update()
         {
             if (!initialized) return;
-            bossHitPulse = Mathf.MoveTowards(bossHitPulse, 0f, Time.unscaledDeltaTime / Mathf.Max(.05f,bossHitFadeSeconds));
-            Shader.SetGlobalVector("_RhythmHitVignette", new Vector4(bossHitColour.r,bossHitColour.g,bossHitColour.b,bossHitPulse*bossHitIntensity));
-            Shader.SetGlobalFloat("_RhythmHitInner", bossHitVignetteInner);
-            WaterLensFeature.RhythmHitActive = bossHitPulse > .001f;
+            if (bossHitAttackRemaining > 0f)
+            {
+                bossHitAttackRemaining = Mathf.Max(0f, bossHitAttackRemaining - Time.unscaledDeltaTime);
+                bossHitPulse = 1f - bossHitAttackRemaining / Mathf.Max(.001f, bossHitAttackSeconds);
+            }
+            else bossHitPulse = Mathf.MoveTowards(bossHitPulse, 0f, Time.unscaledDeltaTime / Mathf.Max(.05f,bossHitFadeSeconds));
+            ApplyBossHitVignette();
             if(naga!=null)
             {
                 var guard=naga.GetComponent<NagaEnvironmentSafety>();
@@ -331,9 +345,22 @@ namespace AKI.Rhythm
             if (phase != GamePhase.BossFight || arrow == null || !arrow.IsRhythmShot || arrow.RhythmSession != conductor.Session) return;
             if (!rewardedBeats.Add(arrow.RhythmBeat)) return;
             SuccessfulBossHits++; breath.RestoreFullBreath(); naga?.PlayHitReaction();
-            bossHitPulse = 1f;
+            bossHitAttackRemaining = Mathf.Max(0f, bossHitAttackSeconds);
+            bossHitPulse = bossHitAttackRemaining > 0f ? 0f : 1f;
+            ApplyBossHitVignette(); // same frame as the hit, not one Update later
             PlayConfig(soundConfig != null ? soundConfig.HitSound : null, arrow.transform.position);
             onBossHit.Invoke();
+        }
+
+        void ApplyBossHitVignette()
+        {
+            Shader.SetGlobalVector("_RhythmHitVignette", new Vector4(bossHitColour.r, bossHitColour.g, bossHitColour.b, bossHitPulse * bossHitIntensity));
+            Shader.SetGlobalFloat("_RhythmHitInner", bossHitVignetteInner);
+            Shader.SetGlobalTexture("_RhythmHitMask", bossHitMask != null ? bossHitMask : Texture2D.whiteTexture);
+            Shader.SetGlobalVector("_RhythmHitMaskParams", new Vector4(bossHitMask != null ? bossHitMaskStrength : 0f,
+                bossHitMaskPower, bossHitMaskInvert ? 1f : 0f, Mathf.Max(bossHitVignetteInner + .01f, bossHitVignetteOuter)));
+            Shader.SetGlobalFloat("_RhythmHitGlow", bossHitGlow);
+            WaterLensFeature.RhythmHitActive = bossHitPulse > .001f || bossHitAttackRemaining > 0f;
         }
         void OnMusicFinished()
         {

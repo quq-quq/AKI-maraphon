@@ -142,8 +142,12 @@ Shader "Hidden/AKI/WaterLens"
             float  _ScreenFade;              // 0..1 towards black
             float  _WakeBlur;                // 0..1 gaussian blur of a view that isn't in focus yet
             float  _EyeClosed;               // 0 = eyes open .. 1 = lids shut
-            float4 _RhythmHitVignette;       // warm light colour + success pulse, no additional render pass
+            float4 _RhythmHitVignette;       // hit colour + success pulse, no additional render pass
             float  _RhythmHitInner;
+            TEXTURE2D(_RhythmHitMask);
+            SAMPLER(sampler_RhythmHitMask);
+            float4 _RhythmHitMaskParams;    // strength, power, invert, radial outer
+            float _RhythmHitGlow;
 
             struct LensVaryings
             {
@@ -549,8 +553,16 @@ Shader "Hidden/AKI/WaterLens"
                     col *= 1.0h - (half)lid;
                 }
 
-                float hitEdge = smoothstep(_RhythmHitInner, 0.78, length((uv-0.5)*float2(1.0, 1.0)));
-                col += _RhythmHitVignette.rgb * (_RhythmHitVignette.a * hitEdge);
+                if (_RhythmHitVignette.a > 0.001)
+                {
+                    float hitEdge = smoothstep(_RhythmHitInner, max(_RhythmHitInner + .01, _RhythmHitMaskParams.w), length(uv - .5));
+                    float hitMask = SAMPLE_TEXTURE2D(_RhythmHitMask, sampler_RhythmHitMask, uv).r;
+                    hitMask = lerp(hitMask, 1.0 - hitMask, _RhythmHitMaskParams.z);
+                    hitMask = pow(saturate(hitMask), max(.25, _RhythmHitMaskParams.y));
+                    float hitAlpha = saturate(_RhythmHitVignette.a * lerp(hitEdge, hitMask, _RhythmHitMaskParams.x));
+                    col = lerp(col, _RhythmHitVignette.rgb, hitAlpha);
+                    col += _RhythmHitVignette.rgb * (hitAlpha * _RhythmHitGlow);
+                }
                 col *= 1.0h - (half)saturate(_ScreenFade);
                 return half4(col, 1.0h);
             }

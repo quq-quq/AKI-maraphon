@@ -22,6 +22,15 @@ namespace AKI.Menu
         [Tooltip("The run starts from standing still and reaches full speed over this time (s).")]
         [Range(0f, 1f)] public float runAccelerationSeconds = 0.4f;
 
+        [Header("Seated idle (additive, fades out when standing)")]
+        public bool seatedBreathing = true;
+        [Range(4f, 30f)] public float breathsPerMinute = 12f;
+        [Range(0f, 3f)] public float breathingSpineDegrees = .55f;
+        [Range(0f, 3f)] public float breathingChestDegrees = .8f;
+        [Min(.05f)] public float breathingBlendOutSeconds = .25f;
+        [Tooltip("Actor-only seated height correction in metres. Fades out before the run; never moves the boat.")]
+        public float seatedHeightOffset = -.055f;
+
         PlayableGraph graph;
         AnimationMixerPlayable mixer;
         AnimationClipPlayable sitPlayable, divePlayable;
@@ -30,6 +39,10 @@ namespace AKI.Menu
         bool playing;
         Transform head;
         SkinnedMeshRenderer[] skins;
+        Transform breathingSpine, breathingChest;
+        Quaternion seatedSpineRotation, seatedChestRotation;
+        Vector3 spineBreathingAxis, chestBreathingAxis, actorBasePosition;
+        float seatedWeight = 1f;
 
         public bool IsPlaying => playing;
 
@@ -79,6 +92,23 @@ namespace AKI.Menu
             AnimationPlayableOutput.Create(graph, "Fishman", actor).SetSourcePlayable(mixer);
             graph.Play();
             Sample(0f);   // seated
+            actorBasePosition = actor.transform.localPosition;
+            if (actor.isHuman)
+            {
+                breathingSpine = actor.GetBoneTransform(HumanBodyBones.Spine);
+                breathingChest = actor.GetBoneTransform(HumanBodyBones.Chest);
+                if (breathingSpine != null)
+                {
+                    seatedSpineRotation = breathingSpine.localRotation;
+                    spineBreathingAxis = breathingSpine.parent.InverseTransformDirection(actor.transform.right).normalized;
+                }
+                if (breathingChest != null)
+                {
+                    seatedChestRotation = breathingChest.localRotation;
+                    chestBreathingAxis = breathingChest.parent.InverseTransformDirection(actor.transform.right).normalized;
+                }
+            }
+            actor.transform.localPosition = actorBasePosition + Vector3.up * seatedHeightOffset;
         }
 
         void OnDestroy()
@@ -104,10 +134,13 @@ namespace AKI.Menu
         public void MeasureDive(out Vector3 headSeated, out Vector3 headAtEnd)
         {
             Sample(0f);
+            actor.transform.localPosition = actorBasePosition + Vector3.up * seatedHeightOffset;
             headSeated = head.position;
             Sample(Duration);
+            actor.transform.localPosition = actorBasePosition;
             headAtEnd = head.position;
             Sample(playing ? time : 0f);
+            actor.transform.localPosition = actorBasePosition + Vector3.up * (seatedHeightOffset * seatedWeight);
         }
 
         void Update()
@@ -115,6 +148,26 @@ namespace AKI.Menu
             if (!playing) return;
             time = Mathf.Min(Duration, time + Time.deltaTime);
             Sample(time);
+        }
+
+        void LateUpdate()
+        {
+            if (!graph.IsValid()) return;
+            seatedWeight = Mathf.MoveTowards(seatedWeight, playing ? 0f : 1f,
+                Time.deltaTime / Mathf.Max(.05f, breathingBlendOutSeconds));
+            actor.transform.localPosition = actorBasePosition + Vector3.up * (seatedHeightOffset * seatedWeight);
+            if (!playing)
+            {
+                if (breathingSpine != null) breathingSpine.localRotation = seatedSpineRotation;
+                if (breathingChest != null) breathingChest.localRotation = seatedChestRotation;
+            }
+            if (!seatedBreathing || seatedWeight <= 0f) return;
+            float inhale = .5f - .5f * Mathf.Cos(Time.time * breathsPerMinute / 60f * 2f * Mathf.PI);
+            float bend = inhale * seatedWeight;
+            if (breathingSpine != null)
+                breathingSpine.localRotation = Quaternion.AngleAxis(bend * breathingSpineDegrees, spineBreathingAxis) * breathingSpine.localRotation;
+            if (breathingChest != null)
+                breathingChest.localRotation = Quaternion.AngleAxis(bend * breathingChestDegrees, chestBreathingAxis) * breathingChest.localRotation;
         }
 
         // Seated first frame -> Sit_Stand -> SmoothStep blend into the run (no pose pop) with the run's time
