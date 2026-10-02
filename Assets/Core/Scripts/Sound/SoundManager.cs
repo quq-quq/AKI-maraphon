@@ -43,13 +43,16 @@ namespace Core.Scripts.Sound
         [Tooltip("The trigger and the shot happen in the player's hands and reach the ear through the body: under water " +
                  "they skip the water's muffling (which leaves nothing of a click) and are only softened to this cutoff (Hz).")]
         [SerializeField, Min(500f)] private float _inHandsUnderwaterCutoff = 3500f;
+        [Tooltip("The player's own strokes under water: a soft swish around him, softened to this cutoff (Hz) " +
+                 "instead of the listener's heavy muffling.")]
+        [SerializeField, Min(300f)] private float _strokesUnderwaterCutoff = 1400f;
 
         [Header("Creatures under water")]
         [Tooltip("The tuna and the Naga are in the water with the player: their sounds skip the listener's muffling " +
-                 "(which leaves only a hum at 450 Hz) and are only softened to this cutoff (Hz).")]
-        [SerializeField, Min(500f)] private float _creaturesUnderwaterCutoff = 2200f;
+                 "(which leaves only a hum at 450 Hz) and are only softened to this cutoff (Hz): a swish lives in the highs.")]
+        [SerializeField, Min(500f)] private float _creaturesUnderwaterCutoff = 5000f;
         [Tooltip("A tuna is heard at full volume up to X metres and fades out linearly to Y metres.")]
-        [SerializeField] private Vector2 _fishHearing = new Vector2(4f, 40f);
+        [SerializeField] private Vector2 _fishHearing = new Vector2(8f, 45f);
         [Tooltip("The Naga is far bigger and louder: full volume up to X metres, silent at Y metres.")]
         [SerializeField] private Vector2 _nagaHearing = new Vector2(15f, 120f);
 
@@ -308,7 +311,7 @@ namespace Core.Scripts.Sound
 
         private void OnSwimming()
         {
-            InHands(PlayRandom(_soundConfig.SwimmingSound, Listener.position));   // his own strokes, right at his ears
+            Softened(PlayRandom(_soundConfig.SwimmingSound, Listener.position), _strokesUnderwaterCutoff);
         }
 
         private void OnHarpoomTrigger()
@@ -331,11 +334,14 @@ namespace Core.Scripts.Sound
         }
 
         // A sound made in the player's hands: under water it skips the listener's water filter, only softened.
-        private void InHands(AudioSource source)
+        private void InHands(AudioSource source) => Softened(source, _inHandsUnderwaterCutoff);
+
+        // Under water: skips the listener's water filter and is only softened to the cutoff.
+        private void Softened(AudioSource source, float cutoff)
         {
             if (source == null || !_headUnderwater || source.bypassListenerEffects) return;
             source.bypassListenerEffects = true;
-            source.gameObject.AddComponent<AudioLowPassFilter>().cutoffFrequency = _inHandsUnderwaterCutoff;
+            source.gameObject.AddComponent<AudioLowPassFilter>().cutoffFrequency = cutoff;
         }
 
         // A creature in the water with the player: carries through it (only softened) and is heard over the given
