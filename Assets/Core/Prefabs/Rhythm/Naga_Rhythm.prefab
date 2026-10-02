@@ -118,25 +118,20 @@ MonoBehaviour:
   modelUpAxis: {x: 0, y: 1, z: 0}
   orbitRadius: 12
   angularSpeed: 55
+  speedVariation: 0.12
   heightOffset: 0.2
   verticalAmplitude: 4.5
   verticalFrequency: 0.09
   radialAmplitude: 2.2
   radialFrequency: 0.15
-  secondaryAmplitude: 1.2
-  secondaryFrequency: 0.37
-  orbitEntryDuration: 1.25
+  lookAhead: 0.7
+  turnRadiusFraction: 0.4
   reverseEverySeconds: {x: 7, y: 13}
-  reverseSmoothSeconds: 2.2
-  headingDegreesPerSecond: 65
-  maximumPitchDegrees: 10
-  bodyBones: []
-  orbitCurveStrength: 1
-  maximumSegmentBend: 8
-  horizontalWaveDegrees: 3.5
-  verticalWaveDegrees: 1.1
-  waveFrequency: 0.65
-  waveLength: 10
+  uTurnHeightShift: {x: 2.5, y: 5}
+  maximumPitchDegrees: 25
+  swimWaveDegrees: 6
+  swimWaveFrequency: 0.45
+  trailSpacing: 0.3
   chargeDuration: 1.05
   chargeStopDistance: 0.2
   jawLocalAxis: {x: 1, y: 0, z: 0}
@@ -1125,6 +1120,7 @@ MonoBehaviour:
   sampledWaveClearance: 1.25
   terrainCacheCellMetres: 2
   waveProbeCount: 16
+  preferredWaterColumn: 9
 --- !u!1 &1384210344486181039
 GameObject:
   m_ObjectHideFlags: 0

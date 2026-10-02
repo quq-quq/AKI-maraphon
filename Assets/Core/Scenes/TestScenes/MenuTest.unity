@@ -1025,11 +1025,12 @@ MonoBehaviour:
   stretch: 0.05
   rhythm: {fileID: 1685433927}
   beatEmission: 6
+  beatSizeBoost: 1.5
   beatGlowColour: {r: 0.45, g: 0.85, b: 1, a: 1}
   accentAmplitude: 0.1
   accentFrequency: 8
   rhythmAttackTime: 0.012
-  rhythmReleaseTime: 0.12
+  rhythmReleaseTime: 0.22
 --- !u!114 &1688107161
 MonoBehaviour:
   m_ObjectHideFlags: 0

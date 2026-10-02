@@ -33,6 +33,10 @@ namespace AKI.Rhythm
         public bool HasSafePose => haveSafePose;
         public bool EnvironmentUnavailable { get; private set; }
         public int EnvelopeCount => envelopes.Length;
+        /// <summary>World metres from the spine to the lowest / highest skin and to the widest side, in the rest pose.</summary>
+        public float BodyBelowSpine { get; private set; }
+        public float BodyAboveSpine { get; private set; }
+        public float BodyHalfWidth { get; private set; }
 
         Terrain terrain;
         Collider seabed;
@@ -49,25 +53,56 @@ namespace AKI.Rhythm
         Vector3 cachedCentre;
         float nextCentreCheck;
 
-        public Vector3 SafeOrbitCentre(Vector3 player, float footprint)
+        /// <summary>Deepest nearby centre for the orbit, never further than maxShift from the player, so the
+        /// Naga keeps circling the player while favouring the open side of a reef.</summary>
+        public Vector3 SafeOrbitCentre(Vector3 player, float footprint, float maxShift)
         {
             if(floorMax==null)return player;
             if(Time.time<nextCentreCheck){cachedCentre.y=player.y;return cachedCentre;}
             nextCentreCheck=Time.time+.6f;
             float level=WaterSurface.FindAt(player)?.WaterLevel??0f;
             float limit=level-waveReserve-preferredWaterColumn;
-            cachedCentre=player;
             var region=new Bounds(player,new Vector3(footprint*2f,1f,footprint*2f));
-            if(FloorUnder(region)<=limit)return player;
-            // A tiny bounded depth-field steering stencil, not navigation/pathfinding. The nearest open
-            // arc is preferred; the player can still see/hit the head as it comes around that arc.
-            for(float r=4f;r<=64f;r*=2f)for(int d=0;d<8;d++)
+            float best=FloorUnder(region);cachedCentre=player;
+            if(best<=limit)return player;
+            // A tiny bounded depth-field steering stencil, not navigation/pathfinding.
+            for(int ring=1;ring<=2;ring++)for(int d=0;d<8;d++)
             {
-                float a=d*Mathf.PI*.25f;var p=player+new Vector3(Mathf.Cos(a),0f,Mathf.Sin(a))*r;
-                region.center=p;
-                if(FloorUnder(region)<=limit){cachedCentre=p;return p;}
+                float a=d*Mathf.PI*.25f;var p=player+new Vector3(Mathf.Cos(a),0f,Mathf.Sin(a))*(maxShift*ring*.5f);
+                region.center=p;float floor=FloorUnder(region);
+                if(floor<best){best=floor;cachedCentre=p;}
+                if(floor<=limit)return cachedCentre;
             }
-            return player;
+            return cachedCentre;
+        }
+
+        /// <summary>Highest seabed under a disc of the given radius (terrain cache, or the fallback collider).</summary>
+        public float FloorBelow(Vector3 p,float radius)
+        {
+            if(!configured)return float.NegativeInfinity;
+            return FloorUnder(new Bounds(p,new Vector3(radius*2f,1f,radius*2f)));
+        }
+        /// <summary>Highest point any part of the body may reach here, below the mean surface and its wave reserve.</summary>
+        public float CeilingAt(Vector3 p)=>(WaterSurface.FindAt(p)?.WaterLevel??0f)-waveReserve;
+
+        /// <summary>Whole-skin vertical fit of the current pose. Moves the model by the returned lift and never
+        /// restores an older pose, so the motion keeps going. When nothing fits, it stays under the water.</summary>
+        public bool SolveLift(out float lift)
+        {
+            lift=0f;
+            if(!configured||envelopes.Length==0)return true;
+            bool fits=FitVertical(out lift,out float lower,out float upper);
+            if(!fits)
+            {
+                // Too tall for the water column here: touch the ceiling rather than leave the water, and let the
+                // motion turn away. Off the terrain cache (no floor data) it only keeps the body submerged.
+                RejectedPoses++;
+                if(float.IsInfinity(upper)||float.IsNaN(upper))lift=0f;
+                else lift=float.IsInfinity(lower)||float.IsNaN(lower)?Mathf.Min(0f,upper):upper;
+            }
+            if(lift!=0f){transform.position+=Vector3.up*lift;LastFloorGap+=lift;LastSurfaceGap-=lift;}
+            RememberPose();UpdateProbes();
+            return fits;
         }
 
         public void Configure(Terrain bottom, Scene scene)
@@ -85,7 +120,22 @@ namespace AKI.Rhythm
             savedRotations = new Quaternion[savedBones.Length];
             probes = new WaterProbe[Mathf.Clamp(waveProbeCount,4,20)];
             for (int i=0;i<probes.Length;i++) { probes[i]=new WaterProbe {position=transform.position}; WaterProbe.Register(probes[i]); }
+            MeasureBody();
             configured = true;
+        }
+
+        void MeasureBody()
+        {
+            // Configure runs on the freshly spawned, straight rest pose: the rig spine lies on the root's forward axis.
+            float below=0f,above=0f,side=0f;Vector3 up=transform.up,right=transform.right;
+            foreach(var e in envelopes)
+            {
+                var b=EnvelopeBounds(e);Vector3 c=b.center-transform.position,x=b.extents;
+                float cu=Vector3.Dot(c,up),hu=Mathf.Abs(up.x)*x.x+Mathf.Abs(up.y)*x.y+Mathf.Abs(up.z)*x.z;
+                float cr=Vector3.Dot(c,right),hr=Mathf.Abs(right.x)*x.x+Mathf.Abs(right.y)*x.y+Mathf.Abs(right.z)*x.z;
+                below=Mathf.Max(below,hu-cu);above=Mathf.Max(above,cu+hu);side=Mathf.Max(side,Mathf.Abs(cr)+hr);
+            }
+            BodyBelowSpine=below;BodyAboveSpine=above;BodyHalfWidth=Mathf.Max(.5f,side);
         }
 
         void OnDisable() { foreach (var p in probes) WaterProbe.Unregister(p); }
@@ -156,12 +206,13 @@ namespace AKI.Rhythm
             return highest;
         }
 
-        bool FitVertical(out float delta)
+        bool FitVertical(out float delta)=>FitVertical(out delta,out _,out _);
+        bool FitVertical(out float delta,out float lower,out float upper)
         {
             float level=WaterSurface.FindAt(transform.position)?.WaterLevel ?? 0f;
             float ceiling=level-waveReserve;
             foreach(var p in probes) if(p.HasData && Time.time-p.SampleTime<.3f) ceiling=Mathf.Min(ceiling,p.PredictedHeight-sampledWaveClearance);
-            float lower=float.NegativeInfinity, upper=float.PositiveInfinity;
+            lower=float.NegativeInfinity;upper=float.PositiveInfinity;
             LastFloorGap=LastSurfaceGap=float.PositiveInfinity;
             for(int i=0;i<envelopes.Length;i++)
             {

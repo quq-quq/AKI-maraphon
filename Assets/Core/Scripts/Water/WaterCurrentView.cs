@@ -14,6 +14,7 @@ namespace AKI.Water
     public class WaterCurrentView : MonoBehaviour
     {
         const float MaxCameraSpeed = 15f;   // m/s: anything faster is a teleport
+        const float MaxScreenSize = 0.012f; // share of the screen a speck may cover between beats
 
         [Tooltip("AKI/UnderwaterParticle material, additive (M_BubbleFizz). Its colour and fade settings are used.")]
         public Material material;
@@ -59,6 +60,8 @@ namespace AKI.Water
         [SerializeField] RhythmConductor rhythm;
         [Tooltip("Extra glow on the music's recorded rhythmic pulses (0 = no beat pulse).")]
         [Min(0f)] public float beatEmission = 6f;
+        [Tooltip("Specks swell by this share on a beat, so the flash reads as light blooming from each mote rather than a one-pixel blink (0 = size stays).")]
+        [Min(0f)] public float beatSizeBoost = 1.5f;
         [ColorUsage(false, true)] public Color beatGlowColour = new Color(.45f, .85f, 1f, 1f);
         [Tooltip("Maximum vertical excursion on strong recorded music transients (m). This is visual motion only, so it cannot accumulate drift.")]
         [Min(0f)] public float accentAmplitude = 0.1f;
@@ -76,6 +79,7 @@ namespace AKI.Water
         Material instance;
         Texture2D builtIn;
         ParticleSystem system;
+        ParticleSystemRenderer speckRenderer;
         ParticleSystem.Particle[] buffer;
         Camera cam;
         Vector3 lastCamPos;
@@ -196,6 +200,8 @@ namespace AKI.Water
             float tanX = tanY * cam.aspect;
             float far = viewDistance;
             float t = Time.time;
+            float swell = 1f + Mathf.Max(0f, beatSizeBoost) * rhythmBeat;
+            if (speckRenderer != null) speckRenderer.maxParticleSize = MaxScreenSize * swell;
 
             for (int i = 0; i < n; i++)
             {
@@ -227,6 +233,7 @@ namespace AKI.Water
                 Color c = Color.Lerp(colorA, colorB, (seed % 97u) / 96f);
                 c.a *= alpha;
                 p.startColor = c;
+                p.startSize = BaseSize(seed) * swell;
                 buffer[i] = p;
             }
             system.SetParticles(buffer, n);
@@ -253,12 +260,19 @@ namespace AKI.Water
             p.velocity = Vector3.zero;
             p.startLifetime = Random.Range(lifetime.x, lifetime.y);
             p.remainingLifetime = p.startLifetime;
-            p.startSize = Mathf.Lerp(size.x, size.y, Mathf.Pow(Random.value, smallBias));
             p.rotation = Random.Range(0f, 360f);
             p.randomSeed = (uint)Random.Range(1, int.MaxValue);
+            p.startSize = BaseSize(p.randomSeed);
             Color c = colorA;
             c.a = 0f;
             p.startColor = c;
+        }
+
+        // The speck's own size, from its seed: the beat swell can scale it every frame without storing it.
+        float BaseSize(uint seed)
+        {
+            float u = ((seed * 2654435761u) >> 8) / 16777216f;
+            return Mathf.Lerp(size.x, size.y, Mathf.Pow(u, smallBias));
         }
 
         ParticleSystem Build()
@@ -289,9 +303,10 @@ namespace AKI.Water
             r.velocityScale = stretch;
             r.lengthScale = 1f;
             r.minParticleSize = 0.0007f;   // far specks stay a pixel or so instead of flickering in and out
-            r.maxParticleSize = 0.012f;    // a speck right at the lens stays a speck
+            r.maxParticleSize = MaxScreenSize;    // a speck right at the lens stays a speck
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             r.receiveShadows = false;
+            speckRenderer = r;
             r.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
             r.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
 
