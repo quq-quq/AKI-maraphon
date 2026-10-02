@@ -22,14 +22,6 @@ namespace AKI.Menu
         [Tooltip("The run starts from standing still and reaches full speed over this time (s).")]
         [Range(0f, 1f)] public float runAccelerationSeconds = 0.4f;
 
-        [Header("Seated breathing (additive, stops when standing up)")]
-        public bool seatedBreathing = true;
-        [Range(4f,30f)] public float breathsPerMinute = 12f;
-        [Tooltip("Small back bend in degrees; no root, boat or leg movement.")]
-        [Range(0f,3f)] public float breathingSpineDegrees = .55f;
-        [Range(0f,3f)] public float breathingChestDegrees = .8f;
-        [Min(.05f)] public float breathingBlendOutSeconds = .25f;
-
         PlayableGraph graph;
         AnimationMixerPlayable mixer;
         AnimationClipPlayable sitPlayable, divePlayable;
@@ -38,10 +30,6 @@ namespace AKI.Menu
         bool playing;
         Transform head;
         SkinnedMeshRenderer[] skins;
-        Transform breathingSpine, breathingChest;
-        Quaternion seatedSpineRotation, seatedChestRotation;
-        Vector3 spineBreathingAxis, chestBreathingAxis;
-        float breathingWeight = 1f;
 
         public bool IsPlaying => playing;
 
@@ -91,21 +79,6 @@ namespace AKI.Menu
             AnimationPlayableOutput.Create(graph, "Fishman", actor).SetSourcePlayable(mixer);
             graph.Play();
             Sample(0f);   // seated
-            if (actor.isHuman)
-            {
-                breathingSpine = actor.GetBoneTransform(HumanBodyBones.Spine);
-                breathingChest = actor.GetBoneTransform(HumanBodyBones.Chest);
-                if (breathingSpine != null)
-                {
-                    seatedSpineRotation = breathingSpine.localRotation;
-                    spineBreathingAxis = breathingSpine.parent.InverseTransformDirection(actor.transform.right).normalized;
-                }
-                if (breathingChest != null)
-                {
-                    seatedChestRotation = breathingChest.localRotation;
-                    chestBreathingAxis = breathingChest.parent.InverseTransformDirection(actor.transform.right).normalized;
-                }
-            }
         }
 
         void OnDestroy()
@@ -142,25 +115,6 @@ namespace AKI.Menu
             if (!playing) return;
             time = Mathf.Min(Duration, time + Time.deltaTime);
             Sample(time);
-        }
-
-        void LateUpdate()
-        {
-            if (!graph.IsValid()) return;
-            breathingWeight = Mathf.MoveTowards(breathingWeight, seatedBreathing && !playing ? 1f : 0f,
-                Time.deltaTime / Mathf.Max(.05f, breathingBlendOutSeconds));
-            // Frozen/manual idle: start from the seated pose every frame, never accumulate rotations.
-            // During the cutscene Sample writes a fresh animated pose and the additive offset fades away.
-            if (!playing)
-            {
-                if (breathingSpine != null) breathingSpine.localRotation = seatedSpineRotation;
-                if (breathingChest != null) breathingChest.localRotation = seatedChestRotation;
-            }
-            if (breathingWeight <= 0f) return;
-            float inhale = .5f - .5f * Mathf.Cos(Time.time * Mathf.Max(0f, breathsPerMinute) / 60f * 2f * Mathf.PI);
-            float bend = inhale * breathingWeight;
-            if (breathingSpine != null) breathingSpine.localRotation = Quaternion.AngleAxis(bend*breathingSpineDegrees,spineBreathingAxis) * breathingSpine.localRotation;
-            if (breathingChest != null) breathingChest.localRotation = Quaternion.AngleAxis(bend*breathingChestDegrees,chestBreathingAxis) * breathingChest.localRotation;
         }
 
         // Seated first frame -> Sit_Stand -> SmoothStep blend into the run (no pose pop) with the run's time

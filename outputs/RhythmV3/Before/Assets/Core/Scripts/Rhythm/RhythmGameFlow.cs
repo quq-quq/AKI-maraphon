@@ -50,22 +50,10 @@ namespace AKI.Rhythm
         [Min(.2f)] public float finalChargeSeconds = 1.2f;
         [Range(.05f,1f)] public float cutToBlackDistance = .45f;
         [Header("Successful boss hit: light vignette")]
-        public Color bossHitColour = new Color(1f, .055f, .42f, 1f);
-        [Range(0f,1f)] public float bossHitIntensity = .58f;
-        [Tooltip("Total pulse duration, including its hold (seconds).")]
-        [Min(.05f)] public float bossHitFadeSeconds = .55f;
-        [Tooltip("Time at full strength, included in Total Pulse Duration.")]
-        [Min(0f)] public float bossHitHoldSeconds = .12f;
+        public Color bossHitColour = new Color(1f, .78f, .12f, 1f);
+        [Range(0f,1f)] public float bossHitIntensity = .24f;
+        [Min(.05f)] public float bossHitFadeSeconds = .35f;
         [Range(.1f,.9f)] public float bossHitVignetteInner = .32f;
-        [Range(.15f,1f)] public float bossHitVignetteOuter = .7f;
-        [Tooltip("White areas are tinted; black areas remain clear. Empty = a radial vignette.")]
-        public Texture2D bossHitMask;
-        [Tooltip("0 = radial edge vignette; 1 = the supplied mask, including its centre artwork.")]
-        [Range(0f,1f)] public float bossHitMaskStrength = 1f;
-        [Range(.25f,4f)] public float bossHitMaskPower = .8f;
-        public bool bossHitMaskInvert;
-        [Tooltip("Optional added glow on top of the dense colour tint.")]
-        [Range(0f,1f)] public float bossHitGlow = .15f;
         [Header("Music fallback (SoundConfig wins when present)")]
         [Range(0f,1f)] public float musicVolume = .75f;
         public bool musicBypassesUnderwaterFilter = true;
@@ -168,14 +156,8 @@ namespace AKI.Rhythm
         {
             if (!initialized) return;
             bossHitPulse = Mathf.MoveTowards(bossHitPulse, 0f, Time.unscaledDeltaTime / Mathf.Max(.05f,bossHitFadeSeconds));
-            float holdShare = Mathf.Clamp(bossHitHoldSeconds / Mathf.Max(.05f,bossHitFadeSeconds), 0f, .95f);
-            float hitStrength = Mathf.Clamp01(bossHitPulse / (1f-holdShare));
-            Shader.SetGlobalVector("_RhythmHitVignette", new Vector4(bossHitColour.r,bossHitColour.g,bossHitColour.b,hitStrength*bossHitIntensity));
+            Shader.SetGlobalVector("_RhythmHitVignette", new Vector4(bossHitColour.r,bossHitColour.g,bossHitColour.b,bossHitPulse*bossHitIntensity));
             Shader.SetGlobalFloat("_RhythmHitInner", bossHitVignetteInner);
-            Shader.SetGlobalTexture("_RhythmHitMask", bossHitMask != null ? bossHitMask : Texture2D.whiteTexture);
-            Shader.SetGlobalVector("_RhythmHitMaskParams", new Vector4(bossHitMask != null ? bossHitMaskStrength : 0f,
-                bossHitMaskPower, bossHitMaskInvert ? 1f : 0f, Mathf.Max(bossHitVignetteInner+.01f,bossHitVignetteOuter)));
-            Shader.SetGlobalFloat("_RhythmHitGlow", bossHitGlow);
             WaterLensFeature.RhythmHitActive = bossHitPulse > .001f;
             if(naga!=null)
             {
@@ -209,7 +191,7 @@ namespace AKI.Rhythm
             Vector3 goldCentre = cameraView.transform.position;
             Vector3 forward = Vector3.ProjectOnPlane(cameraView.transform.forward, Vector3.up).normalized;
             if (forward.sqrMagnitude < .1f) forward = Vector3.forward;
-            gold = Instantiate(goldenFishPrefab, SafeOceanPoint(goldCentre - forward * goldenDistance, .7f), Quaternion.LookRotation(forward));
+            gold = Instantiate(goldenFishPrefab, SafeOceanPoint(goldCentre + forward * goldenDistance, .7f), Quaternion.LookRotation(-forward));
             gold.name = "GoldenFish_RhythmOpportunity";
             var ai = gold.GetComponent<FishAI>();
             if (ai != null)

@@ -816,11 +816,6 @@ MonoBehaviour:
   runToDive: {fileID: -9108934695566093783, guid: 43bdfd79564cb054097175deff78d2ab, type: 3}
   crossfadeSeconds: 0.25
   runAccelerationSeconds: 0.4
-  seatedBreathing: 1
-  breathsPerMinute: 12
-  breathingSpineDegrees: 0.55
-  breathingChestDegrees: 0.8
-  breathingBlendOutSeconds: 0.25
 --- !u!114 &999013457
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1029,7 +1024,6 @@ MonoBehaviour:
   wobble: 0.05
   stretch: 0.05
   rhythm: {fileID: 1685433927}
-  rhythmicFraction: 0.33333334
   beatEmission: 6
   beatSizeBoost: 1.5
   beatGlowColour: {r: 0.45, g: 0.85, b: 1, a: 1}
@@ -1037,9 +1031,6 @@ MonoBehaviour:
   accentFrequency: 8
   rhythmAttackTime: 0.012
   rhythmReleaseTime: 0.22
-  maxRhythmLights: 4
-  rhythmLightIntensity: 2
-  rhythmLightRange: 4
 --- !u!114 &1688107161
 MonoBehaviour:
   m_ObjectHideFlags: 0

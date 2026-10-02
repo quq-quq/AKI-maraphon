@@ -1,5 +1,4 @@
 using AKI.Rhythm;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace AKI.Water
@@ -59,8 +58,6 @@ namespace AKI.Water
         [Header("Rhythm")]
         [Tooltip("Music clock. Empty = the active RhythmConductor.")]
         [SerializeField] RhythmConductor rhythm;
-        [Tooltip("Only this share reacts to music; all remaining specks keep the original current drift.")]
-        [Range(0f,1f)] public float rhythmicFraction = 1f / 3f;
         [Tooltip("Extra glow on the music's recorded rhythmic pulses (0 = no beat pulse).")]
         [Min(0f)] public float beatEmission = 6f;
         [Tooltip("Specks swell by this share on a beat, so the flash reads as light blooming from each mote rather than a one-pixel blink (0 = size stays).")]
@@ -74,12 +71,6 @@ namespace AKI.Water
         [Min(0.001f)] public float rhythmAttackTime = 0.025f;
         [Tooltip("Seconds for the rhythm glow and motion to settle when the music stops.")]
         [Min(0.001f)] public float rhythmReleaseTime = 0.15f;
-
-        [Header("Rhythm: actual nearby illumination (small shared light pool)")]
-        [Tooltip("Maximum real point lights, not one light per particle. No shadows. 0 disables environment illumination.")]
-        [Range(0,8)] public int maxRhythmLights = 4;
-        [Min(0f)] public float rhythmLightIntensity = 2f;
-        [Min(.1f)] public float rhythmLightRange = 4f;
 
         static readonly int RhythmId = Shader.PropertyToID("_CurrentRhythm");
         static readonly int GlowId = Shader.PropertyToID("_CurrentGlowColour");
@@ -97,9 +88,6 @@ namespace AKI.Water
         float rhythmBeat;
         float rhythmAccent;
         float rhythmPhase;
-        readonly List<Vector4> rhythmFlags = new List<Vector4>();
-        Light[] rhythmLights;
-        int lastCount = -1;
 
         void Start()
         {
@@ -114,7 +102,6 @@ namespace AKI.Water
             instance.SetFloat("_FadeDensity", fadeDensity);
             instance.SetVector(RhythmId, Vector4.zero);
             instance.SetColor(GlowId, beatGlowColour);
-            instance.SetFloat("_CurrentUsesParticleMask", 1f);
             if (texture == null) texture = builtIn = BuildSpeckTexture(64);
             instance.SetTexture("_BaseMap", texture);
             system = Build();
@@ -126,20 +113,6 @@ namespace AKI.Water
             if (root != null) Destroy(root.gameObject);
             if (instance != null) Destroy(instance);
             if (builtIn != null) Destroy(builtIn);
-        }
-
-        void OnDisable()
-        {
-            if (instance != null) instance.SetVector(RhythmId, Vector4.zero);
-            if (system != null) system.Clear();
-            SetLightsOff();
-            wasUnder = false;
-        }
-
-        void SetLightsOff()
-        {
-            if (rhythmLights == null) return;
-            foreach (Light light in rhythmLights) if (light != null) light.enabled = false;
         }
 
         void LateUpdate()
@@ -166,17 +139,10 @@ namespace AKI.Water
             if (!under)
             {
                 if (wasUnder) system.Clear();
-                SetLightsOff();
                 wasUnder = false;
                 return;
             }
-            if (!wasUnder || jumped || lastCount != count)
-            {
-                var main = system.main;
-                main.maxParticles = Mathf.Max(1,count);
-                Fill();
-                lastCount = count;
-            }
+            if (!wasUnder || jumped) Fill();
             wasUnder = true;
             Steer(camPos, dt);
         }
@@ -225,13 +191,8 @@ namespace AKI.Water
         // reborn somewhere else in the view.
         void Steer(Vector3 camPos, float dt)
         {
-            // A long frame can expire specks before our manual respawn; keep the configured density intact.
-            int missing = Mathf.Max(0,count) - system.particleCount;
-            if (missing > 0) system.Emit(new ParticleSystem.EmitParams { applyShapeToPosition = false },missing);
             int n = system.GetParticles(buffer);
-            if (n == 0) { SetLightsOff(); return; }
-            int rhythmicCount = Mathf.RoundToInt(n * Mathf.Clamp01(rhythmicFraction));
-            rhythmFlags.Clear();
+            if (n == 0) return;
 
             Transform ct = cam.transform;
             Quaternion toCam = Quaternion.Inverse(ct.rotation);
@@ -244,8 +205,6 @@ namespace AKI.Water
 
             for (int i = 0; i < n; i++)
             {
-                bool rhythmic = i < rhythmicCount;
-                rhythmFlags.Add(rhythmic ? new Vector4(1f,0f,0f,0f) : Vector4.zero);
                 ParticleSystem.Particle p = buffer[i];
                 Vector3 world = camPos + p.position;
                 Vector3 local = toCam * p.position;
@@ -274,52 +233,10 @@ namespace AKI.Water
                 Color c = Color.Lerp(colorA, colorB, (seed % 97u) / 96f);
                 c.a *= alpha;
                 p.startColor = c;
-                p.startSize = BaseSize(seed) * (rhythmic ? swell : 1f);
+                p.startSize = BaseSize(seed) * swell;
                 buffer[i] = p;
             }
             system.SetParticles(buffer, n);
-            // One draw call, explicit flag on each particle: the normal two-thirds never receive beat glow/offset.
-            system.SetCustomParticleData(rhythmFlags, ParticleSystemCustomData.Custom1);
-            UpdateLights(camPos, rhythmicCount);
-        }
-
-        void UpdateLights(Vector3 camPos, int rhythmicCount)
-        {
-            int limit = Mathf.Clamp(maxRhythmLights,0,8);
-            if (rhythmLights == null || rhythmLights.Length != limit)
-            {
-                if (rhythmLights != null) foreach (Light light in rhythmLights)
-                    if (light != null) Destroy(light.gameObject);
-                rhythmLights = new Light[limit];
-                for (int i=0; i<limit; i++)
-                {
-                    var go = new GameObject("Rhythm mote light "+(i+1));
-                    go.transform.SetParent(root,false);
-                    Light light = go.AddComponent<Light>();
-                    light.type = LightType.Point;
-                    light.shadows = LightShadows.None;
-                    light.renderMode = LightRenderMode.ForcePixel;
-                    light.enabled = false;
-                    rhythmLights[i] = light;
-                }
-            }
-            for (int slot=0; slot<limit; slot++)
-            {
-                Light light = rhythmLights[slot];
-                if (rhythmicCount == 0 || slot >= rhythmicCount || rhythmBeat < .001f)
-                { light.enabled = false; continue; }
-                // Stable representatives spread across the rhythmic subset, no per-frame search/sort/allocations.
-                var p = buffer[slot * rhythmicCount / limit];
-                Color c = Color.Lerp(colorA,colorB,(p.randomSeed%97u)/96f);
-                float phase = Vector3.Dot(new Vector3(c.r,c.g,c.b),new Vector3(131.7f,231.1f,95.3f));
-                Vector3 world = camPos+p.position;
-                world.y += rhythmAccent*accentAmplitude*Mathf.Sin(rhythmPhase+phase);
-                light.transform.position = world;
-                light.color = beatGlowColour;
-                light.range = Mathf.Max(.1f,rhythmLightRange);
-                light.intensity = Mathf.Max(0f,rhythmLightIntensity)*rhythmBeat*((Color)p.startColor).a;
-                light.enabled = light.intensity > .001f && WaterSurface.IsPointUnderwater(world);
-            }
         }
 
         // A random spot in the (widened) view, spread evenly through its volume, under water.
@@ -379,8 +296,6 @@ namespace AKI.Water
             emission.enabled = false;   // placed and reborn by hand (Steer / Respawn)
             var shape = ps.shape;
             shape.enabled = false;
-            var custom = ps.customData;
-            custom.enabled = false; // SetCustomParticleData owns the flag, not a module curve.
 
             var r = go.GetComponent<ParticleSystemRenderer>();
             r.sharedMaterial = instance;
@@ -391,11 +306,6 @@ namespace AKI.Water
             r.maxParticleSize = MaxScreenSize;    // a speck right at the lens stays a speck
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             r.receiveShadows = false;
-            r.SetActiveVertexStreams(new List<ParticleSystemVertexStream>
-            {
-                ParticleSystemVertexStream.Position, ParticleSystemVertexStream.Color,
-                ParticleSystemVertexStream.UV, ParticleSystemVertexStream.Custom1X
-            });
             speckRenderer = r;
             r.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
             r.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
