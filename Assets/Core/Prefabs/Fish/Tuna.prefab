@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 1888779596029478606}
   - component: {fileID: 464959624463116848}
   - component: {fileID: 847683172401169754}
+  - component: {fileID: 7318520946638201457}
   m_Layer: 0
   m_Name: Tuna
   m_TagString: Untagged
@@ -155,13 +156,25 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AKI.Fish.FishCollision
   body: {fileID: 5453269603050214423}
   depthOffset: 0
-  knockbackSpeed: 1.6
-  knockbackSpin: 90
-  waterDrag: 2.5
+  knockbackSpeed: 3.5
+  knockbackSpin: 180
+  waterDrag: 2.2
   sinkSpeed: 0.15
   onHit:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &7318520946638201457
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6819945141867718893}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c233518a68e34c78ad3232ac9db12dfa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Fish.FishHitBend
 --- !u!114 &847683172401169754
 MonoBehaviour:
   m_ObjectHideFlags: 0

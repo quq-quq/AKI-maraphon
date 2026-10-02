@@ -21,11 +21,11 @@ namespace AKI.Fish
 
         [Header("Knockback")]
         [Tooltip("Push along the shot for an arrow at full speed (m/s). A slowed-down arrow pushes less.")]
-        [Min(0f)] public float knockbackSpeed = 1.6f;
+        [Min(0f)] public float knockbackSpeed = 3.5f;
         [Tooltip("Spin from an off-centre hit (degrees per second).")]
-        [Min(0f)] public float knockbackSpin = 90f;
+        [Min(0f)] public float knockbackSpin = 180f;
         [Tooltip("How quickly the water eats the push and the spin (1/s).")]
-        [Min(0f)] public float waterDrag = 2.5f;
+        [Min(0f)] public float waterDrag = 2.2f;
         [Tooltip("Sinking speed once hit (m/s).")]
         [Min(0f)] public float sinkSpeed = 0.15f;
 

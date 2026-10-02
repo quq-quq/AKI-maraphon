@@ -11,7 +11,8 @@ namespace AKI.Fish.Editor
 {
     /// <summary>
     /// Builds the tuna prefabs and puts a <see cref="FishSpawner"/> into the open scene, aimed at the player's camera.
-    ///   Tuna:          the animated fish model (Models/Fish) with the AC_Fish animator: Swim, and Struggle when hit.
+    ///   Tuna:          the animated fish model (Models/Fish) with the AC_Fish animator: Swim, and Struggle when hit,
+    ///                  with the spine bent around the wound on top (FishHitBend).
     ///   Tuna_Greybox:  capsule-and-cubes stand-in.
     /// The collider sits on the unscaled root (a harpoon stuck into a stretched parent would be skewed), the meshes are
     /// children without colliders. No blood on them: that effect hooks into <see cref="FishCollision.onHit"/>.
@@ -97,6 +98,7 @@ namespace AKI.Fish.Editor
             ai.wiggleDegrees = 0f;                 // the swim animation wags the tail now
             ai.bodyHalfHeight = bounds.extents.y;  // up to the tip of the dorsal fin
             root.AddComponent<FishAnimation>().animator = animator;
+            root.AddComponent<FishHitBend>();   // finds the spine bones by name
 
             return Save(root, TunaPrefabPath);
         }
