@@ -113,7 +113,7 @@ Shader "Hidden/AKI/WaterLens"
             Name "WaterLens"
 
             HLSLPROGRAM
-            #pragma target 3.5
+            #pragma target 4.5   // ddx_fine / ddy_fine
             #pragma vertex LensVert
             #pragma fragment Frag
             #pragma multi_compile_local _ _FFT_WAVES
@@ -337,11 +337,13 @@ Shader "Hidden/AKI/WaterLens"
                 return h;
             }
 
-            float FilmHeight(float2 q, float since, float wet, LensRunOff run)
+            // sheets: the sheets alone (before the wetness scale), for the defocus
+            float FilmHeight(float2 q, float since, float wet, LensRunOff run, out float sheets)
             {
                 q.x += run.slant * (1.0 - q.y);   // this time it runs a little sideways
                 float flow = since * 0.9;
-                float h = Sheets(q, since, run);
+                sheets = Sheets(q, since, run);
+                float h = sheets;
                 // a thin streaky wet layer behind the sheet, running down and drying off
                 float behind = saturate((q.y - SheetEdge(q.x, since, _WaterLensSeed, run.tongues)) / 0.05);
                 h += behind * saturate(1.0 - since / 2.5) * 0.003
@@ -358,15 +360,14 @@ Shader "Hidden/AKI/WaterLens"
 
             // Gaussian blur in one pass: taps on a sunflower (Vogel) spiral, weighted by a gaussian of their distance.
             // radius = 2-sigma reach as a share of the screen height.
-            half3 SampleGaussian(float2 uv, float radius, float aspect)
+            half3 GaussianTaps(float2 uv, float radius, float aspect, const int taps)
             {
-                const int Taps = 40;
                 half3 sum = 0;
                 float weights = 0;
                 [unroll]
-                for (int i = 0; i < Taps; i++)
+                for (int i = 0; i < taps; i++)
                 {
-                    float r = sqrt((i + 0.5) / Taps);
+                    float r = sqrt((i + 0.5) / taps);
                     float a = i * 2.39996323;                 // golden angle
                     float2 o = float2(cos(a), sin(a)) * r * radius;
                     o.x /= aspect;
@@ -375,6 +376,15 @@ Shader "Hidden/AKI/WaterLens"
                     weights += w;
                 }
                 return sum / weights;
+            }
+
+            // a small blur (the meniscus film, a running sheet) is smooth with a third of the taps
+            half3 SampleGaussian(float2 uv, float radius, float aspect)
+            {
+                half3 col = 0;
+                [branch] if (radius < 0.01) col = GaussianTaps(uv, radius, aspect, 16);
+                else col = GaussianTaps(uv, radius, aspect, 40);
+                return col;
             }
 
             half4 Frag(LensVaryings input) : SV_Target
@@ -457,19 +467,22 @@ Shader "Hidden/AKI/WaterLens"
                 float film = 0;
                 float2 filmOffset = 0;
                 half3 filmTint = 1;
-                float wet = _WaterLensWetness * _WaterLensDrops * (1.0 - underLens);
-                if (wet > 0.001)
+                float wetAll = _WaterLensWetness * _WaterLensDrops;
+                if (wetAll > 0.001)   // the same for every pixel: the screen-space derivatives below stay defined
                 {
                     LensRunOff run = RollRunOff();
                     float since = _WaterLensSinceExit * run.speed;
 
-                    float h0 = FilmHeight(q, since, wet, run);
+                    // The height field once per pixel; its slope from the neighbouring pixels (instead of evaluating
+                    // it twice more). Taken over the whole lens and masked after, so the waterline doesn't add a slope.
+                    float sheets;
+                    float h0 = FilmHeight(q, since, wetAll, run, sheets);
+                    float2 grad = float2(ddx_fine(h0), ddy_fine(h0)) / float2(ddx_fine(q.x), ddy_fine(q.y));
+                    float mask = saturate(wetAll * (1.0 - underLens) * 1.5) / max(saturate(wetAll * 1.5), 1e-5);
+                    h0 *= mask;
+                    grad *= mask;
                     if (h0 > 1e-5)
                     {
-                        const float e = 0.0025;
-                        float hx = FilmHeight(q + float2(e, 0), since, wet, run);
-                        float hy = FilmHeight(q + float2(0, e), since, wet, run);
-                        float2 grad = float2(hx - h0, hy - h0) / e;
                         float slope = length(grad);
 
                         // the slope of the water refracts the view
@@ -492,8 +505,7 @@ Shader "Hidden/AKI/WaterLens"
 
                         // Looking through the sheet is out of focus: strongly the instant the head leaves the water (that
                         // hides the jump from the underwater view), clearing as the sheet runs off.
-                        float2 qs = float2(q.x + run.slant * (1.0 - q.y), q.y);
-                        float sheet = saturate(Sheets(qs, since, run) * 25.0);
+                        float sheet = saturate(sheets * 25.0);
                         float second = run.second > 0.0 ? saturate(1.0 - (since - run.second) / 0.6) * step(run.second, since) : 0.0;
                         defocus = max(defocus, 0.035 * first * first + 0.012 * second * second * sheet + 0.006 * sheet);
                     }
