@@ -54133,8 +54133,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AKI.Menu.MenuCameraFocus
   target: {fileID: 999013471}
+  targetHeight: 0.6
   volume: {fileID: 237753740}
   followSeconds: 0.25
+  keepFramed: 1
+  frameSeconds: 1.4
+  heaveFollow: 0.6
+  menu: {fileID: 0}
 --- !u!114 &237753740
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -382120,6 +382125,7 @@ GameObject:
   - component: {fileID: 1688107162}
   - component: {fileID: 1688107161}
   - component: {fileID: 1688107160}
+  - component: {fileID: 1688107168}
   m_Layer: 0
   m_Name: Water
   m_TagString: Untagged
@@ -382334,6 +382340,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1688107168
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1688107159}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e6f21320f9cbec545b62b7be2653070c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Menu.MenuSeaState
+  menu: {fileID: 23182050}
+  gameWaveScale: 1
+  riseSeconds: 12
 --- !u!1 &1688420548
 GameObject:
   m_ObjectHideFlags: 0
