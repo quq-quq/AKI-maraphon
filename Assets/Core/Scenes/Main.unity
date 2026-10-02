@@ -4576,8 +4576,8 @@ MonoBehaviour:
   possessSeconds: 0.6
   eyeForward: 0.12
   maxDivePitch: 70
-  handOverDepth: 1.2
-  settleSeconds: 0.6
+  handOverDepth: 0.5
+  settleSeconds: 0.3
   waterDrag: 2.5
   steadyCurrentInMenu: 1
   currentReleaseSeconds: 3

@@ -10,13 +10,14 @@ namespace AKI.Endings
     /// The ending screen: the view goes black, then the subtitles of an <see cref="EndingData"/> fade in on it one
     /// after another. After the last one it stays, or waits for a key / a few seconds and reloads the scene, loads
     /// another one or quits
-    /// (<see cref="EndingData.after"/>). Builds its own overlay canvas on top of everything, runs on unscaled time
-    /// and removes itself with the scene.
+    /// (<see cref="EndingData.after"/>). Builds its own overlay canvas on top of everything and runs on unscaled time.
+    /// When a scene is loaded after it, the black lives through the load and clears over the new scene (the menu).
     /// </summary>
     public class EndingScreen : MonoBehaviour
     {
         const int SortingOrder = 32000;            // above every other canvas
         const float LeaveFadeSeconds = 0.6f;       // the text fades out before the next scene
+        const float ArriveFadeSeconds = 1.5f;      // the black clears over the next scene
 
         static EndingScreen current;
 
@@ -29,6 +30,7 @@ namespace AKI.Endings
         Text line;
         CanvasGroup words;
         CanvasGroup hint;
+        AudioSource voice;
 
         /// <summary>Shows <paramref name="ending"/>. Ignored while another ending is on the screen.</summary>
         public static void Show(EndingData ending)
@@ -64,6 +66,13 @@ namespace AKI.Endings
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
             gameObject.AddComponent<GraphicRaycaster>();   // the black takes the clicks, nothing under it reacts
+
+            voice = gameObject.AddComponent<AudioSource>();
+            voice.playOnAwake = false;
+            voice.spatialBlend = 0f;
+            voice.bypassListenerEffects = true;   // the narrator is not under water
+            voice.ignoreListenerPause = true;
+            voice.volume = ending.voiceVolume;
 
             RectTransform background = Panel("Black", transform, Vector2.zero, Vector2.one);
             background.gameObject.AddComponent<Image>().color = Color.black;
@@ -127,8 +136,15 @@ namespace AKI.Endings
             for (int i = 0; i < subtitles.Length; i++)
             {
                 line.text = subtitles[i].text;
+                float hold = subtitles[i].seconds;
+                if (subtitles[i].voice != null)
+                {
+                    voice.clip = subtitles[i].voice;
+                    voice.Play();
+                    hold = Mathf.Max(hold, subtitles[i].voice.length - ending.textFadeSeconds);   // the line outlasts its voice
+                }
                 yield return Fade(words, 0f, 1f, ending.textFadeSeconds);
-                if (subtitles[i].seconds > 0f) yield return new WaitForSecondsRealtime(subtitles[i].seconds);
+                if (hold > 0f) yield return new WaitForSecondsRealtime(hold);
                 if (i < subtitles.Length - 1) yield return Fade(words, 1f, 0f, ending.textFadeSeconds);   // the last line stays
             }
             if (ending.after == EndingData.AfterEnding.StayOnScreen) yield break;
@@ -168,7 +184,7 @@ namespace AKI.Endings
             switch (ending.after)
             {
                 case EndingData.AfterEnding.ReloadScene:
-                    yield return Load(SceneManager.GetActiveScene());
+                    yield return Arrive(Load(SceneManager.GetActiveScene()));
                     break;
 
                 case EndingData.AfterEnding.LoadScene:
@@ -177,7 +193,7 @@ namespace AKI.Endings
                         Debug.LogWarning("EndingScreen: '" + ending.name + "' has no scene to load.", ending);
                         yield break;
                     }
-                    yield return SceneManager.LoadSceneAsync(ending.sceneName);
+                    yield return Arrive(SceneManager.LoadSceneAsync(ending.sceneName));
                     break;
 
                 case EndingData.AfterEnding.QuitGame:
@@ -188,6 +204,16 @@ namespace AKI.Endings
 #endif
                     break;
             }
+        }
+
+        // the next scene starts from scratch behind the black, then the black clears
+        IEnumerator Arrive(AsyncOperation load)
+        {
+            DontDestroyOnLoad(gameObject);
+            while (load != null && !load.isDone) yield return null;
+            yield return null;   // let the new scene set itself up behind the black
+            yield return Fade(black, 1f, 0f, ArriveFadeSeconds);
+            Destroy(gameObject);
         }
 
         static AsyncOperation Load(Scene scene)
