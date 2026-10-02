@@ -91,6 +91,7 @@ Shader "Hidden/AKI/WaterLens"
         _UnderFogScale     ("Underwater Fog Density", Range(0.05, 6)) = 0.6
         _UnderWobble       ("Underwater Wobble", Range(0, 3)) = 1
         _UnderMaxDistance  ("Underwater Visibility (m)", Range(5, 300)) = 120
+        _UnderFogEnd       ("Underwater Fog End (m)", Range(10, 300)) = 60
         _UnderFogColor     ("Underwater Haze Colour", Color) = (0.02, 0.19, 0.44, 1)
         _UnderDeepColor    ("Underwater Deep Colour", Color) = (0.00, 0.02, 0.08, 1)
         _UnderDepthFalloff ("Haze Darkening With Depth (1/m)", Range(0.005, 0.2)) = 0.05
