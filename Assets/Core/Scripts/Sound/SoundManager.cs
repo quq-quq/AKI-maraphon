@@ -44,6 +44,15 @@ namespace Core.Scripts.Sound
                  "they skip the water's muffling (which leaves nothing of a click) and are only softened to this cutoff (Hz).")]
         [SerializeField, Min(500f)] private float _inHandsUnderwaterCutoff = 3500f;
 
+        [Header("Creatures under water")]
+        [Tooltip("The tuna and the Naga are in the water with the player: their sounds skip the listener's muffling " +
+                 "(which leaves only a hum at 450 Hz) and are only softened to this cutoff (Hz).")]
+        [SerializeField, Min(500f)] private float _creaturesUnderwaterCutoff = 2200f;
+        [Tooltip("A tuna is heard at full volume up to X metres and fades out linearly to Y metres.")]
+        [SerializeField] private Vector2 _fishHearing = new Vector2(4f, 40f);
+        [Tooltip("The Naga is far bigger and louder: full volume up to X metres, silent at Y metres.")]
+        [SerializeField] private Vector2 _nagaHearing = new Vector2(15f, 120f);
+
         private AudioSource _menuGamelanSource;
         private AudioSource _fishingGamelanSource;
         private AudioSource _nagaGamelanSource;
@@ -243,13 +252,13 @@ namespace Core.Scripts.Sound
         private void OnFishSpawned(Transform fishTransform)
         {
             // rides on the fish and goes with it; there can be two (the last tuna and the golden fish)
-            PlayLoopSound(_soundConfig.FishSwimmingSound, fishTransform, true);
+            InWater(PlayLoopSound(_soundConfig.FishSwimmingSound, fishTransform, true), _fishHearing);
         }
 
         private void OnFishDied(Transform fishTransform)
         {
             StopLoopsOn(fishTransform, _soundConfig.FishSwimmingSound);
-            PlaySound(_soundConfig.FishDeathSound, fishTransform.position);
+            InWater(PlaySound(_soundConfig.FishDeathSound, fishTransform.position), _fishHearing);
         }
 
         private void OnNagaAppered(Transform nagaTransform)
@@ -267,6 +276,8 @@ namespace Core.Scripts.Sound
                 FadeIn(_nagaGamelanSource);
             }
             _nagaSwimmingSource = PlayLoopSound(_soundConfig.NagaSwimmingSound, nagaTransform, true);
+            InWater(_nagaSwimmingSource, _nagaHearing);
+            NagaRhythmMotion naga = nagaTransform.GetComponent<NagaRhythmMotion>();
 
             _nagaCoroutine = StartCoroutine(GrowlLoop());
 
@@ -276,8 +287,9 @@ namespace Core.Scripts.Sound
                 {
                     yield return new WaitForSeconds(_soundConfig.NagaDistanceSeconds);
 
+                    // it roars from its mouth, not from the middle of its body
                     if (nagaTransform != null)
-                        PlayRandom(_soundConfig.NagaSounds, nagaTransform.position);
+                        InWater(PlayRandom(_soundConfig.NagaSounds, naga != null ? naga.HeadWorldPosition : nagaTransform.position), _nagaHearing);
                 }
                 _nagaCoroutine = null;
             }
@@ -296,7 +308,7 @@ namespace Core.Scripts.Sound
 
         private void OnSwimming()
         {
-            PlayRandom(_soundConfig.SwimmingSound, Listener.position);
+            InHands(PlayRandom(_soundConfig.SwimmingSound, Listener.position));   // his own strokes, right at his ears
         }
 
         private void OnHarpoomTrigger()
@@ -324,6 +336,20 @@ namespace Core.Scripts.Sound
             if (source == null || !_headUnderwater || source.bypassListenerEffects) return;
             source.bypassListenerEffects = true;
             source.gameObject.AddComponent<AudioLowPassFilter>().cutoffFrequency = _inHandsUnderwaterCutoff;
+        }
+
+        // A creature in the water with the player: carries through it (only softened) and is heard over the given
+        // distances. Linear: Unity's default curve leaves a tenth of the volume at 10 m.
+        private void InWater(AudioSource source, Vector2 hearing)
+        {
+            if (source == null) return;
+            source.rolloffMode = AudioRolloffMode.Linear;
+            source.minDistance = Mathf.Max(0.1f, hearing.x);
+            source.maxDistance = Mathf.Max(source.minDistance + 0.1f, hearing.y);
+            source.dopplerLevel = 0f;   // a darting tuna must not warble
+            if (source.bypassListenerEffects) return;
+            source.bypassListenerEffects = true;
+            source.gameObject.AddComponent<AudioLowPassFilter>().cutoffFrequency = _creaturesUnderwaterCutoff;
         }
 
         private void FadeIn(AudioSource source)

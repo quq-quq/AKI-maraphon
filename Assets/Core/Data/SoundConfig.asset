@@ -79,19 +79,19 @@ MonoBehaviour:
   - Clip: {fileID: 8300000, guid: f9131bab2b9dea841ab1313644f92ebc, type: 3}
     Is3D: 0
     IgnoreUnderwater: 0
-    Volume: 0.2
+    Volume: 0.5
     Pitch: 1
     RandomAdd: 0.1
   - Clip: {fileID: 8300000, guid: 86fb5f2f6bf55e549afde903f8ffe09f, type: 3}
     Is3D: 0
     IgnoreUnderwater: 0
-    Volume: 0.2
+    Volume: 0.5
     Pitch: 1
     RandomAdd: 0.1
   - Clip: {fileID: 8300000, guid: 277fc9dc5e45b834caa8c30ac384bed7, type: 3}
     Is3D: 0
     IgnoreUnderwater: 0
-    Volume: 0.2
+    Volume: 0.5
     Pitch: 1
     RandomAdd: 0.1
   <SplashSound>k__BackingField:
