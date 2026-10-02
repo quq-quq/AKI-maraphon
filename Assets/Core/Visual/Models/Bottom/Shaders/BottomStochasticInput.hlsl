@@ -28,6 +28,21 @@ float _RandomSeed;
 float _TileSize;
 float _BlendSharpness;
 float _HeightBlend;
+// Shared with CoralSmartTerrain; one constant-buffer layout across its passes.
+float _GroundTileMeters;
+float _CliffTileMeters;
+float _CliffNormalStrength;
+float _SlopeStart;
+float _SlopeEnd;
+float _ElevationStart;
+float _ElevationEnd;
+float _ElevationInfluence;
+float _TransitionNoise;
+float _ReefTerrain;
+float _CliffOnly;
+float _TerrainDetailStart;
+float _TerrainDetailEnd;
+half4 _CliffTint;
 UNITY_TEXTURE_STREAMING_DEBUG_VARS;
 CBUFFER_END
 
@@ -73,11 +88,9 @@ BottomPatch BottomMakePatch(float2 uv, float2 dx, float2 dy, float2 id)
     return patch;
 }
 
-void BottomLayout(float2 uv, out BottomPatch a, out BottomPatch b,
-                  out BottomPatch c, out float3 weights)
+void BottomLayoutGrad(float2 uv, float2 dx, float2 dy, out BottomPatch a, out BottomPatch b,
+                      out BottomPatch c, out float3 weights)
 {
-    float2 dx = ddx(uv);
-    float2 dy = ddy(uv);
 #if defined(_RANDOM_TILE_UV)
     float2 p = uv / max(_TileSize, 0.001);
     float2 grid = float2(p.x - 0.577350269 * p.y, 1.154700538 * p.y);
@@ -110,6 +123,12 @@ void BottomLayout(float2 uv, out BottomPatch a, out BottomPatch b,
     weights = float3(1, 0, 0);
 #endif
     weights /= max(dot(weights, float3(1, 1, 1)), 0.000001);
+}
+
+void BottomLayout(float2 uv, out BottomPatch a, out BottomPatch b,
+                  out BottomPatch c, out float3 weights)
+{
+    BottomLayoutGrad(uv,ddx(uv),ddy(uv),a,b,c,weights);
 }
 
 float BottomHeight(BottomPatch patch)
@@ -170,10 +189,10 @@ void ApplyPerPixelDisplacement(half3 viewDirTS, inout float2 uv)
 #endif
 }
 
-void InitializeStandardLitSurfaceData(float2 uv, out SurfaceData surface)
+void InitializeStandardLitSurfaceDataGrad(float2 uv, float2 dx, float2 dy, out SurfaceData surface)
 {
     BottomPatch a, b, c; float3 weights;
-    BottomLayout(uv, a, b, c, weights);
+    BottomLayoutGrad(uv, dx, dy, a, b, c, weights);
     weights = BottomWeights(a, b, c, weights);
     half3 color = SAMPLE_TEXTURE2D_GRAD(_BaseMap, sampler_BaseMap, a.uv, a.dx, a.dy).rgb;
     half roughness = SAMPLE_TEXTURE2D_GRAD(_RoughnessMap, sampler_RoughnessMap, a.uv, a.dx, a.dy).r;
@@ -195,5 +214,9 @@ void InitializeStandardLitSurfaceData(float2 uv, out SurfaceData surface)
     surface.metallic = _Metallic;
     surface.occlusion = 1;
     surface.alpha = 1;
+}
+void InitializeStandardLitSurfaceData(float2 uv, out SurfaceData surface)
+{
+    InitializeStandardLitSurfaceDataGrad(uv,ddx(uv),ddy(uv),surface);
 }
 #endif
