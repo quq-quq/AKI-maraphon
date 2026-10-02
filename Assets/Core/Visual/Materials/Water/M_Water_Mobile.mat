@@ -43,6 +43,7 @@ Material:
     - _DetailFade: 90
     - _DetailStrength: 0.8
     - _EdgeSoftness: 0.35
+    - _FFTWaves: 0
     - _FlattenDistance: 500
     - _FoamIntensity: 1
     - _FoamOn: 0
@@ -73,6 +74,7 @@ Material:
     - _ToonSoftness: 0.2
     - _Turbidity: 1
     - _UnderDepthFalloff: 0.05
+    - _UnderFogEnd: 60
     - _UnderFogScale: 0.6
     - _UnderLightAbsorb: 0.6
     - _UnderMaxDistance: 120

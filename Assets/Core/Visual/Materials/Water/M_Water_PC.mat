@@ -84,6 +84,7 @@ Material:
     - _ToonSoftness: 0.2
     - _Turbidity: 1
     - _UnderDepthFalloff: 0.025
+    - _UnderFogEnd: 60
     - _UnderFogScale: 0.2
     - _UnderLightAbsorb: 0.2
     - _UnderMaxDistance: 120

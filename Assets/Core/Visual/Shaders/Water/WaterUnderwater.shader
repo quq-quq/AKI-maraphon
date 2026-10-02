@@ -90,6 +90,7 @@ Shader "AKI/WaterUnderwater"
         _UnderFogScale     ("Underwater Fog Density", Range(0.05, 6)) = 0.6
         _UnderWobble       ("Underwater Wobble", Range(0, 3)) = 1
         _UnderMaxDistance  ("Underwater Visibility (m)", Range(5, 300)) = 120
+        _UnderFogEnd       ("Underwater Fog End (m)", Range(10, 300)) = 60
         _UnderFogColor     ("Underwater Haze Colour", Color) = (0.02, 0.19, 0.44, 1)
         _UnderDeepColor    ("Underwater Deep Colour", Color) = (0.00, 0.02, 0.08, 1)
         _UnderDepthFalloff ("Haze Darkening With Depth (1/m)", Range(0.005, 0.2)) = 0.05
@@ -188,7 +189,7 @@ Shader "AKI/WaterUnderwater"
                 float3 toPix = worldPos - cam;
                 float dist = length(toPix);
                 float3 dir = toPix / max(dist, 1e-4);
-                dist = min(dist, _UnderMaxDistance);
+                dist = WaterUnderViewDistance(dist);
 
                 // per-pixel waterline when the camera is at the surface
                 half coverage = 1.0h;
@@ -231,6 +232,7 @@ Shader "AKI/WaterUnderwater"
                 half3 fogCol = WaterUnderFogColor(camDepth, endDepth, dir, L, scatterLight);
                 float3 T = WaterTransmittanceSoft(dist, _UnderFogScale);
                 half3 col = sceneCol * T + fogCol * (1.0 - T);
+                col = lerp(col, fogCol, (half)WaterUnderHaze(dist));
 
             #if defined(_GODRAYS)
                 col += WaterGodRays(cam, cam + dir * dist, i.positionCS.xy, L, lightColor, waterLevel, t) * 2.0h;

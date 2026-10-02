@@ -88,6 +88,7 @@ Shader "AKI/Water"
         _UnderFogScale     ("Underwater Fog Density", Range(0.05, 6)) = 0.6
         _UnderWobble       ("Underwater Wobble", Range(0, 3)) = 1
         _UnderMaxDistance  ("Underwater Visibility (m)", Range(5, 300)) = 120
+        _UnderFogEnd       ("Underwater Fog End (m)", Range(10, 300)) = 60
         _UnderFogColor     ("Underwater Haze Colour", Color) = (0.02, 0.19, 0.44, 1)
         _UnderDeepColor    ("Underwater Deep Colour", Color) = (0.00, 0.02, 0.08, 1)
         _UnderDepthFalloff ("Haze Darkening With Depth (1/m)", Range(0.005, 0.2)) = 0.05
@@ -191,7 +192,7 @@ Shader "AKI/Water"
                 float3 cam = _WorldSpaceCameraPos;
                 float camDepth = max(waterLevel - cam.y, 0.0);
                 float3 viewDir = -V;                                 // camera -> surface
-                float capDist = min(dist, _UnderMaxDistance);
+                float capDist = WaterUnderViewDistance(dist);
                 float endDepth = max(waterLevel - (cam.y + viewDir.y * capDist), 0.0);
 
                 // volume haze along this view ray (same formula as the full-screen effect)
@@ -239,6 +240,7 @@ Shader "AKI/Water"
 
                 float3 T = WaterTransmittanceSoft(dist * 2.0, _UnderFogScale);
                 col = col * T + hazeCol * (1.0 - T);
+                col = lerp(col, hazeCol, (half)WaterUnderHaze(dist));
 
                 half luma = dot(col, half3(0.299, 0.587, 0.114));
                 col = lerp(luma.xxx, col, 1.0 + 0.12 * _ToonAmount);
