@@ -133,6 +133,7 @@ Shader "Hidden/AKI/WaterLens"
             float  _ScreenFade;              // 0..1 towards black
             float  _WakeBlur;                // 0..1 gaussian blur of a view that isn't in focus yet
             float  _EyeClosed;               // 0 = eyes open .. 1 = lids shut
+            float  _DivingMask;              // 0..1 the diving mask's glass under water (UnderwaterPostVolume)
             // set by WaterLensFeature while the lens is wet
             TEXTURE2D(_WaterLensFilm);       // FragFilm's output at half resolution: (height, sheets)
             float4 _WaterLensFilmTexel;      // 1 / its size
@@ -511,6 +512,24 @@ Shader "Hidden/AKI/WaterLens"
                     }
                 }
 
+                // ---- under water: the rim of the diving mask's glass. The view is magnified a little and goes soft
+                // towards it, colours split there, the glass mists over in patches, and the rubber frame shows in the
+                // corners.
+                float maskEdge = 0;
+                float maskFrame = 0;
+                float2 maskDir = 0;
+                if (_DivingMask > 0.001)
+                {
+                    float2 p = (uv - 0.5) * float2(aspect, 1.0);
+                    float2 b = abs(p) - (float2(0.5 * aspect, 0.5) * 1.03 - 0.28);
+                    float d = length(max(b, 0.0)) + min(max(b.x, b.y), 0.0) - 0.28;   // rounded box: < 0 inside the glass
+                    maskEdge = smoothstep(-0.2, 0.0, d) * _DivingMask;
+                    maskFrame = smoothstep(-0.015, 0.02, d) * _DivingMask;
+                    maskDir = p / max(length(p), 1e-4);
+                    offset -= maskDir * (maskEdge * maskEdge * 0.012);
+                    blur = max(blur, maskEdge * maskEdge * 0.004);
+                }
+
                 // the most blur anywhere on the screen this frame: picks the tap count for all pixels alike (switching it
                 // per pixel would draw a seam where the blur crosses over)
                 float widest = max(max(_WakeBlur * 0.06, 0.025 * dive),
@@ -534,9 +553,21 @@ Shader "Hidden/AKI/WaterLens"
                     col.r = FragBlitSample(uv + offset + lineFringe).r;
                     col.b = FragBlitSample(uv + offset - lineFringe).b;
                 }
+                if (maskEdge > 0.001)
+                {
+                    float2 split = maskDir * (maskEdge * maskEdge * 0.0035);
+                    col.r = lerp(col.r, FragBlitSample(uv + offset + split).r, (half)maskEdge);
+                    col.b = lerp(col.b, FragBlitSample(uv + offset - split).b, (half)maskEdge);
+                }
                 col *= 1.0h - saturate(dark);
                 col += light;
                 col *= filmTint;
+                if (maskEdge > 0.001)
+                {
+                    half mist = (half)(maskEdge * maskEdge * (0.12 + 0.16 * LensNoiseRound(q * 5.0 + 3.1)));
+                    col = lerp(col, col * 0.55h + half3(0.30, 0.38, 0.40), mist);
+                    col *= 1.0h - (half)(maskFrame * 0.85);
+                }
 
                 // ---- running out of air: a dark vignette closes in, then the whole view fades towards black
                 float suff = saturate(_BreathEffect);
