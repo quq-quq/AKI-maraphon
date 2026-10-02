@@ -67999,6 +67999,68 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6213660224943038684, guid: c9f397d1d436a4749af543d14f2ac984, type: 3}
   m_PrefabInstance: {fileID: 806180207}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &806531760
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 806531762}
+  - component: {fileID: 806531761}
+  m_Layer: 0
+  m_Name: CloudSky_Optimized
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &806531761
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 806531760}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42afd9d1c6250fe4c8e022267befb234, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Clouds.OptimizedCloudSky
+  material: {fileID: 2100000, guid: ce3513b516b894a45ae0312a354ac68c, type: 2}
+  downsample: 4
+  maximumBufferWidth: 384
+  raySteps: 32
+  showInSceneView: 1
+  skipUnderwater: 1
+  waterLevel: 0
+  baseHeight: 650
+  thickness: 500
+  maxDistance: 15000
+  shapeScale: 1800
+  coverage: 0.53
+  extinction: 0.009
+  wind: {x: 6, y: 2}
+  evolution: 0.0035
+  ambientColor: {r: 0.68, g: 0.74, b: 0.82, a: 1}
+  sunlightColor: {r: 0.98, g: 0.99, b: 1, a: 1}
+  silverLining: 0.45
+--- !u!4 &806531762
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 806531760}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &806900221
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -176721,3 +176783,4 @@ SceneRoots:
   - {fileID: 1074734825}
   - {fileID: 557888858}
   - {fileID: 1525227312}
+  - {fileID: 806531762}
