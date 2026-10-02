@@ -368,7 +368,7 @@ Camera:
     height: 1
   near clip plane: 0.05
   far clip plane: 1500
-  field of view: 60
+  field of view: 30
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
@@ -419,13 +419,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 237753733}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.15922864, y: 0.73027176, z: -0.18242037, w: 0.63880527}
-  m_LocalPosition: {x: -11.497255, y: 7.49, z: -57.372852}
+  m_LocalRotation: {x: 0.14985679, y: 0.7823361, z: -0.20630766, w: 0.56826967}
+  m_LocalPosition: {x: -14.13, y: 7.1700025, z: -57.53}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 28.026, y: 97.636, z: -0.033}
+  m_LocalEulerAnglesHint: {x: 29.546, y: 108.013, z: 0}
 --- !u!114 &237753738
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -582,6 +582,67 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &420528234
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 420528236}
+  - component: {fileID: 420528235}
+  m_Layer: 0
+  m_Name: Fish Spawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &420528235
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 420528234}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0647b0d17cbb0946b025dffeab86158, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Fish.FishSpawner
+  fishPrefab: {fileID: 1888779596029478606, guid: ce2086f0aea24ec4cb71c47ecda2910f, type: 3}
+  player: {fileID: 0}
+  spawnOnStart: 1
+  firstSpawnDelay: 1
+  respawnDelay: 2
+  spawnDistance: 22
+  hiddenAngle: 70
+  onFishSpawned:
+    m_PersistentCalls:
+      m_Calls: []
+  onFishHit:
+    m_PersistentCalls:
+      m_Calls: []
+  onFishCaught:
+    m_PersistentCalls:
+      m_Calls: []
+  drawGizmos: 1
+--- !u!4 &420528236
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 420528234}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &501039099
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -630,6 +691,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1814609501035579349, guid: 91b9f75b1befe014091236f3226eeea7, type: 3}
+      propertyPath: aimMask.m_Bits
+      value: 51
+      objectReference: {fileID: 0}
     - target: {fileID: 9182919468106720292, guid: 91b9f75b1befe014091236f3226eeea7, type: 3}
       propertyPath: m_Name
       value: Player
@@ -667,7 +732,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7860559958069615843, guid: be9e78dd85177784095954fb481c6d72, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -0.007947922
+      value: -2.79
       objectReference: {fileID: 0}
     - target: {fileID: 7860559958069615843, guid: be9e78dd85177784095954fb481c6d72, type: 3}
       propertyPath: m_LocalPosition.y
@@ -675,7 +740,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7860559958069615843, guid: be9e78dd85177784095954fb481c6d72, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -60.887474
+      value: -62.05
       objectReference: {fileID: 0}
     - target: {fileID: 7860559958069615843, guid: be9e78dd85177784095954fb481c6d72, type: 3}
       propertyPath: m_LocalRotation.w
@@ -767,8 +832,26 @@ MonoBehaviour:
   heave: 1
   tilt: 1
   maxTiltDegrees: 35
-  smoothing: 0.08
+  heavePeriod: 1
+  tiltPeriod: 1
+  damping: 0.6
   draft: 0
+--- !u!114 &999013470
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 999013455}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc7044cc0bde48efb65e6e6f710106fc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Menu.BoatWaterMask
+  hull: {fileID: 0}
+  maskShader: {fileID: 4800000, guid: 60fbf5a614eacd14b9e54d95ce0830b6, type: 3}
+  drop: 0.03
+  inset: 0.03
 --- !u!1 &1688107159
 GameObject:
   m_ObjectHideFlags: 0
@@ -805,17 +888,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AKI.Water.WaterCurrentView
   material: {fileID: 2100000, guid: a12aeb61d0ad6468ca76fcceb1228d8e, type: 2}
-  extent: {x: 7, y: 4, z: 7}
+  texture: {fileID: 0}
+  nearDistance: 0.2
+  viewDistance: 8
+  margin: 0.2
   fadeDensity: 0.06
-  specks: 1400
-  speckSize: {x: 0.035, y: 0.07}
-  speckStretch: 0.06
-  speckColor: {r: 0.75, g: 0.9, b: 1, a: 0.6}
-  streaks: 30
-  streakSize: {x: 0.015, y: 0.025}
-  streakStretch: 0.9
-  streakColor: {r: 0.85, g: 0.95, b: 1, a: 0.4}
+  count: 650
+  size: {x: 0.008, y: 0.04}
+  smallBias: 2.5
+  colorA: {r: 0.8, g: 0.95, b: 1, a: 0.75}
+  colorB: {r: 0.62, g: 0.72, b: 0.62, a: 0.55}
+  lifetime: {x: 5, y: 10}
+  fadeIn: 0.5
+  twinkle: 0.3
+  flowSpeed: 2
   wobble: 0.05
+  stretch: 0.05
 --- !u!114 &1688107161
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -897,6 +985,9 @@ MonoBehaviour:
   size: 6000
   resolution: 256
   expandingGrid: 1
+  clipCell: 0.15
+  clipDensity: 20
+  clipLevels: 8
   detailRadius: 60
   fallbackResolution: 192
   followTarget: {fileID: 0}
@@ -919,7 +1010,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1688107159}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -977,7 +1068,7 @@ Transform:
   m_GameObject: {fileID: 1688107159}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -11.05826, y: 0, z: -57.134342}
+  m_LocalPosition: {x: -14.1, y: 0, z: -57.600002}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -987,26 +1078,11 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 237753737}
   - {fileID: 34718103}
   - {fileID: 1688107167}
   - {fileID: 281591702}
+  - {fileID: 237753737}
   - {fileID: 999013452}
   - {fileID: 501039099}
   - {fileID: 23182051}
---- !u!114 &999013470
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 999013455}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bc7044cc0bde48efb65e6e6f710106fc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AKI.Menu.BoatWaterMask
-  hull: {fileID: 0}
-  maskShader: {fileID: 4800000, guid: 60fbf5a614eacd14b9e54d95ce0830b6, type: 3}
-  drop: 0.03
-  inset: 0.03
+  - {fileID: 420528236}
