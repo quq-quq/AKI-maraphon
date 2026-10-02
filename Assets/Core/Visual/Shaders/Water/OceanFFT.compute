@@ -1,15 +1,16 @@
-// FFT ocean (Tessendorf). One N x N cascade per dispatch set:
-//   InitSpectrum   (when settings change)  JONSWAP spectrum with directional spreading -> h0(k)
-//   PackConjugate  (when settings change)  h0(k) and conj(h0(-k)) side by side
-//   TimeSpectrum   (every frame)           h(k, t) and the spectra of displacement + derivatives
-//   IFFTHorizontal / IFFTVertical          inverse FFT of 4 complex signals packed in two float4 textures
-//   Assemble       (every frame)           displacement, slopes, and foam that builds up on breaking crests
+// FFT ocean (Tessendorf). All three cascades are simulated side by side: the cascade is the z of every dispatch.
+//   InitSpectrum   (when settings change, per cascade)  JONSWAP spectrum with directional spreading -> h0(k)
+//   PackConjugate  (when settings change, per cascade)  h0(k) and conj(h0(-k)) side by side
+//   SpectrumRows   (every frame)  h(k, t) and the spectra of displacement + derivatives, straight into the inverse
+//                                 FFT of every row (one thread group per row, in groupshared memory)
+//   ColumnsAssemble(every frame)  inverse FFT of every column, then displacement, slopes and foam right away
+// So a frame is two dispatches for all cascades, and the spectra never make a round trip through memory between
+// "compute" and "transform". Eight real fields (Dx, Dy, Dz and five derivatives) travel as four complex signals
+// (a + i b) packed in two float4s. The twiddle factors come from a table filled once on the CPU.
 #pragma kernel InitSpectrum
 #pragma kernel PackConjugate
-#pragma kernel TimeSpectrum
-#pragma kernel IFFTHorizontal
-#pragma kernel IFFTVertical
-#pragma kernel Assemble
+#pragma kernel SpectrumRows
+#pragma kernel ColumnsAssemble
 
 #define SIZE 256
 #define LOG_SIZE 8
@@ -17,6 +18,7 @@
 #define G 9.81
 
 uint _Size;
+uint _Cascade;          // InitSpectrum / PackConjugate: the slice being set up
 float _LengthScale;
 float _CutoffLow;
 float _CutoffHigh;
@@ -36,17 +38,22 @@ float _Scale;
 
 float _Lambda;         // choppiness
 float _FoamDecay;      // how fast foam fades (per second)
-float _FoamBias;       // jacobian below this makes foam
 float _Reset;          // 1 on the first frame: start without foam
 
-Texture2D<float4>   _Noise;       // two independent gaussian pairs
-RWTexture2D<float2> _H0K;
-RWTexture2D<float4> _WaveData;    // kx, kz, 1/|k|, omega
-RWTexture2D<float4> _H0;          // h0(k).xy, conj(h0(-k)).xy
-RWTexture2D<float4> _SpecA;       // (Dx + i Dy), (Dz + i dDx/dz)
-RWTexture2D<float4> _SpecB;       // (dDy/dx + i dDy/dz), (dDx/dx + i dDz/dz)
-RWTexture2D<float4> _Displacement;
-RWTexture2D<float4> _Derivatives;
+Texture2D<float4>        _Noise;      // two independent gaussian pairs (per cascade: set before each InitSpectrum)
+RWTexture2DArray<float2> _H0K;        // slice = cascade
+RWTexture2DArray<float4> _WaveData;   // kx, kz, 1/|k|, omega
+RWTexture2DArray<float4> _H0;         // h0(k).xy, conj(h0(-k)).xy
+RWTexture2DArray<float4> _Spec;       // slice 2c: (Dx + i Dy), (Dz + i dDx/dz); 2c+1: (dDy/dx + i dDy/dz), (dDx/dx + i dDz/dz)
+StructuredBuffer<float2> _Twiddles;   // e^(+i 2 pi j / SIZE), j < SIZE / 2 (+ sign: inverse transform)
+
+// the results, one texture per cascade (what every shader samples)
+RWTexture2D<float4> _Displacement0;
+RWTexture2D<float4> _Displacement1;
+RWTexture2D<float4> _Displacement2;
+RWTexture2D<float4> _Derivatives0;
+RWTexture2D<float4> _Derivatives1;
+RWTexture2D<float4> _Derivatives2;
 
 // ------------------------------------------------------------------ spectrum
 
@@ -74,9 +81,8 @@ float Jonswap(float omega)
 // Mitsuyasu cos-2s spreading; the gamma-function normalisation uses Stirling's approximation.
 float SpreadPower(float omega)
 {
-    if (omega > _PeakOmega)
-        return 9.77 * pow(abs(omega / _PeakOmega), -2.5);
-    return 6.97 * pow(abs(omega / _PeakOmega), 5.0);
+    float r = abs(omega / _PeakOmega);
+    return omega > _PeakOmega ? 9.77 * pow(r, -2.5) : 6.97 * pow(r, 5.0);
 }
 
 float Direction(float theta, float omega)
@@ -91,6 +97,7 @@ float Direction(float theta, float omega)
 [numthreads(8, 8, 1)]
 void InitSpectrum(uint3 id : SV_DispatchThreadID)
 {
+    uint3 at = uint3(id.xy, _Cascade);
     float deltaK = 2.0 * PI / _LengthScale;
     int halfSize = (int)(_Size >> 1);
     int nx = (int)id.x - halfSize;
@@ -101,7 +108,7 @@ void InitSpectrum(uint3 id : SV_DispatchThreadID)
     if (kLength <= _CutoffHigh && kLength >= _CutoffLow)
     {
         float omega = Frequency(kLength);
-        _WaveData[id.xy] = float4(k.x, k.y, 1.0 / kLength, omega);
+        _WaveData[at] = float4(k.x, k.y, 1.0 / kLength, omega);
 
         float kAngle = atan2(k.y, k.x);
         float dOmegadk = FrequencyDerivative(kLength);
@@ -110,37 +117,37 @@ void InitSpectrum(uint3 id : SV_DispatchThreadID)
         float amplitude = sqrt(2.0 * spectrum * abs(dOmegadk) / kLength * deltaK * deltaK);
         // var(h) = sum over k of |h0(k)|^2 + |h0(-k)|^2 must equal the spectrum's energy, and the noise is a complex
         // gaussian (E|xi|^2 = 2): h0 = xi * sqrt(S dk^2) / 2  ->  sqrt(2 S dk^2) / (2 sqrt 2)
-        _H0K[id.xy] = _Noise[id.xy].xy * (amplitude * 0.35355339);
+        _H0K[at] = _Noise[id.xy].xy * (amplitude * 0.35355339);
     }
     else
     {
-        _H0K[id.xy] = 0;
-        _WaveData[id.xy] = float4(k.x, k.y, 1.0, 0.0);
+        _H0K[at] = 0;
+        _WaveData[at] = float4(k.x, k.y, 1.0, 0.0);
     }
 }
 
 [numthreads(8, 8, 1)]
 void PackConjugate(uint3 id : SV_DispatchThreadID)
 {
-    float2 h0k = _H0K[id.xy];
-    float2 h0MinusK = _H0K[uint2((_Size - id.x) % _Size, (_Size - id.y) % _Size)];
-    _H0[id.xy] = float4(h0k.x, h0k.y, h0MinusK.x, -h0MinusK.y);
+    float2 h0k = _H0K[uint3(id.xy, _Cascade)];
+    float2 h0MinusK = _H0K[uint3((_Size - id.x) % _Size, (_Size - id.y) % _Size, _Cascade)];
+    _H0[uint3(id.xy, _Cascade)] = float4(h0k.x, h0k.y, h0MinusK.x, -h0MinusK.y);
 }
 
-// ------------------------------------------------------------------ time evolution
+// ------------------------------------------------------------------ helpers
 
 float2 ComplexMult(float2 a, float2 b)
 {
     return float2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
 }
 
-[numthreads(8, 8, 1)]
-void TimeSpectrum(uint3 id : SV_DispatchThreadID)
+// the time-evolved spectrum at one texel, as the two packed float4s
+void TimeSpectrum(uint3 at, out float4 specA, out float4 specB)
 {
-    float4 wave = _WaveData[id.xy];
+    float4 wave = _WaveData[at];
     float phase = wave.w * _Time;
     float2 e = float2(cos(phase), sin(phase));
-    float4 h0 = _H0[id.xy];
+    float4 h0 = _H0[at];
     float2 h = ComplexMult(h0.xy, e) + ComplexMult(h0.zw, float2(e.x, -e.y));
     float2 ih = float2(-h.y, h.x);
 
@@ -156,8 +163,8 @@ void TimeSpectrum(uint3 id : SV_DispatchThreadID)
     float2 dispZdz = -h * wave.y * wave.y * wave.z;
 
     // two real fields per complex number: a + i*b
-    _SpecA[id.xy] = float4(dispX.x - dispY.y, dispX.y + dispY.x, dispZ.x - dispZdx.y, dispZ.y + dispZdx.x);
-    _SpecB[id.xy] = float4(dispYdx.x - dispYdz.y, dispYdx.y + dispYdz.x, dispXdx.x - dispZdz.y, dispXdx.y + dispZdz.x);
+    specA = float4(dispX.x - dispY.y, dispX.y + dispY.x, dispZ.x - dispZdx.y, dispZ.y + dispZdx.x);
+    specB = float4(dispYdx.x - dispYdz.y, dispYdx.y + dispYdz.x, dispXdx.x - dispZdz.y, dispXdx.y + dispZdz.x);
 }
 
 // ------------------------------------------------------------------ inverse FFT (radix-2, in groupshared memory)
@@ -165,14 +172,9 @@ void TimeSpectrum(uint3 id : SV_DispatchThreadID)
 groupshared float4 sharedA[SIZE];
 groupshared float4 sharedB[SIZE];
 
-float2 Twiddle(uint j, uint m)
-{
-    float angle = 2.0 * PI * j / m;          // + sign: inverse transform
-    return float2(cos(angle), sin(angle));
-}
-
 void FFTInShared(uint i)
 {
+    [unroll]
     for (uint stage = 1; stage <= LOG_SIZE; stage++)
     {
         GroupMemoryBarrierWithGroupSync();
@@ -180,9 +182,9 @@ void FFTInShared(uint i)
         uint half = m >> 1;
         if (i < SIZE / 2)
         {
-            uint j = i % half;
-            uint k = (i / half) * m + j;
-            float2 w = Twiddle(j, m);
+            uint j = i & (half - 1);
+            uint k = (i >> (stage - 1)) * m + j;
+            float2 w = _Twiddles[j << (LOG_SIZE - stage)];      // e^(+i 2 pi j / m)
 
             float4 ua = sharedA[k], ta = sharedA[k + half];
             float4 ub = sharedB[k], tb = sharedB[k + half];
@@ -203,53 +205,73 @@ uint BitReverse(uint x)
     return reversebits(x) >> (32 - LOG_SIZE);
 }
 
+// ------------------------------------------------------------------ every frame
+
+// one group per (row, cascade): the spectrum is evaluated straight into shared memory, bit-reversed
 [numthreads(SIZE, 1, 1)]
-void IFFTHorizontal(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
+void SpectrumRows(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
 {
     uint i = threadId.x;
     uint row = groupId.x;
-    uint src = BitReverse(i);
-    sharedA[i] = _SpecA[uint2(src, row)];
-    sharedB[i] = _SpecB[uint2(src, row)];
+    uint cascade = groupId.z;
+    float4 a, b;
+    TimeSpectrum(uint3(BitReverse(i), row, cascade), a, b);
+    sharedA[i] = a;
+    sharedB[i] = b;
     FFTInShared(i);
-    _SpecA[uint2(i, row)] = sharedA[i];
-    _SpecB[uint2(i, row)] = sharedB[i];
+    _Spec[uint3(i, row, cascade * 2)] = sharedA[i];
+    _Spec[uint3(i, row, cascade * 2 + 1)] = sharedB[i];
 }
 
-[numthreads(SIZE, 1, 1)]
-void IFFTVertical(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
+// "turbulence": drops to the jacobian where the crest folds (breaks), then slowly recovers. The water moves on while
+// the texture stays, so the foam is left behind as trails and patches.
+void Assemble(float4 a, float4 b, float4 previous, out float4 displacement, out float4 derivatives)
 {
-    uint i = threadId.x;
-    uint col = groupId.x;
-    uint src = BitReverse(i);
-    sharedA[i] = _SpecA[uint2(col, src)];
-    sharedB[i] = _SpecB[uint2(col, src)];
-    FFTInShared(i);
-    _SpecA[uint2(col, i)] = sharedA[i];
-    _SpecB[uint2(col, i)] = sharedB[i];
-}
-
-// ------------------------------------------------------------------ assemble
-
-[numthreads(8, 8, 1)]
-void Assemble(uint3 id : SV_DispatchThreadID)
-{
-    // k was centred on N/2, which shifts the result by (-1)^(x+z)
-    float sign = ((id.x + id.y) & 1u) ? -1.0 : 1.0;
-    float4 a = _SpecA[id.xy] * sign;
-    float4 b = _SpecB[id.xy] * sign;
-
     float Dx = a.x, Dy = a.y, Dz = a.z, dDxdz = a.w;
     float dDydx = b.x, dDydz = b.y, dDxdx = b.z, dDzdz = b.w;
 
     float jacobian = (1.0 + _Lambda * dDxdx) * (1.0 + _Lambda * dDzdz) - _Lambda * _Lambda * dDxdz * dDxdz;
-
-    // "turbulence": drops to the jacobian where the crest folds (breaks), then slowly recovers.
-    // The water moves on while the texture stays, so the foam is left behind as trails and patches.
-    float previous = _Reset > 0.5 ? 1.0 : _Displacement[id.xy].w;
-    float turbulence = previous + _DeltaTime * _FoamDecay / max(jacobian, 0.5);
+    float turbulence = (_Reset > 0.5 ? 1.0 : previous.w) + _DeltaTime * _FoamDecay / max(jacobian, 0.5);
     turbulence = min(jacobian, turbulence);
 
-    _Displacement[id.xy] = float4(_Lambda * Dx, Dy, _Lambda * Dz, turbulence);
-    _Derivatives[id.xy] = float4(dDydx, dDydz, _Lambda * dDxdx, _Lambda * dDzdz);
+    displacement = float4(_Lambda * Dx, Dy, _Lambda * Dz, turbulence);
+    derivatives = float4(dDydx, dDydz, _Lambda * dDxdx, _Lambda * dDzdz);
+}
+
+// one group per (column, cascade): the column transform, then the final textures of that cascade
+[numthreads(SIZE, 1, 1)]
+void ColumnsAssemble(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
+{
+    uint i = threadId.x;
+    uint col = groupId.x;
+    uint cascade = groupId.z;
+    uint src = BitReverse(i);
+    sharedA[i] = _Spec[uint3(col, src, cascade * 2)];
+    sharedB[i] = _Spec[uint3(col, src, cascade * 2 + 1)];
+    FFTInShared(i);
+
+    uint2 at = uint2(col, i);
+    // k was centred on N/2, which shifts the result by (-1)^(x+z)
+    float sign = ((at.x + at.y) & 1u) ? -1.0 : 1.0;
+    float4 a = sharedA[i] * sign;
+    float4 b = sharedB[i] * sign;
+    float4 displacement, derivatives;
+    if (cascade == 0)
+    {
+        Assemble(a, b, _Displacement0[at], displacement, derivatives);
+        _Displacement0[at] = displacement;
+        _Derivatives0[at] = derivatives;
+    }
+    else if (cascade == 1)
+    {
+        Assemble(a, b, _Displacement1[at], displacement, derivatives);
+        _Displacement1[at] = displacement;
+        _Derivatives1[at] = derivatives;
+    }
+    else
+    {
+        Assemble(a, b, _Displacement2[at], displacement, derivatives);
+        _Displacement2[at] = displacement;
+        _Derivatives2[at] = derivatives;
+    }
 }

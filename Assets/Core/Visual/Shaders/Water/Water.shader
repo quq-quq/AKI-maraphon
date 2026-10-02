@@ -77,7 +77,7 @@ Shader "AKI/Water"
         _RayColor          ("Colour", Color) = (0.50, 0.80, 1, 1)
         _RayIntensity      ("Intensity", Range(0, 8)) = 2.6
         _RayScale          ("Pattern Scale", Range(0.02, 1.5)) = 0.22
-        _RaySteps          ("Steps (quality)", Range(2, 32)) = 24
+        _RaySteps          ("Steps (quality)", Range(2, 12)) = 8
         _RayLength         ("Max Length (m)", Range(1, 60)) = 50
         _RayPhase          ("Forward Scattering", Range(0, 0.9)) = 0.72
         _RayFade           ("View Fade", Range(0, 0.5)) = 0.045
@@ -258,7 +258,7 @@ Shader "AKI/Water"
                 {
                     float3 camFwd = -UNITY_MATRIX_V[2].xyz;
                     float3 np = WaterNearPoint(_WorldSpaceCameraPos, normalize(i.positionWS - _WorldSpaceCameraPos), camFwd, _ProjectionParams.y);
-                    camAbove = WaterPlaneSubmergedDist(i.camPlane, np, _WorldSpaceCameraPos) <= 0.0;
+                    camAbove = WaterPlaneSubmergedDist(WaterCameraPlaneLoad(), np, _WorldSpaceCameraPos) <= 0.0;
                 }
                 const bool front = camAbove;
 
@@ -369,8 +369,9 @@ Shader "AKI/Water"
                 // always along the refracted ray, as far as the bottom: marching towards where the bottom shows on
                 // screen instead turned the shafts another way wherever the seabed ends (a line across the sea)
                 float3 endWS = posWS + Rr * (sky ? _RayLength : min(distance(posWS, bottomWS), _RayLength));
-                // far away the shafts are too small to see: skip the march
-                half3 rays = dist < 150.0 ? WaterGodRays(posWS, endWS, i.positionCS.xy, L, lightColor, waterLevel, t) : half3(0, 0, 0);
+                half3 rays = 0;
+                [branch] if (dist < 80.0)   // further out the shafts are too small to see: skip the march
+                    rays = WaterGodRays(posWS, endWS, i.positionCS.xy, L, lightColor, waterLevel, t) * saturate((80.0 - dist) / 20.0);
                 under += rays * (1.0 - fresnel);
             #endif
 

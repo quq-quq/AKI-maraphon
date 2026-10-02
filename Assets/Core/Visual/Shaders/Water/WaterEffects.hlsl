@@ -202,8 +202,10 @@ half3 WaterApplyCaustics(half3 bottomColor, float3 bottomWS, float waterLevel, f
 
     float2 p = hitXZ * _CausticsScale * 1.2;
     float tt = t * _CausticsSpeed;
-    float2 split = Lw.xz * (_CausticsDispersion * 0.12) + float2(0.05, 0.03) * _CausticsDispersion;
-    float3 caus = float3(WaterCausticTex(p + split, tt), WaterCausticTex(p, tt), WaterCausticTex(p - split, tt));
+    // one lookup (two fetches) for all three colours; the "rainbow" edges come from bending the curve per channel
+    // instead of three offset lookups
+    float c = WaterCausticTex(p, tt);
+    float3 caus = pow(max(c, 1e-4).xxx, float3(1.0 + _CausticsDispersion * 0.6, 1.0, 1.0 - _CausticsDispersion * 0.4));
     caus = caus * caus * 3.0;
 
     float3 sunT = exp(-_Absorption.rgb * _Turbidity * travel);
@@ -271,6 +273,7 @@ float WaterRayField(float2 xz, float t, float lod)
 {
     float2 uv1 = xz * (_RayScale * 0.5) + float2(t * 0.013, t * 0.009) * _CausticsSpeed;
     float2 uv2 = xz * (_RayScale * 0.18) + float2(0.37 - t * 0.006 * _CausticsSpeed, 0.11 + t * 0.008 * _CausticsSpeed);
+    // lod is for the fine layer; the broad one is 2.8x larger, so it needs 1.5 mips less
     float fine  = SAMPLE_TEXTURE2D_LOD(_WaterRayTex, sampler_WaterRayTex, uv1, lod).r;
     float broad = SAMPLE_TEXTURE2D_LOD(_WaterRayTex, sampler_WaterRayTex, uv2, max(lod - 1.5, 0.0)).g;
     return saturate(fine * 0.45 + broad * 0.55);
@@ -278,9 +281,9 @@ float WaterRayField(float2 xz, float t, float lod)
 
 // Marches from startWS towards endWS (a view ray through the water). At every step the *sun* ray through
 // that point is followed back up to the surface (where it entered, bent by refraction); the light it carries
-// is the field above, attenuated by the water it travelled through (blue/green survives, red does not) and
-// cut by the shadow map (rocks and boats really do break the beams). Forward scattering makes the shafts
-// glow when you look towards the sun.
+// is the field above, attenuated by the water it travelled through (blue/green survives, red does not).
+// Forward scattering makes the shafts glow when you look towards the sun. Kept cheap: at most 12 steps and no
+// shadow map lookups along the way.
 half3 WaterGodRays(float3 startWS, float3 endWS, float2 pixel, float3 toLight, half3 lightColor,
                    float waterLevel, float t)
 {
@@ -295,11 +298,14 @@ half3 WaterGodRays(float3 startWS, float3 endWS, float2 pixel, float3 toLight, h
     float3 Lw = WaterUnderLight(toLight);
     float3 absorb = _Absorption.rgb * _Turbidity;
 
-    int steps = (int)clamp(_RaySteps, 2.0, 32.0);
+    int steps = (int)clamp(_RaySteps, 2.0, 12.0);
     float dt = len / steps;
-    float jitter = WaterDither(pixel);
-    // pre-filter the pattern by the step length (mip level), so thin filaments can't flicker between steps -> no grain
-    float lod = clamp(log2(max(dt * _RayScale * 0.5 * 256.0, 1.0)) - 1.0, 0.0, 6.0);
+    // the pattern is filtered to the step length, so the steps sit in the middle of their stretch: a per-pixel
+    // jitter (to hide banding) turned the few steps into a grainy screen-door pattern
+    float jitter = 0.5;
+    // pre-filter the pattern by the step length (mip level): a texel at least a step long, so the per-pixel jitter
+    // of the steps can't turn the pattern into grain
+    float lod = clamp(log2(max(dt * _RayScale * 0.5 * 256.0, 1.0)) - 1.0, 0.0, 7.5);
 
     // Henyey-Greenstein forward scattering (normalised so an isotropic medium would be 1)
     float g = _RayPhase;
@@ -320,9 +326,9 @@ half3 WaterGodRays(float3 startWS, float3 endWS, float2 pixel, float3 toLight, h
         float3 Tsun = exp(-absorb * travel);
         float  Tview = exp(-s * _RayFade);
         float  depthFade = exp(-max(waterLevel - p.y, 0.0) * _RayDepthFade);   // shafts die out with depth
-        float  sh = WaterMainLightShadow(p);
 
-        sum += field * sh * Tsun * Tview * depthFade;
+        // (no shadow map lookup per step: it was most of the cost of the whole effect)
+        sum += field * Tsun * Tview * depthFade;
     }
 
     sum *= dt * phase * _RayIntensity * 0.12;   // 0.12 ~ in-scattering coefficient per metre

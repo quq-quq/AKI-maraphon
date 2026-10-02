@@ -65,7 +65,7 @@ Material:
     - _RayLength: 50
     - _RayPhase: 0.72
     - _RayScale: 0.22
-    - _RaySteps: 24
+    - _RaySteps: 8
     - _ReflectionStrength: 0.6
     - _RefractionStrength: 1.1
     - _Roughness: 0.08

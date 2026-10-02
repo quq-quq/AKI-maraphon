@@ -20,7 +20,6 @@ struct Varyings
     float4 fieldB     : TEXCOORD5;
     float4 fieldC     : TEXCOORD6;
     float4 cellColor  : TEXCOORD7;   // large-scale colour + glint cells (xy colour, zw glints)
-    nointerpolation float4 camPlane : TEXCOORD8;   // the surface around a camera at the waterline (WaterCameraPlane)
 };
 
 Varyings vert(Attributes v)
@@ -44,12 +43,6 @@ Varyings vert(Attributes v)
                          WaterSoftCells(posWS.xz * _GlintCellScale, tt * 0.08));
     posWS += WaterDisplacementF(field, posWS.xz, tt, o.q) * geoFade;
 #endif
-
-    // only a camera at the surface can be half in the water: then each pixel needs the waterline across the lens
-    o.camPlane = 0;
-    const float waterLevel = GetObjectToWorldMatrix()._m13;
-    if (abs(_WorldSpaceCameraPos.y - waterLevel) < WaterSurfaceBand())
-        o.camPlane = WaterCameraPlane(_WorldSpaceCameraPos, tt, waterLevel);
 
     o.positionWS = posWS;
     o.positionCS = TransformWorldToHClip(posWS);

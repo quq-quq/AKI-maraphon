@@ -79,7 +79,7 @@ Shader "AKI/WaterUnderwater"
         _RayColor          ("Colour", Color) = (0.50, 0.80, 1, 1)
         _RayIntensity      ("Intensity", Range(0, 8)) = 2.6
         _RayScale          ("Pattern Scale", Range(0.02, 1.5)) = 0.22
-        _RaySteps          ("Steps (quality)", Range(2, 32)) = 24
+        _RaySteps          ("Steps (quality)", Range(2, 12)) = 8
         _RayLength         ("Max Length (m)", Range(1, 60)) = 50
         _RayPhase          ("Forward Scattering", Range(0, 0.9)) = 0.72
         _RayFade           ("View Fade", Range(0, 0.5)) = 0.045
@@ -164,8 +164,7 @@ Shader "AKI/WaterUnderwater"
 
                 float band = WaterSurfaceBand();
                 o.mode = (cam.y < surfY - band) ? 1.0 : 0.5;
-                o.plane = 0;
-                if (o.mode < 0.75) o.plane = WaterCameraPlane(cam, t, waterLevel);   // (a ternary would always pay for it)
+                o.plane = WaterCameraPlaneLoad();
                 // camera well above the water -> collapse the triangle outside the screen (no pixels are shaded)
                 o.positionCS = (cam.y < surfY + band) ? GetFullScreenTriangleVertexPosition(vid) : float4(2, 2, 1, 1);
                 return o;
@@ -190,6 +189,11 @@ Shader "AKI/WaterUnderwater"
                 float dist = length(toPix);
                 float3 dir = toPix / max(dist, 1e-4);
                 dist = min(dist, _UnderMaxDistance);
+
+                // A ray going up into the open (nothing in the scene in the way) runs into the water's surface, and
+                // that is drawn over this pixel with its own haze and light shafts: nothing to do here. (Looking up,
+                // that is half the screen that used to be worked out twice.)
+                if (i.mode > 0.75 && sky && dir.y * 2000.0 > max(waterLevel - cam.y, 0.0)) discard;
 
                 // per-pixel waterline when the camera is at the surface
                 half coverage = 1.0h;

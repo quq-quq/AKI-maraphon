@@ -80,7 +80,7 @@ Shader "Hidden/AKI/WaterLens"
         _RayColor          ("Colour", Color) = (0.50, 0.80, 1, 1)
         _RayIntensity      ("Intensity", Range(0, 8)) = 1.6
         _RayScale          ("Pattern Scale", Range(0.02, 1.5)) = 0.22
-        _RaySteps          ("Steps (quality)", Range(2, 32)) = 16
+        _RaySteps          ("Steps (quality)", Range(2, 12)) = 8
         _RayLength         ("Max Length (m)", Range(1, 60)) = 30
         _RayPhase          ("Forward Scattering", Range(0, 0.9)) = 0.72
         _RayFade           ("View Fade", Range(0, 0.5)) = 0.07
@@ -161,7 +161,7 @@ Shader "Hidden/AKI/WaterLens"
                 o.positionCS = GetFullScreenTriangleVertexPosition(input.vertexID);
                 o.texcoord = DYNAMIC_SCALING_APPLY_SCALEBIAS(GetFullScreenTriangleTexCoord(input.vertexID));
                 o.plane = 0;
-                if (_WaterLensNearSurface > 0.5) o.plane = WaterCameraPlane(_WaterLensCamPos.xyz, _Time.y, _WaterLevelGlobal);
+                if (_WaterLensNearSurface > 0.5) o.plane = WaterCameraPlaneLoad();
                 return o;
             }
 
