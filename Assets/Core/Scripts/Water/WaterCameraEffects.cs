@@ -4,8 +4,9 @@ namespace AKI.Water
 {
     /// <summary>
     /// Put on the player camera. Drives the lens effects of <see cref="WaterLensFeature"/>:
-    ///  - when the camera leaves the water the lens is soaked: a sheet of water slides off, then drops run down
-    ///    and evaporate over <see cref="dryTime"/> seconds,
+    ///  - when the camera's head breaks the surface (measured against the real wave above it, not the mean level)
+    ///    the lens is soaked: a sheet of water drains down, smearing the view into wavy runnels, then drops run
+    ///    down and evaporate over <see cref="dryTime"/> seconds,
     ///  - near the surface the waterline is drawn across the lens.
     /// Requires the renderer feature (menu AKI/Water/Install Lens Effect).
     /// </summary>
@@ -20,8 +21,10 @@ namespace AKI.Water
         [Range(0f, 1.5f)] public float drops = 1f;
         [Tooltip("How strongly water on the lens bends the image.")]
         [Range(0f, 2f)] public float distortion = 1f;
-        [Tooltip("Depth (m) the camera has to reach before surfacing counts as leaving the water (hysteresis).")]
+        [Tooltip("Depth (m) under the wave the camera has to reach before surfacing counts as leaving the water (hysteresis).")]
         [Min(0f)] public float submergeDepth = 0.2f;
+        [Tooltip("Height (m) above the wave the camera has to reach to count as out of the water.")]
+        [Min(0f)] public float exitHeight = 0.05f;
 
         static readonly int WetnessId = Shader.PropertyToID("_WaterLensWetness");
         static readonly int SinceExitId = Shader.PropertyToID("_WaterLensSinceExit");
@@ -35,6 +38,7 @@ namespace AKI.Water
         static readonly int NearUpId = Shader.PropertyToID("_WaterLensNearUp");
 
         Camera cam;
+        readonly WaterProbe probe = new WaterProbe();
         bool submerged;
         float exitTime = -1000f;
         float wetness;
@@ -62,10 +66,12 @@ namespace AKI.Water
         void OnEnable()
         {
             cam = GetComponent<Camera>();
+            WaterProbe.Register(probe);
         }
 
         void OnDisable()
         {
+            WaterProbe.Unregister(probe);
             WaterLensFeature.Active = false;
             Shader.SetGlobalFloat(WetnessId, 0f);
         }
@@ -86,9 +92,12 @@ namespace AKI.Water
                 ? src.GetFloat("_WaveAmplitude") * 2f + src.GetFloat("_CellWaveHeight") + 0.4f + cam.nearClipPlane
                 : 1.5f;
 
-            // leaving the water soaks the lens
-            if (!submerged && depth > submergeDepth) submerged = true;
-            else if (submerged && depth < -band * 0.5f)
+            // leaving the water soaks the lens: depth under the actual wave right above the camera, so simply
+            // coming up to float at the surface counts too (the mean level is metres off in a swell)
+            probe.position = transform.position;
+            float waveDepth = probe.HeightOr(level) - transform.position.y;
+            if (!submerged && waveDepth > submergeDepth) submerged = true;
+            else if (submerged && waveDepth < -exitHeight)
             {
                 submerged = false;
                 exitTime = Now;

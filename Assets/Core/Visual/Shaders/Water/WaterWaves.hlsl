@@ -352,10 +352,18 @@ float3 WaterNearPoint(float3 cam, float3 dir, float3 camFwd, float nearDist)
     return cam + dir * (nearDist / max(dot(dir, camFwd), 1e-3));
 }
 
-// Metres the point lies below the wavy surface (negative = above). Ignores the small horizontal Gerstner shift.
+// Metres the point lies below the wavy surface (negative = above). The waves also move water sideways (a lot with
+// the choppy FFT ocean, metres near the crests), so first find the undisplaced point that ends up above p - the
+// same way the camera's own test does - otherwise the waterline lands in the wrong place and a camera floating on
+// the surface can see the underwater view.
 float WaterSubmergedDist(float3 p, float t, float waterLevel)
 {
-    return waterLevel + WaterDisplacement(p.xz, t, WaterQ()).y - p.y;
+    float q = WaterQ();
+    float2 xz0 = p.xz;
+    [unroll]
+    for (int k = 0; k < 3; k++)
+        xz0 = p.xz - WaterDisplacement(xz0, t, q).xz;
+    return waterLevel + WaterDisplacement(xz0, t, q).y - p.y;
 }
 
 // Analytic normal + Jacobian of the horizontal Gerstner mapping (jacobian < ~0.6 means the

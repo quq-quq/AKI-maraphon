@@ -101,6 +101,7 @@ namespace AKI.Weapons
 
             if (lastShot != null) lastShot.CutRope();   // the new arrow takes the line
             HarpoonProjectile arrow = Instantiate(projectilePrefab, muzzle.position, rotation);
+            arrow.transform.localScale = Vector3.one * transform.lossyScale.x;   // the shot arrow is as big as the one in the gun
             arrow.Launch(this);
             lastShot = arrow;
             onShoot.Invoke();

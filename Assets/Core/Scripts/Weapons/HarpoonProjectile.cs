@@ -15,7 +15,7 @@ namespace AKI.Weapons
     public class HarpoonProjectile : MonoBehaviour
     {
         public HarpoonBubbles bubbles;
-        [Min(1f)] public float speed = 12f;
+        [Min(1f)] public float speed = 20f;
 
         [Header("Under water")]
         [Tooltip("Speed lost per second (fraction of the current speed).")]

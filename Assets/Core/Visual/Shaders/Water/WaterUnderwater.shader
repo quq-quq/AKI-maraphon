@@ -77,14 +77,14 @@ Shader "AKI/WaterUnderwater"
         [Header(Light Shafts)]
         [Toggle(_GODRAYS)] _GodRaysOn ("Underwater Light Shafts", Float) = 1
         _RayColor          ("Colour", Color) = (0.50, 0.80, 1, 1)
-        _RayIntensity      ("Intensity", Range(0, 8)) = 1.6
+        _RayIntensity      ("Intensity", Range(0, 8)) = 2.6
         _RayScale          ("Pattern Scale", Range(0.02, 1.5)) = 0.22
-        _RaySteps          ("Steps (quality)", Range(2, 32)) = 16
-        _RayLength         ("Max Length (m)", Range(1, 60)) = 30
+        _RaySteps          ("Steps (quality)", Range(2, 32)) = 24
+        _RayLength         ("Max Length (m)", Range(1, 60)) = 50
         _RayPhase          ("Forward Scattering", Range(0, 0.9)) = 0.72
-        _RayFade           ("View Fade", Range(0, 0.5)) = 0.07
-        _RayContrast       ("Beam Contrast", Range(0.5, 8)) = 2.4
-        _RayDepthFade      ("Fade With Depth (1/m)", Range(0, 1)) = 0.06
+        _RayFade           ("View Fade", Range(0, 0.5)) = 0.045
+        _RayContrast       ("Beam Contrast", Range(0.5, 8)) = 1.9
+        _RayDepthFade      ("Fade With Depth (1/m)", Range(0, 1)) = 0.025
 
         [Header(Seen From Below)]
         _UnderFogScale     ("Underwater Fog Density", Range(0.05, 6)) = 0.6
@@ -206,8 +206,16 @@ Shader "AKI/WaterUnderwater"
 
                 half3 sceneCol = sky ? half3(0, 0, 0) : SampleSceneColor(uvD);
             #if defined(_CAUSTICS)
-                if (!sky && worldPos.y < waterLevel)
-                    sceneCol = WaterApplyCaustics(sceneCol, worldPos, waterLevel, L, lightColor, t);
+                // under the real waves, not under the flat mean level (that cut objects in a crest along a straight line);
+                // the exact test only near the surface, where a crest or trough can make a difference
+                if (!sky)
+                {
+                    float band = WaterSurfaceBand();
+                    bool submerged = worldPos.y < waterLevel - band
+                                  || (worldPos.y < waterLevel + band && WaterSubmergedDist(worldPos, t, waterLevel) > 0.0);
+                    if (submerged)
+                        sceneCol = WaterApplyCaustics(sceneCol, worldPos, waterLevel, L, lightColor, t);
+                }
             #endif
 
                 sceneCol *= lerp(half3(1, 1, 1), saturate(_ShallowColor.rgb * 1.25h), _ToonAmount * 0.75);   // cartoon: tint instead of grey-out

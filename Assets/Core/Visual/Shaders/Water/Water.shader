@@ -75,14 +75,14 @@ Shader "AKI/Water"
         [Header(Light Shafts)]
         [Toggle(_GODRAYS)] _GodRaysOn ("Underwater Light Shafts", Float) = 1
         _RayColor          ("Colour", Color) = (0.50, 0.80, 1, 1)
-        _RayIntensity      ("Intensity", Range(0, 8)) = 1.6
+        _RayIntensity      ("Intensity", Range(0, 8)) = 2.6
         _RayScale          ("Pattern Scale", Range(0.02, 1.5)) = 0.22
-        _RaySteps          ("Steps (quality)", Range(2, 32)) = 16
-        _RayLength         ("Max Length (m)", Range(1, 60)) = 30
+        _RaySteps          ("Steps (quality)", Range(2, 32)) = 24
+        _RayLength         ("Max Length (m)", Range(1, 60)) = 50
         _RayPhase          ("Forward Scattering", Range(0, 0.9)) = 0.72
-        _RayFade           ("View Fade", Range(0, 0.5)) = 0.07
-        _RayContrast       ("Beam Contrast", Range(0.5, 8)) = 2.4
-        _RayDepthFade      ("Fade With Depth (1/m)", Range(0, 1)) = 0.06
+        _RayFade           ("View Fade", Range(0, 0.5)) = 0.045
+        _RayContrast       ("Beam Contrast", Range(0.5, 8)) = 1.9
+        _RayDepthFade      ("Fade With Depth (1/m)", Range(0, 1)) = 0.025
 
         [Header(Seen From Below)]
         _UnderFogScale     ("Underwater Fog Density", Range(0.05, 6)) = 0.6
@@ -107,6 +107,44 @@ Shader "AKI/Water"
             "IgnoreProjector" = "True"
         }
 
+        // Depth pre-pass. The surface is one big transparent mesh drawn in index order, so without depth the far
+        // side of a wave could be drawn over its own crest (straight-edged holes along the grid lines, "seeing
+        // through" waves, folded shards from below). URP draws SRPDefaultUnlit before UniversalForward for the same
+        // object: this pass leaves the nearest layer of water in the depth buffer and the colour pass shades only it.
+        Pass
+        {
+            Name "WaterDepth"
+            Tags { "LightMode" = "SRPDefaultUnlit" }
+
+            ZWrite On
+            ColorMask 0
+            Cull Off
+            Offset 0, 1   // a hair behind, so the colour pass is never rejected by its own surface
+
+            HLSLPROGRAM
+            #pragma target 3.5
+            #pragma vertex vert
+            #pragma fragment fragDepth
+
+            #pragma shader_feature_local _FFT_WAVES
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareOpaqueTexture.hlsl"
+
+            #include "WaterInput.hlsl"
+            #include "WaterWaves.hlsl"
+            #include "WaterEffects.hlsl"
+            #include "WaterSurfaceVertex.hlsl"
+
+            half4 fragDepth(Varyings i) : SV_Target
+            {
+                return 0;
+            }
+            ENDHLSL
+        }
+
         Pass
         {
             Name "ForwardLit"
@@ -114,6 +152,7 @@ Shader "AKI/Water"
 
             Blend SrcAlpha OneMinusSrcAlpha
             ZWrite Off
+            ZTest LEqual
             Cull Off      // both sides: the underside is the ceiling you see from below
 
             HLSLPROGRAM
@@ -141,51 +180,7 @@ Shader "AKI/Water"
             #include "WaterWaves.hlsl"
             #include "WaterEffects.hlsl"
 
-            struct Attributes
-            {
-                float4 positionOS : POSITION;
-            };
-
-            struct Varyings
-            {
-                float4 positionCS : SV_POSITION;
-                float3 positionWS : TEXCOORD0;
-                float2 waveXZ     : TEXCOORD1;   // undisplaced xz - what the wave functions are evaluated at
-                float  fogCoord   : TEXCOORD2;
-                float  q          : TEXCOORD3;   // Gerstner steepness factor (constant per material)
-                float4 fieldA     : TEXCOORD4;   // low-frequency wave fields, evaluated per vertex (see WaterWaves.hlsl)
-                float4 fieldB     : TEXCOORD5;
-                float4 fieldC     : TEXCOORD6;
-                float4 cellColor  : TEXCOORD7;   // large-scale colour + glint cells (xy colour, zw glints)
-            };
-
-            Varyings vert(Attributes v)
-            {
-                Varyings o;
-                float3 posWS = TransformObjectToWorld(v.positionOS.xyz);
-                o.waveXZ = posWS.xz;
-                o.q = WaterQ();
-
-                float dist = distance(posWS, _WorldSpaceCameraPos);
-                float geoFade = saturate(1.0 - (dist - _FlattenDistance * 0.6) / (_FlattenDistance * 0.4));
-                const float tt = _Time.y;
-            #if defined(_FFT_WAVES)
-                o.fieldA = 0; o.fieldB = 0; o.fieldC = 0;
-                o.cellColor = 0;
-                posWS += OceanDisplacement(posWS.xz) * geoFade;
-            #else
-                WaterWaveField field = WaterEvalField(posWS.xz, tt);
-                WaterPackField(field, o.fieldA, o.fieldB, o.fieldC);
-                o.cellColor = float4((WaterSoftCells(posWS.xz * _ColorCellScale, tt * 0.04) - 0.5) * 1.8,
-                                     WaterSoftCells(posWS.xz * _GlintCellScale, tt * 0.08));
-                posWS += WaterDisplacementF(field, posWS.xz, tt, o.q) * geoFade;
-            #endif
-
-                o.positionWS = posWS;
-                o.positionCS = TransformWorldToHClip(posWS);
-                o.fogCoord = ComputeFogFactor(o.positionCS.z);
-                return o;
-            }
+            #include "WaterSurfaceVertex.hlsl"
 
             // The water surface as seen from below: Snell's window onto the sky, mirror outside it.
             // It is fogged (and lit by the same light shafts) exactly like the rest of the volume, so at a distance

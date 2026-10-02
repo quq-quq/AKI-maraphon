@@ -218,13 +218,17 @@ half3 WaterApplyCaustics(half3 bottomColor, float3 bottomWS, float waterLevel, f
 float WaterFoam(float2 xz, float t, float shore, float crest, float lace)
 {
     float2 p = xz * _FoamScale;
-    float tex = WaterValueNoise(p + float2(t * 0.08, -t * 0.05)) * 0.6
-              + WaterValueNoise(p * 2.7 - float2(t * 0.11, t * 0.07)) * 0.4;
+    // same anti-aliasing as OceanFoam: octaves smaller than ~2 pixels fade to their mean
+    float2 dp = fwidth(p);
+    float2 keep = saturate(2.0 - max(dp.x, dp.y) * float2(1.0, 2.7) * 4.0);
+    float tex = lerp(0.5, WaterValueNoise(p + float2(t * 0.08, -t * 0.05)), keep.x) * 0.6
+              + lerp(0.5, WaterValueNoise(p * 2.7 - float2(t * 0.11, t * 0.07)), keep.y) * 0.4;
     tex = saturate(tex * 0.75 + lace * 0.45);                     // foam clings to the Voronoi cell borders
 
     // "dissolve" threshold: high coverage -> low threshold, so foam breaks up into lace at its border.
     float cover = saturate(max(shore, crest));
     float soft = lerp(0.12, 0.025, _ToonAmount);                 // hard-edged blobs in cartoon mode
+    soft += (1.0 - dot(keep, float2(0.6, 0.4))) * 0.25;          // lost detail -> softer edge, not slivers
     return smoothstep(1.0 - cover - soft, 1.0 - cover + soft, tex) * step(0.001, cover);
 }
 
@@ -239,12 +243,20 @@ float OceanFoam(float2 xz, float t, float turbulence, out float haze)
     float2 wind;
     sincos(radians(_WindAngle), wind.y, wind.x);
     float2 q = float2(dot(xz, wind) * 0.45, dot(xz, float2(-wind.y, wind.x))) * _FoamScale;
-    float lace = WaterValueNoise(q * 1.3 + float2(t * 0.05, 0.0)) * 0.5
-               + WaterValueNoise(q * 3.7 - t * 0.04) * 0.3
-               + WaterValueNoise(q * 9.0 + 4.0) * 0.2;
+    // Anti-aliasing: far away (and at grazing angles) a pixel covers many noise cells. Unfiltered, the hard
+    // threshold below turns that into torn white slivers sparkling along distant crests. Each octave fades to its
+    // mean once its cells get smaller than ~2 pixels, and the threshold softens by the contrast that was lost.
+    float2 dq = fwidth(q);
+    float footprint = max(dq.x, dq.y);
+    float3 keep = saturate(2.0 - footprint * float3(1.3, 3.7, 9.0) * 4.0);
+    float lace = lerp(0.5, WaterValueNoise(q * 1.3 + float2(t * 0.05, 0.0)), keep.x) * 0.5
+               + lerp(0.5, WaterValueNoise(q * 3.7 - t * 0.04), keep.y) * 0.3
+               + lerp(0.5, WaterValueNoise(q * 9.0 + 4.0), keep.z) * 0.2;
+    float contrast = dot(keep, float3(0.5, 0.3, 0.2));
     // never fully solid: even the heart of a breaking crest has holes and thinner areas
     float cover = saturate(sqrt(amount) * 1.3) * 0.82;
-    float f = smoothstep(1.0 - cover, 1.0 - cover + 0.22, lace);
+    float soft = lerp(0.6, 0.22, contrast);
+    float f = smoothstep(1.0 - cover - (soft - 0.22) * 0.5, 1.0 - cover + soft * 0.5 + 0.11, lace);
     return f * (0.55 + 0.45 * saturate(lace * 1.4)) * (0.6 + 0.4 * amount);
 }
 
@@ -276,9 +288,9 @@ half3 WaterGodRays(float3 startWS, float3 endWS, float2 pixel, float3 toLight, h
     float len = length(seg);
     float3 dir = seg / max(len, 1e-4);
     len = min(len, _RayLength);
-    // a ray that leaves the water through the surface stops there
-    if (dir.y > 1e-3 && startWS.y < waterLevel)
-        len = min(len, (waterLevel - startWS.y) / dir.y);
+    // No clipping at the flat mean level: inside a wave crest the water reaches well above it, and cutting the march
+    // there drew a horizontal "ceiling" in the water that you could swim through. Where a view ray really leaves the
+    // water, the wavy surface is drawn over it, and seen from below the surface passes its own point as endWS.
 
     float3 Lw = WaterUnderLight(toLight);
     float3 absorb = _Absorption.rgb * _Turbidity;
