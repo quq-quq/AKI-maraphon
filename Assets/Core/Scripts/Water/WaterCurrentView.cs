@@ -1,3 +1,4 @@
+using AKI.Rhythm;
 using UnityEngine;
 
 namespace AKI.Water
@@ -53,6 +54,24 @@ namespace AKI.Water
         [Tooltip("Stretch along the motion relative to the camera (seconds of travel): swimming makes them streak.")]
         [Min(0f)] public float stretch = 0.05f;
 
+        [Header("Rhythm")]
+        [Tooltip("Music clock. Empty = the active RhythmConductor.")]
+        [SerializeField] RhythmConductor rhythm;
+        [Tooltip("Extra glow on the music's recorded rhythmic pulses (0 = no beat pulse).")]
+        [Min(0f)] public float beatEmission = 6f;
+        [ColorUsage(false, true)] public Color beatGlowColour = new Color(.45f, .85f, 1f, 1f);
+        [Tooltip("Maximum vertical excursion on strong recorded music transients (m). This is visual motion only, so it cannot accumulate drift.")]
+        [Min(0f)] public float accentAmplitude = 0.1f;
+        [Tooltip("Vertical oscillations per second during an accent.")]
+        [Min(0f)] public float accentFrequency = 8f;
+        [Tooltip("Seconds for the particles to respond to a beat or accent.")]
+        [Min(0.001f)] public float rhythmAttackTime = 0.025f;
+        [Tooltip("Seconds for the rhythm glow and motion to settle when the music stops.")]
+        [Min(0.001f)] public float rhythmReleaseTime = 0.15f;
+
+        static readonly int RhythmId = Shader.PropertyToID("_CurrentRhythm");
+        static readonly int GlowId = Shader.PropertyToID("_CurrentGlowColour");
+
         Transform root;
         Material instance;
         Texture2D builtIn;
@@ -62,6 +81,9 @@ namespace AKI.Water
         Vector3 lastCamPos;
         Vector3 camVelocity;
         bool wasUnder;
+        float rhythmBeat;
+        float rhythmAccent;
+        float rhythmPhase;
 
         void Start()
         {
@@ -74,6 +96,8 @@ namespace AKI.Water
             root = new GameObject("Water Current View").transform;
             instance = new Material(material) { name = material.name + " (current)" };
             instance.SetFloat("_FadeDensity", fadeDensity);
+            instance.SetVector(RhythmId, Vector4.zero);
+            instance.SetColor(GlowId, beatGlowColour);
             if (texture == null) texture = builtIn = BuildSpeckTexture(64);
             instance.SetTexture("_BaseMap", texture);
             system = Build();
@@ -89,8 +113,11 @@ namespace AKI.Water
 
         void LateUpdate()
         {
+            UpdateRhythm(Time.unscaledDeltaTime);
             if (cam == null || !cam.isActiveAndEnabled) cam = Camera.main;
             if (cam == null || system == null) return;
+            // Unity hot reload cannot retain ParticleSystem.Particle[]; also support live count edits safely.
+            if (buffer == null || buffer.Length < count) buffer = new ParticleSystem.Particle[count];
 
             float dt = Time.deltaTime;
             Vector3 camPos = cam.transform.position;
@@ -114,6 +141,31 @@ namespace AKI.Water
             if (!wasUnder || jumped) Fill();
             wasUnder = true;
             Steer(camPos, dt);
+        }
+
+        void UpdateRhythm(float dt)
+        {
+            if (instance == null) return;
+
+            RhythmConductor clock = rhythm != null ? rhythm : RhythmConductor.Active;
+            bool playing = clock != null && clock.isActiveAndEnabled && clock.IsPlaying;
+            float beat = playing ? Mathf.Clamp01(clock.BeatPulse) : 0f;
+            float accent = playing ? Mathf.Clamp01(clock.AccentPulse) : 0f;
+            rhythmBeat = FollowPulse(rhythmBeat, beat, dt);
+            rhythmAccent = FollowPulse(rhythmAccent, accent, dt);
+            rhythmPhase = Mathf.Repeat(rhythmPhase + dt * Mathf.Max(0f, accentFrequency) * (2f * Mathf.PI), 2f * Mathf.PI);
+
+            // Offset only the rendered vertices: the particle simulation, current sampling and stretched
+            // billboards still use the original drift. The bounded offset returns to zero as music fades.
+            instance.SetVector(RhythmId, new Vector4(rhythmBeat * Mathf.Max(0f, beatEmission),
+                rhythmAccent * Mathf.Max(0f, accentAmplitude), rhythmPhase, 0f));
+            instance.SetColor(GlowId, beatGlowColour);
+        }
+
+        float FollowPulse(float current, float target, float dt)
+        {
+            float response = target > current ? rhythmAttackTime : rhythmReleaseTime;
+            return Mathf.Lerp(current, target, 1f - Mathf.Exp(-dt / Mathf.Max(0.001f, response)));
         }
 
         void Fill()

@@ -6,6 +6,12 @@ namespace Core.Scripts.Sound
     public partial class SoundManager : MonoBehaviour
     {
         public static SoundManager Instance { get; private set; }
+        public SoundConfig Config => _soundConfig;
+        /// <summary>Only music is transferred to the DSP rhythm clock; ambient and one-shots keep playing.</summary>
+        public void TakeRhythmMusicControl()
+        {
+            OnMenuEnded(); OnFishingEnded(); OnNagaDissapeared();
+        }
 
         [SerializeField] private SoundConfig _soundConfig;
         [SerializeField] private Transform _wavesTransform;
@@ -18,8 +24,19 @@ namespace Core.Scripts.Sound
         private AudioSource _fishSwimmingSource;
         private AudioSource _nagaSwimmingSource;
         private AudioSource _arrowMoveSource;
+        private AudioSource _wavesSource;
+        private AudioSource _seagullSource;
         private AudioListener _audiolistener;
         private Coroutine _nagaCoroutine;
+        private bool _headUnderwater;
+
+        /// <summary>Scene player drives this; repeated notifications do not create duplicate ambient loops.</summary>
+        public void SetHeadUnderwater(bool underwater)
+        {
+            if (_soundConfig == null || _headUnderwater == underwater) return;
+            _headUnderwater = underwater;
+            if (underwater) OnWaterDown(); else OnWaterUp();
+        }
 
         private void Awake()
         {
@@ -30,12 +47,15 @@ namespace Core.Scripts.Sound
             }
             else
             {
+                // Blackout reloads the gameplay scene. Keep the singleton, but bind the new scene's anchors.
+                Instance.RebindScene(_soundConfig, _wavesTransform, _seagoolTransform);
                 Destroy(gameObject);
             }
         }
 
         private void OnEnable()
         {
+            if (Instance != this) return;
             if (_soundConfig == null)
             {
                 Debug.LogWarning("SoundManager: no SoundConfig assigned, sounds are off.", this);
@@ -62,7 +82,7 @@ namespace Core.Scripts.Sound
         #region SoundsRealization
         private void OnMenuStarted()
         {
-            _menuGamelanSource = PlayLoopSound(_soundConfig.MenuGamelan, Camera.main.transform);
+            _menuGamelanSource = PlayLoopSound(_soundConfig.MenuGamelan, Camera.main != null ? Camera.main.transform : null);
         }
 
         private void OnMenuEnded()
@@ -87,12 +107,10 @@ namespace Core.Scripts.Sound
         private void OnWaterDown()
         {
             _underwaterAudio.Enter();
-
-            _waterAmbientSource = PlayLoopSound(_soundConfig.WaterAmbient, Camera.main.transform);
-
-            int randomIndex = Random.Range(0, _soundConfig.SplashSound.Count);
-            PlaySound(_soundConfig.SplashSound[randomIndex], Camera.main.transform.position);
-
+            var listener = Camera.main != null ? Camera.main.transform : transform;
+            if (_waterAmbientSource == null) _waterAmbientSource = PlayLoopSound(_soundConfig.WaterAmbient, listener);
+            if (_soundConfig.SplashSound.Count > 0)
+                PlaySound(_soundConfig.SplashSound[Random.Range(0, _soundConfig.SplashSound.Count)], listener.position);
         }
 
         private void OnWaterUp()
@@ -103,17 +121,32 @@ namespace Core.Scripts.Sound
                 Destroy(_waterAmbientSource.gameObject);
             _waterAmbientSource = null;
 
-            int randomIndexSplash = Random.Range(0, _soundConfig.SplashSound.Count);
-            PlaySound(_soundConfig.SplashSound[randomIndexSplash], Camera.main.transform.position);
-
-            int randomIndexBreatheOut = Random.Range(0, _soundConfig.BreatheOutSound.Count);
-            PlaySound(_soundConfig.BreatheOutSound[randomIndexBreatheOut], Camera.main.transform.position);
+            var listener = Camera.main != null ? Camera.main.transform : transform;
+            if (_soundConfig.SplashSound.Count > 0)
+                PlaySound(_soundConfig.SplashSound[Random.Range(0, _soundConfig.SplashSound.Count)], listener.position);
+            if (_soundConfig.BreatheOutSound.Count > 0)
+                PlaySound(_soundConfig.BreatheOutSound[Random.Range(0, _soundConfig.BreatheOutSound.Count)], listener.position);
         }
 
         private void OnStartGame(Transform wavesTransform, Transform seagoolTransform)
         {
-            PlayLoopSound(_soundConfig.WaterAmbient, wavesTransform);
-            PlayLoopSound(_soundConfig.SeagoolSound, seagoolTransform);
+            var fallback = Camera.main != null ? Camera.main.transform : transform;
+            _wavesSource = PlayLoopSound(_soundConfig.WavesSound, wavesTransform != null ? wavesTransform : fallback);
+            _seagullSource = PlayLoopSound(_soundConfig.SeagoolSound, seagoolTransform != null ? seagoolTransform : fallback);
+        }
+
+        private void RebindScene(SoundConfig config, Transform waves, Transform seagulls)
+        {
+            TakeRhythmMusicControl();
+            if (_wavesSource != null) Destroy(_wavesSource.gameObject);
+            if (_seagullSource != null) Destroy(_seagullSource.gameObject);
+            if (_waterAmbientSource != null) Destroy(_waterAmbientSource.gameObject);
+            _waterAmbientSource = null; _headUnderwater = false;
+            if (config != null) _soundConfig = config;
+            _wavesTransform = waves; _seagoolTransform = seagulls;
+            _underwaterAudio.Reset();
+            if (_soundConfig == null) return;
+            OnMenuStarted(); OnStartGame(waves, seagulls);
         }
 
         private void OnArrowFired(Transform arrowTransform)
@@ -205,6 +238,7 @@ namespace Core.Scripts.Sound
                 return null;
 
             GameObject sourceObj = new GameObject($"LoopAudio{clipConfig.Clip.name}");
+            // Scene-owned loop, not a child of the cutscene camera (that camera is destroyed at hand-over).
             sourceObj.transform.position = parentTransform.position;
 
             AudioSource audioSource = sourceObj.AddComponent<AudioSource>();
@@ -220,6 +254,7 @@ namespace Core.Scripts.Sound
 
         public void PlaySound(AudioClipConfig clipConfig, Vector3 position)
         {
+            if (clipConfig == null || clipConfig.Clip == null) return;
             GameObject tempObj = new GameObject("TempAudio");
             tempObj.transform.position = position;
 
@@ -236,7 +271,7 @@ namespace Core.Scripts.Sound
         private IEnumerator DestroyAfterPlay(AudioSource source, float clipLength)
         {
             yield return new WaitForSeconds(clipLength / Mathf.Abs(source.pitch));
-            Object.Destroy(source.gameObject);
+            if (source != null) Object.Destroy(source.gameObject);
         }
     }
 }

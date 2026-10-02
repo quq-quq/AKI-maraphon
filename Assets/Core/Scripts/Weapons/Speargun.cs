@@ -92,7 +92,11 @@ namespace AKI.Weapons
 
         HarpoonProjectile Launch(Quaternion rotation)
         {
-            if (!IsLoaded || projectilePrefab == null || muzzle == null) return null;
+            if (projectilePrefab == null || muzzle == null) return null;
+            // Optional per-scene rhythm gate. Check every launch path, not just the mouse-input script.
+            AKI.Rhythm.RhythmShotGate rhythm = GetComponent<AKI.Rhythm.RhythmShotGate>();
+            if (rhythm != null && !rhythm.TryAuthorize(IsLoaded)) return null;
+            if (!IsLoaded) return null;
 
             IsLoaded = false;
             shotAt = Time.time;
@@ -103,6 +107,7 @@ namespace AKI.Weapons
             HarpoonProjectile arrow = Instantiate(projectilePrefab, muzzle.position, rotation);
             arrow.transform.localScale = Vector3.one * transform.lossyScale.x;   // the shot arrow is as big as the one in the gun
             arrow.Launch(this);
+            if (rhythm != null) arrow.SetRhythmAuthorization(rhythm.AcceptedSession, rhythm.LastAcceptedBeat);
             lastShot = arrow;
             onShoot.Invoke();
             return arrow;

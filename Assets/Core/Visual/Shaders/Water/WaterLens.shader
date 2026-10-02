@@ -142,6 +142,8 @@ Shader "Hidden/AKI/WaterLens"
             float  _ScreenFade;              // 0..1 towards black
             float  _WakeBlur;                // 0..1 gaussian blur of a view that isn't in focus yet
             float  _EyeClosed;               // 0 = eyes open .. 1 = lids shut
+            float4 _RhythmHitVignette;       // warm light colour + success pulse, no additional render pass
+            float  _RhythmHitInner;
 
             struct LensVaryings
             {
@@ -547,6 +549,8 @@ Shader "Hidden/AKI/WaterLens"
                     col *= 1.0h - (half)lid;
                 }
 
+                float hitEdge = smoothstep(_RhythmHitInner, 0.78, length((uv-0.5)*float2(1.0, 1.0)));
+                col += _RhythmHitVignette.rgb * (_RhythmHitVignette.a * hitEdge);
                 col *= 1.0h - (half)saturate(_ScreenFade);
                 return half4(col, 1.0h);
             }

@@ -16,6 +16,9 @@ Shader "AKI/UnderwaterParticle"
         _SoftDistance   ("Soft Distance (m)", Range(0.01, 2)) = 0.25
         _SurfaceFade    ("Fade Below Surface (m)", Range(0.01, 1)) = 0.08
         [ToggleUI] _ClipAboveWater ("Hide Above Water", Float) = 1
+        // WaterCurrentView supplies glow, vertical excursion and oscillation phase. Zero for other particles.
+        [HideInInspector] _CurrentRhythm ("Current Rhythm", Vector) = (0, 0, 0, 0)
+        [HideInInspector][HDR] _CurrentGlowColour ("Current Glow Colour", Color) = (.45, .85, 1, 1)
     }
 
     SubShader
@@ -58,6 +61,8 @@ Shader "AKI/UnderwaterParticle"
                 float  _SoftDistance;
                 float  _SurfaceFade;
                 float  _ClipAboveWater;
+                float4 _CurrentRhythm;
+                half4 _CurrentGlowColour;
             CBUFFER_END
 
             // set by WaterSurface: cell > 0 means there is water in the scene, centre.y is its mean level
@@ -120,6 +125,10 @@ Shader "AKI/UnderwaterParticle"
             {
                 Varyings o;
                 o.positionWS = TransformObjectToWorld(v.positionOS.xyz);
+                // Vertex colour is constant across a speck: its phase is stable without another particle stream.
+                // Render-only displacement preserves the simulation's current drift and cannot bias positions.
+                float speckPhase = dot(v.color.rgb, float3(131.7, 231.1, 95.3));
+                o.positionWS.y += _CurrentRhythm.y * sin(_CurrentRhythm.z + speckPhase);
                 o.positionCS = TransformWorldToHClip(o.positionWS);
                 o.color = v.color;
                 o.uv = TRANSFORM_TEX(v.uv, _BaseMap);
@@ -131,6 +140,8 @@ Shader "AKI/UnderwaterParticle"
             half4 frag(Varyings i) : SV_Target
             {
                 half4 c = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv) * _BaseColor * i.color;
+                // Real additive HDR emission, independent of the dim base tint. Existing bubbles have a zero pulse.
+                c.rgb += _CurrentGlowColour.rgb * _CurrentRhythm.x;
 
                 // water between the particle and the eye: red goes first, then everything sinks into the haze
                 float dist = distance(i.positionWS, _WorldSpaceCameraPos);

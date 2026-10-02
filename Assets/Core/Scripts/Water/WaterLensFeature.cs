@@ -27,6 +27,7 @@ namespace AKI.Water
 
         /// <summary>Set by Blackout while the screen fades, the eyes open and the view comes into focus.</summary>
         public static bool ScreenActive;
+        public static bool RhythmHitActive;
 
         /// <summary>The material the pass draws with; WaterCameraEffects copies the water's settings into it.</summary>
         public static Material SharedMaterial { get; private set; }
@@ -51,7 +52,7 @@ namespace AKI.Water
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
-            if (!(Active || BreathActive || ScreenActive) || material == null || pass == null) return;
+            if (!(Active || BreathActive || ScreenActive || RhythmHitActive) || material == null || pass == null) return;
             if (renderingData.cameraData.cameraType != CameraType.Game) return;
 
             pass.material = material;

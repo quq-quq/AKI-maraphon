@@ -119,6 +119,8 @@ namespace AKI.Player
         public float FovScale { get; set; } = 1f;
         /// <summary>Multiplies look sensitivity (e.g. steadier while aiming). 1 = normal.</summary>
         public float LookScale { get; set; } = 1f;
+        public bool SurfaceBlocked { get; set; }
+        [Min(0.3f)] public float cursedHeadDepth = 1.25f;
 
         CharacterController controller;
         InputActionAsset actions;
@@ -233,6 +235,11 @@ namespace AKI.Player
             probe.position = transform.position;
             float surfaceY = probe.HeightOr(float.NegativeInfinity);
             bool hasWater = probe.Water != null;
+            if (SurfaceBlocked && State == MoveState.Climbing)
+            {
+                controller.enabled = true;
+                State = MoveState.Underwater;
+            }
 
             if (State == MoveState.Climbing)
             {
@@ -242,6 +249,7 @@ namespace AKI.Player
             }
 
             UpdateState(surfaceY, hasWater);
+            if (SurfaceBlocked && hasWater) State = MoveState.Underwater;
 
             switch (State)
             {
@@ -254,8 +262,32 @@ namespace AKI.Player
                     break;
             }
 
+            bool curseClamped = false;
+            if (SurfaceBlocked && hasWater)
+            {
+                float ceiling = surfaceY - eyeHeight - cursedHeadDepth;
+                float allowed = (ceiling - transform.position.y) / dt;
+                if (velocity.y > allowed) { velocity.y = allowed; curseClamped = true; }
+            }
             CollisionFlags flags = controller.Move(velocity * dt);
             if ((flags & CollisionFlags.Above) != 0 && velocity.y > 0f) velocity.y = 0f;
+            // A one-frame constraint correction is not diving momentum.
+            if (curseClamped) velocity.y = 0f;
+
+            if (SurfaceBlocked && hasWater)
+            {
+                float ceiling = surfaceY - eyeHeight - cursedHeadDepth;
+                // An already surfaced player can start the boss from the boat/shore. Collision resolution must
+                // not leave them standing above the curse plane when a hull prevents Move from pushing down.
+                if (transform.position.y > ceiling + .02f)
+                {
+                    Vector3 below = transform.position; below.y = ceiling;
+                    controller.enabled = false;
+                    transform.position = below;
+                    controller.enabled = true;
+                    velocity.y = 0f;
+                }
+            }
 
             UpdateHeadState(surfaceY, hasWater);
         }

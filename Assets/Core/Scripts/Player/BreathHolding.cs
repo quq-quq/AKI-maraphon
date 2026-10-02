@@ -51,6 +51,15 @@ namespace AKI.Player
         public float Effect => effect;
 
         public bool IsOutOfAir => outOfAir;
+        /// <summary>The boss curse consumes breath even at the surface and disables surface refill.</summary>
+        public bool SurfaceRefillBlocked { get; set; }
+        public void RestoreFullBreath()
+        {
+            if (outOfAir || Blackout.IsRunning) return;
+            recoverTween?.Kill(); air = 1f;
+            recoverTween = DOTween.To(() => effect, v => effect = v, 0f, .25f).SetEase(Ease.OutSine).SetTarget(this);
+            onBreathRestored.Invoke();
+        }
 
         void Awake()
         {
@@ -66,7 +75,7 @@ namespace AKI.Player
 
         void Update()
         {
-            bool under = swimmer.IsHeadUnderwater;
+            bool under = swimmer.IsHeadUnderwater || SurfaceRefillBlocked;
 
             if (under)
             {

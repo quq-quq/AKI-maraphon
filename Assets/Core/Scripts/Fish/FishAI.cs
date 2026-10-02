@@ -123,6 +123,9 @@ namespace AKI.Fish
 
         public Vector3 Velocity { get; private set; }
 
+        /// <summary>Configure a freshly spawned special fish at the player's depth, without another path system.</summary>
+        public void SetDepth(float metres) => depth = Mathf.Max(1f, metres);
+
         /// <summary>Called by the spawner right after the fish is created.</summary>
         public void Init(Transform player)
         {

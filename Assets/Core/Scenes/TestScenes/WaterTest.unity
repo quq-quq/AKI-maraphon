@@ -169501,6 +169501,67 @@ LODGroup:
     renderers:
     - renderer: {fileID: 2026075978}
   m_Enabled: 1
+--- !u!1 &760456564
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 760456566}
+  - component: {fileID: 760456565}
+  m_Layer: 0
+  m_Name: Fish Spawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &760456565
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 760456564}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0647b0d17cbb0946b025dffeab86158, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Fish.FishSpawner
+  fishPrefab: {fileID: 1888779596029478606, guid: ce2086f0aea24ec4cb71c47ecda2910f, type: 3}
+  player: {fileID: 539679234811341237}
+  spawnOnStart: 1
+  firstSpawnDelay: 1
+  respawnDelay: 2
+  spawnDistance: 22
+  hiddenAngle: 70
+  onFishSpawned:
+    m_PersistentCalls:
+      m_Calls: []
+  onFishHit:
+    m_PersistentCalls:
+      m_Calls: []
+  onFishCaught:
+    m_PersistentCalls:
+      m_Calls: []
+  drawGizmos: 1
+--- !u!4 &760456566
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 760456564}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &761122117
 GameObject:
   m_ObjectHideFlags: 0
@@ -404639,6 +404700,13 @@ MonoBehaviour:
   flowSpeed: 2
   wobble: 0.05
   stretch: 0.05
+  rhythm: {fileID: 365345908507205701}
+  beatEmission: 6
+  beatGlowColour: {r: 0.45, g: 0.85, b: 1, a: 1}
+  accentAmplitude: 0.1
+  accentFrequency: 8
+  rhythmAttackTime: 0.012
+  rhythmReleaseTime: 0.12
 --- !u!114 &1789588076
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -478159,6 +478227,98 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2147302271}
   m_Mesh: {fileID: 8063930638851537737, guid: b5bd075369b76354187f1e998af53e8a, type: 3}
+--- !u!1001 &365345908507205700
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 2900648057692513017, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: nagaScale
+      value: 1.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 2900648057692513017, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: spamQuietSeconds
+      value: 0.3
+      objectReference: {fileID: 0}
+    - target: {fileID: 2900648057692513017, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: bossBreathSeconds
+      value: 60
+      objectReference: {fileID: 0}
+    - target: {fileID: 2900648057692513017, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: lateWindowSeconds
+      value: 0.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2900648057692513017, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: earlyWindowSeconds
+      value: 0.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2900648057692513017, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: goldenAppearsAfterSeconds
+      value: 30
+      objectReference: {fileID: 0}
+    - target: {fileID: 5850830026352339529, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_Name
+      value: Rhythm Gameplay
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8913121740339199757, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+--- !u!114 &365345908507205701 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6821533460490447493, guid: b5fe4a35bd3090741b91282f7ab853a1, type: 3}
+  m_PrefabInstance: {fileID: 365345908507205700}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 782938a3a41a18f459c0545c8dde26e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Rhythm.RhythmConductor
 --- !u!1001 &539679234811341236
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -478206,6 +478366,10 @@ PrefabInstance:
     - target: {fileID: 868813301614671140, guid: 91b9f75b1befe014091236f3226eeea7, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1061537911927120286, guid: 91b9f75b1befe014091236f3226eeea7, type: 3}
+      propertyPath: maxBreathSeconds
+      value: 60
       objectReference: {fileID: 0}
     - target: {fileID: 1607848450998260076, guid: 91b9f75b1befe014091236f3226eeea7, type: 3}
       propertyPath: m_DirtyAABB
@@ -478284,6 +478448,11 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 91b9f75b1befe014091236f3226eeea7, type: 3}
+--- !u!4 &539679234811341237 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1375917004531709344, guid: 91b9f75b1befe014091236f3226eeea7, type: 3}
+  m_PrefabInstance: {fileID: 539679234811341236}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -478296,3 +478465,5 @@ SceneRoots:
   - {fileID: 1338456583}
   - {fileID: 833229214}
   - {fileID: 956445417}
+  - {fileID: 760456566}
+  - {fileID: 365345908507205700}

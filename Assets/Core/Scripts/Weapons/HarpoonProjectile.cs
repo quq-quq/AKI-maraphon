@@ -51,6 +51,16 @@ namespace AKI.Weapons
         bool vanishing;
 
         public bool IsFlying => flying;
+        public int RhythmSession { get; private set; } = -1;
+        public long RhythmBeat { get; private set; } = -1;
+        public bool IsRhythmShot => RhythmBeat >= 0;
+        public void SetRhythmAuthorization(int session, long beat) { RhythmSession = session; RhythmBeat = beat; }
+
+        /// <summary>Special targets (gold fish / boss) take this arrow without dissolving the whole target.</summary>
+        public void RetireAfterSpecialHit()
+        {
+            if (!vanishing && !caught) Vanish();
+        }
 
         public Vector3 Velocity => velocity;
 
