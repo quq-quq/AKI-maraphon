@@ -514,22 +514,18 @@ Shader "Hidden/AKI/WaterLens"
                     }
                 }
 
-                // ---- under water: the rim of the diving mask's glass. The view is magnified a little and goes soft
-                // towards it, colours split there, the glass mists over in patches, and the rubber frame shows in the
-                // corners.
+                // ---- under water: the rim of the diving mask's glass. Right at the edges of the screen the view is
+                // magnified a touch and its colours split a little - no frame or mist that would hide the breath vignette.
                 float maskEdge = 0;
-                float maskFrame = 0;
                 float2 maskDir = 0;
                 if (_DivingMask > 0.001)
                 {
                     float2 p = (uv - 0.5) * float2(aspect, 1.0);
-                    float2 b = abs(p) - (float2(0.5 * aspect, 0.5) * 1.03 - 0.28);
-                    float d = length(max(b, 0.0)) + min(max(b.x, b.y), 0.0) - 0.28;   // rounded box: < 0 inside the glass
-                    maskEdge = smoothstep(-0.2, 0.0, d) * _DivingMask;
-                    maskFrame = smoothstep(-0.015, 0.02, d) * _DivingMask;
+                    float2 b = abs(p) - (float2(0.5 * aspect, 0.5) - 0.28);
+                    float d = length(max(b, 0.0)) + min(max(b.x, b.y), 0.0) - 0.28;   // rounded box: 0 at the screen edge
+                    maskEdge = smoothstep(-0.15, 0.03, d) * _DivingMask;
                     maskDir = p / max(length(p), 1e-4);
-                    offset -= maskDir * (maskEdge * maskEdge * 0.012);
-                    blur = max(blur, maskEdge * maskEdge * 0.004);
+                    offset -= maskDir * (maskEdge * maskEdge * 0.006);
                 }
 
                 // the most blur anywhere on the screen this frame: picks the tap count for all pixels alike (switching it
@@ -557,19 +553,13 @@ Shader "Hidden/AKI/WaterLens"
                 }
                 if (maskEdge > 0.001)
                 {
-                    float2 split = maskDir * (maskEdge * maskEdge * 0.0035);
+                    float2 split = maskDir * (maskEdge * maskEdge * 0.0025);
                     col.r = lerp(col.r, FragBlitSample(uv + offset + split).r, (half)maskEdge);
                     col.b = lerp(col.b, FragBlitSample(uv + offset - split).b, (half)maskEdge);
                 }
                 col *= 1.0h - saturate(dark);
                 col += light;
                 col *= filmTint;
-                if (maskEdge > 0.001)
-                {
-                    half mist = (half)(maskEdge * maskEdge * (0.12 + 0.16 * LensNoiseRound(q * 5.0 + 3.1)));
-                    col = lerp(col, col * 0.55h + half3(0.30, 0.38, 0.40), mist);
-                    col *= 1.0h - (half)(maskFrame * 0.85);
-                }
 
                 // ---- running out of air: a dark vignette closes in, then the whole view fades towards black
                 float suff = saturate(_BreathEffect);
