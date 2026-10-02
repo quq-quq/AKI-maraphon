@@ -89,6 +89,7 @@ namespace AKI.Water
         ComputeBuffer probeResults;
         bool readbackPending;
         float readbackStart;
+        float inFlightTime;     // game time the heights being read back describe
         float readbackLatency = 0.05f;
         int probeKernel = -1;
         Shader propertyCacheShader;
@@ -156,7 +157,8 @@ namespace AKI.Water
             heightCompute.SetFloat("_WaterMeshCell", InnerCell);
             heightCompute.SetFloat("_WaterMeshGrowth", builtExpanding ? builtRadius : 1e9f);
             heightCompute.SetVector("_WaterMeshCenter", transform.position);
-            SetupProbeWaves(src);
+            // the FFT textures hold the sea of this frame, the Gerstner maths is evaluated ahead by the latency
+            inFlightTime = Time.time + (SetupProbeWaves(src) ? 0f : readbackLatency);
             heightCompute.SetBuffer(probeKernel, "_ProbePoints", probePoints);
             heightCompute.SetBuffer(probeKernel, "_ProbeResults", probeResults);
             heightCompute.Dispatch(probeKernel, (inFlight.Count + 63) / 64, 1, 1);
@@ -167,13 +169,13 @@ namespace AKI.Water
         }
 
         // FFT ocean: the probes read the same displacement textures the surface is drawn with
-        void SetupProbeWaves(Material src)
+        bool SetupProbeWaves(Material src)
         {
             var fftKeyword = new LocalKeyword(heightCompute, "_FFT_WAVES");
             OceanFFT ocean = OceanFFT.Active;
             bool fft = src.IsKeywordEnabled("_FFT_WAVES") && ocean != null && ocean.GetDisplacement(0) != null;
             heightCompute.SetKeyword(fftKeyword, fft);
-            if (!fft) return;
+            if (!fft) return false;
 
             for (int i = 0; i < 3; i++)
             {
@@ -181,6 +183,7 @@ namespace AKI.Water
                 heightCompute.SetTexture(probeKernel, "_OceanDeriv" + i, ocean.GetDerivatives(i));
             }
             heightCompute.SetVector("_OceanLengthScales", ocean.LengthScales);
+            return true;
         }
 
         void OnProbeReadback(AsyncGPUReadbackRequest request)
@@ -194,6 +197,9 @@ namespace AKI.Water
             {
                 WaterProbe p = inFlight[i];
                 if (p.Water != this) continue;
+                float sampleDt = inFlightTime - p.SampleTime;
+                p.HeightRate = p.HasData && sampleDt > 1e-3f ? (data[i].x - p.Height) / sampleDt : 0f;
+                p.SampleTime = inFlightTime;
                 p.Height = data[i].x;
                 p.Normal = new Vector3(data[i].y, data[i].z, data[i].w);
                 p.HasData = true;

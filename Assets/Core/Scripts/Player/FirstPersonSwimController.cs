@@ -60,10 +60,15 @@ namespace AKI.Player
         public float strokePulse = 0.55f;
         [Tooltip("Height above the feet where the water has to reach before you swim instead of wade.")]
         public float chestHeight = 1.25f;
-        [Tooltip("How far the eyes stay above the waves while floating.")]
-        public float surfaceEyeHeight = 0.85f;
+        [Tooltip("How far the eyes stay above the waves while floating (0.45 = water at the chest).")]
+        public float surfaceEyeHeight = 0.45f;
         [Tooltip("Natural frequency of the float spring (higher = follows the waves more tightly).")]
         public float surfaceSpring = 4.5f;
+        [Tooltip("Most the body may rise above its floating pose (m): a crest dropping away or a fast swim up never " +
+                 "leaves you standing on the water, you sink with it.")]
+        [Min(0f)] public float maxRiseAboveFloat = 0.12f;
+        [Tooltip("Most the body may sink below its floating pose (m) while at the surface.")]
+        [Min(0f)] public float maxSinkBelowFloat = 0.4f;
         [Tooltip("Slow upward drift under water when not swimming (m/s²).")]
         public float buoyancy = 0.3f;
         [Tooltip("Look at least this far down while swimming forward to dive from the surface.")]
@@ -85,7 +90,8 @@ namespace AKI.Player
         public float swimSwayDegrees = 1.3f;
         public float strafeRollDegrees = 3.5f;
         public float strokeSurge = 0.04f;
-        public float waveTiltDegrees = 6f;
+        [Tooltip("Most the waves tilt the head at the surface (degrees), reached on a 45° slope.")]
+        public float waveTiltDegrees = 3f;
         public float sprintFovBoost = 7f;
         public float landingDip = 0.12f;
 
@@ -132,8 +138,11 @@ namespace AKI.Player
         float landOffset, landVelocity;
         float rollSmooth;
         Vector3 waveTiltSmooth;
+        Vector3 waveNormalSmooth = Vector3.up;
         float lastAirborneVy;
         bool wasGrounded;
+
+        const float MaxStep = 0.05f;   // s
 
         Vector3 climbFrom, climbTo;
         float climbT;
@@ -212,7 +221,8 @@ namespace AKI.Player
 
         void Update()
         {
-            float dt = Time.deltaTime;
+            // a hitch must not become one giant step: the float spring overshoots and throws you out of the water
+            float dt = Mathf.Min(Time.deltaTime, MaxStep);
             if (dt <= 0f) return;
 
             if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) LockCursor(false);
@@ -276,8 +286,10 @@ namespace AKI.Player
 
             if (IsSwimming)
             {
-                // leave the water when the body is mostly out of it, or standing in the shallows
-                if (chestDepth < -0.35f || (grounded && chestDepth < 0.05f && velocity.y <= 0.1f))
+                // leave the water when the body is well above the floating pose (thrown off a crest), or standing in
+                // the shallows. Measured from the floating pose: a fixed limit would throw a high-floating swimmer out
+                // every time a wave drops away under them, and they would fall back in steps.
+                if (chestDepth < Mathf.Min(-0.35f, FloatChestDepth - 0.5f) || (grounded && chestDepth < 0.05f && velocity.y <= 0.1f))
                     State = grounded ? MoveState.Wading : MoveState.Airborne;
                 else if (State == MoveState.Underwater && eyeDepth < 0.08f && velocity.y > -0.2f)
                     State = MoveState.SurfaceSwimming;
@@ -286,7 +298,9 @@ namespace AKI.Player
             }
             else
             {
-                if (chestDepth > 0.25f && !(grounded && chestDepth < 0.4f))
+                // falling in: start floating as soon as the body reaches the floating pose instead of sinking past it
+                float enterDepth = grounded ? 0.25f : Mathf.Min(0.25f, FloatChestDepth + 0.15f);
+                if (chestDepth > enterDepth && !(grounded && chestDepth < 0.4f))
                 {
                     State = eyeDepth > 0.3f ? MoveState.Underwater : MoveState.SurfaceSwimming;
                     onEnterWater.Invoke(Mathf.Abs(velocity.y));
@@ -300,6 +314,9 @@ namespace AKI.Player
             if ((previous == MoveState.SurfaceSwimming || previous == MoveState.Underwater) && !IsSwimming)
                 onExitWater.Invoke();
         }
+
+        // How deep the chest is (negative = above the surface) while floating at rest.
+        float FloatChestDepth => eyeHeight - surfaceEyeHeight - chestHeight;
 
         void UpdateHeadState(float surfaceY, bool hasWater)
         {
@@ -439,11 +456,22 @@ namespace AKI.Player
 
             if (atSurface)
             {
-                // float on the real waves: critically damped spring to "eyes just above the surface"
+                // float on the real waves: critically damped spring to "eyes just above the surface".
+                // It damps towards the surface's own vertical speed, so it rides a rising or falling wave
+                // without lagging behind it.
                 float targetY = surfaceY - eyeHeight + surfaceEyeHeight;
                 float error = targetY - transform.position.y;
+                float surfaceVy = probe.HasData ? probe.HeightRate : 0f;
                 float w = surfaceSpring;
-                velocity.y += (w * w * error - 2f * w * velocity.y) * dt;
+                velocity.y += (w * w * error + 2f * w * (surfaceVy - velocity.y)) * dt;
+
+                // Hard limits around the pose, so the body is always about chest deep: coming up fast or a crest
+                // falling away under you can't leave you standing on the water, and you don't get dunked either.
+                float nextY = transform.position.y + velocity.y * dt;
+                if (nextY > targetY + maxRiseAboveFloat)
+                    velocity.y = Mathf.Min(velocity.y, (targetY + maxRiseAboveFloat - transform.position.y) / dt);
+                else if (nextY < targetY - maxSinkBelowFloat)
+                    velocity.y = Mathf.Max(velocity.y, (targetY - maxSinkBelowFloat - transform.position.y) / dt);
 
                 // the slope of the waves pushes you downhill a little
                 Vector3 n = probe.HasData ? probe.Normal : Vector3.up;
@@ -560,15 +588,18 @@ namespace AKI.Player
             rollSmooth = Mathf.Lerp(rollSmooth, -move.x * strafeRollDegrees * (swimming ? 1f : 0.35f), 1f - Mathf.Exp(-dt * 6f));
             roll += rollSmooth;
 
-            // at the surface the waves tilt the head
+            // at the surface the waves tilt the head: only the broad swell (the normal is smoothed, so choppy
+            // ripples and the stepwise GPU readback don't rock the view), and never more than waveTiltDegrees
             Vector3 tilt = Vector3.zero;
             if (State == MoveState.SurfaceSwimming && probe.HasData)
             {
-                Vector3 n = probe.Normal;
-                Vector3 local = transform.InverseTransformDirection(n);
-                tilt = new Vector3(local.z, 0f, -local.x) * Mathf.Rad2Deg * (waveTiltDegrees / 10f);
+                waveNormalSmooth = Vector3.Slerp(waveNormalSmooth, probe.Normal, 1f - Mathf.Exp(-dt * 1.5f));
+                Vector3 local = transform.InverseTransformDirection(waveNormalSmooth);
+                Vector2 slope = new Vector2(local.z, -local.x) / Mathf.Max(local.y, 0.2f);   // tan of the slope angle
+                tilt = Vector2.ClampMagnitude(slope * waveTiltDegrees, waveTiltDegrees);
             }
-            waveTiltSmooth = Vector3.Lerp(waveTiltSmooth, tilt, 1f - Mathf.Exp(-dt * 3f));
+            else waveNormalSmooth = Vector3.up;
+            waveTiltSmooth = Vector3.Lerp(waveTiltSmooth, tilt, 1f - Mathf.Exp(-dt * 2f));
 
             cameraPivot.localRotation = Quaternion.Euler(pitch + pitchOffset + waveTiltSmooth.x, 0f, roll + waveTiltSmooth.z);
             if (playerCamera != null)
