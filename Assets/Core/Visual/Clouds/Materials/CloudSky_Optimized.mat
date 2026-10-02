@@ -34,6 +34,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _CloudTimeOverride: -1
+    - _CloudVisibility: 1
     m_Colors:
     - _CloudAmbient: {r: 0.68, g: 0.74, b: 0.82, a: 1}
     - _CloudLayer: {r: 650, g: 1150, b: 15000, a: 1800}

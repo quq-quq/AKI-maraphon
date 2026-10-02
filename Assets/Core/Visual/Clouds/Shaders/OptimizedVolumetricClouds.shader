@@ -64,7 +64,10 @@ Shader "Hidden/AKI/OptimizedVolumetricClouds"
         half4 March(Varyings i) : SV_Target
         {
             UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
-            if (!IsSky(i.uv)) return 0;
+            // Keep the low-resolution cloud field independent of foreground silhouettes.
+            // Cutting holes here makes bilinear upsampling spread those holes into the
+            // surrounding sky, producing a moving blocky halo around thin objects/birds.
+            // Occlusion is applied only by Composite using full-resolution scene depth.
             #if UNITY_REVERSED_Z
             float farDepth = 0;
             #else

@@ -73,7 +73,8 @@ namespace AKI.Clouds
                 using (var builder = graph.AddRasterRenderPass<PassData>("AKI Clouds / Low-resolution volume", out var data))
                 {
                     data.material = sky.material; data.shaderPass = 0;
-                    builder.UseTexture(resources.cameraDepthTexture, AccessFlags.Read);
+                    // Background only: do not punch foreground depth holes into this small
+                    // buffer. Full-resolution composite depth preserves crisp silhouettes.
                     builder.SetRenderAttachment(clouds, 0, AccessFlags.Write);
                     builder.SetGlobalTextureAfterPass(clouds, CloudBuffer);
                     builder.SetRenderFunc((PassData d, RasterGraphContext ctx) =>
