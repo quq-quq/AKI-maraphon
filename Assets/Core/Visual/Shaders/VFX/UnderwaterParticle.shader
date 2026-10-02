@@ -19,6 +19,7 @@ Shader "AKI/UnderwaterParticle"
         // WaterCurrentView supplies glow, vertical excursion and oscillation phase. Zero for other particles.
         [HideInInspector] _CurrentRhythm ("Current Rhythm", Vector) = (0, 0, 0, 0)
         [HideInInspector][HDR] _CurrentGlowColour ("Current Glow Colour", Color) = (.45, .85, 1, 1)
+        [HideInInspector] _CurrentUsesParticleMask ("Use Current Particle Mask", Float) = 0
     }
 
     SubShader
@@ -63,6 +64,7 @@ Shader "AKI/UnderwaterParticle"
                 float  _ClipAboveWater;
                 float4 _CurrentRhythm;
                 half4 _CurrentGlowColour;
+                float _CurrentUsesParticleMask;
             CBUFFER_END
 
             // set by WaterSurface: cell > 0 means there is water in the scene, centre.y is its mean level
@@ -109,7 +111,7 @@ Shader "AKI/UnderwaterParticle"
             {
                 float4 positionOS : POSITION;
                 half4  color      : COLOR;
-                float2 uv         : TEXCOORD0;
+                float3 uv         : TEXCOORD0; // xy = sprite UV, z = Custom1.x rhythm flag
             };
 
             struct Varyings
@@ -119,6 +121,7 @@ Shader "AKI/UnderwaterParticle"
                 float2 uv         : TEXCOORD0;
                 float3 positionWS : TEXCOORD1;
                 float  surfaceY   : TEXCOORD2;
+                half rhythmMask   : TEXCOORD3;
             };
 
             Varyings vert(Attributes v)
@@ -128,10 +131,11 @@ Shader "AKI/UnderwaterParticle"
                 // Vertex colour is constant across a speck: its phase is stable without another particle stream.
                 // Render-only displacement preserves the simulation's current drift and cannot bias positions.
                 float speckPhase = dot(v.color.rgb, float3(131.7, 231.1, 95.3));
-                o.positionWS.y += _CurrentRhythm.y * sin(_CurrentRhythm.z + speckPhase);
+                o.rhythmMask = lerp(1.0, saturate(v.uv.z), _CurrentUsesParticleMask);
+                o.positionWS.y += o.rhythmMask * _CurrentRhythm.y * sin(_CurrentRhythm.z + speckPhase);
                 o.positionCS = TransformWorldToHClip(o.positionWS);
                 o.color = v.color;
-                o.uv = TRANSFORM_TEX(v.uv, _BaseMap);
+                o.uv = TRANSFORM_TEX(v.uv.xy, _BaseMap);
                 // per vertex is plenty: a bubble is far smaller than a wave
                 o.surfaceY = _WaterMeshCell > 0.0 ? SurfaceHeight(o.positionWS.xz) : 1e6;
                 return o;
@@ -141,7 +145,7 @@ Shader "AKI/UnderwaterParticle"
             {
                 half4 c = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv) * _BaseColor * i.color;
                 // Real additive HDR emission, independent of the dim base tint. Existing bubbles have a zero pulse.
-                c.rgb += _CurrentGlowColour.rgb * _CurrentRhythm.x;
+                c.rgb += _CurrentGlowColour.rgb * (_CurrentRhythm.x * i.rhythmMask);
 
                 // water between the particle and the eye: red goes first, then everything sinks into the haze
                 float dist = distance(i.positionWS, _WorldSpaceCameraPos);

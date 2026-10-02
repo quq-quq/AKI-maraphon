@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AKI.Endings;
 using AKI.Fish;
 using AKI.Menu;
 using AKI.Player;
@@ -52,21 +53,30 @@ namespace AKI.Rhythm
         [Header("Successful boss hit: light vignette")]
         public Color bossHitColour = new Color(1f, .055f, .42f, 1f);
         [Range(0f,1f)] public float bossHitIntensity = .58f;
-        [Tooltip("Appearance time. Zero applies the hit flash immediately in the hit callback.")]
-        [Range(0f,.1f)] public float bossHitAttackSeconds;
-        [Tooltip("Disappearance time after reaching full strength (unchanged by the attack setting).")]
-        [Min(.05f)] public float bossHitFadeSeconds = .35f;
+        [Tooltip("Total pulse duration, including its hold (seconds).")]
+        [Min(.05f)] public float bossHitFadeSeconds = .55f;
+        [Tooltip("Time at full strength, included in Total Pulse Duration.")]
+        [Min(0f)] public float bossHitHoldSeconds = .12f;
         [Range(.1f,.9f)] public float bossHitVignetteInner = .32f;
-        [Range(.15f,1f)] public float bossHitVignetteOuter = .78f;
-        [Tooltip("White areas show the hit colour, black areas stay clear.")]
+        [Range(.15f,1f)] public float bossHitVignetteOuter = .7f;
+        [Tooltip("White areas are tinted; black areas remain clear. Empty = a radial vignette.")]
         public Texture2D bossHitMask;
+        [Tooltip("0 = radial edge vignette; 1 = the supplied mask, including its centre artwork.")]
         [Range(0f,1f)] public float bossHitMaskStrength = 1f;
         [Range(.25f,4f)] public float bossHitMaskPower = .8f;
         public bool bossHitMaskInvert;
+        [Tooltip("Optional added glow on top of the dense colour tint.")]
         [Range(0f,1f)] public float bossHitGlow = .15f;
         [Header("Music fallback (SoundConfig wins when present)")]
         [Range(0f,1f)] public float musicVolume = .75f;
         public bool musicBypassesUnderwaterFilter = true;
+        [Header("Endings: black screen with subtitles (empty = the old behaviour)")]
+        [Tooltip("The golden fish was let go: the view slowly goes black. Empty = the scene restarts.")]
+        public EndingData goldenIgnoredEnding;
+        [Tooltip("Out of air in the Naga fight. Empty = passing out and coming to.")]
+        public EndingData drownedEnding;
+        [Tooltip("The Naga track was survived and the Naga swallows the player, after the cut to black.")]
+        public EndingData eatenEnding;
         [Header("Events")]
         public UnityEvent onFishingStarted = new UnityEvent();
         public UnityEvent onGoldenAppeared = new UnityEvent();
@@ -91,7 +101,6 @@ namespace AKI.Rhythm
         float originalBreathSeconds;
         bool initialized, ownsEndFade;
         float bossHitPulse;
-        float bossHitAttackRemaining;
         AudioSource nagaAmbient;
         Vector3 lastDeepBossPosition;
         bool hasDeepBossPosition;
@@ -166,13 +175,17 @@ namespace AKI.Rhythm
         void Update()
         {
             if (!initialized) return;
-            if (bossHitAttackRemaining > 0f)
-            {
-                bossHitAttackRemaining = Mathf.Max(0f, bossHitAttackRemaining - Time.unscaledDeltaTime);
-                bossHitPulse = 1f - bossHitAttackRemaining / Mathf.Max(.001f, bossHitAttackSeconds);
-            }
-            else bossHitPulse = Mathf.MoveTowards(bossHitPulse, 0f, Time.unscaledDeltaTime / Mathf.Max(.05f,bossHitFadeSeconds));
-            ApplyBossHitVignette();
+            bossHitPulse = Mathf.MoveTowards(bossHitPulse, 0f, Time.unscaledDeltaTime / Mathf.Max(.05f,bossHitFadeSeconds));
+            float holdShare = Mathf.Clamp(bossHitHoldSeconds / Mathf.Max(.05f,bossHitFadeSeconds), 0f, .95f);
+            float hitStrength = Mathf.Clamp01(bossHitPulse / (1f-holdShare));
+            Shader.SetGlobalVector("_RhythmHitVignette", new Vector4(bossHitColour.r,bossHitColour.g,bossHitColour.b,hitStrength*bossHitIntensity));
+            Shader.SetGlobalFloat("_RhythmHitInner", bossHitVignetteInner);
+            Shader.SetGlobalTexture("_RhythmHitMask", bossHitMask != null ? bossHitMask : Texture2D.whiteTexture);
+            Shader.SetGlobalVector("_RhythmHitMaskParams", new Vector4(bossHitMask != null ? bossHitMaskStrength : 0f,
+                bossHitMaskPower, bossHitMaskInvert ? 1f : 0f, Mathf.Max(bossHitVignetteInner+.01f,bossHitVignetteOuter)));
+            Shader.SetGlobalFloat("_RhythmHitGlow", bossHitGlow);
+            WaterLensFeature.RhythmHitActive = bossHitPulse > .001f;
+            if (phase == GamePhase.Ended) return;   // nothing may restart the scene under an ending
             if(naga!=null)
             {
                 var guard=naga.GetComponent<NagaEnvironmentSafety>();
@@ -187,7 +200,11 @@ namespace AKI.Rhythm
             else if (phase == GamePhase.GoldenFish)
             {
                 // FishAI and FishAnimation own swimming, just as on an ordinary tuna.
-                if (elapsed >= goldenIgnoreSeconds) RestartGame();
+                if (elapsed >= goldenIgnoreSeconds)
+                {
+                    if (goldenIgnoredEnding != null) ShowEnding(goldenIgnoredEnding);
+                    else RestartGame();
+                }
             }
             else if (phase == GamePhase.FinalCharge && naga != null)
             {
@@ -205,7 +222,7 @@ namespace AKI.Rhythm
             Vector3 goldCentre = cameraView.transform.position;
             Vector3 forward = Vector3.ProjectOnPlane(cameraView.transform.forward, Vector3.up).normalized;
             if (forward.sqrMagnitude < .1f) forward = Vector3.forward;
-            gold = Instantiate(goldenFishPrefab, SafeOceanPoint(goldCentre + forward * goldenDistance, .7f), Quaternion.LookRotation(-forward));
+            gold = Instantiate(goldenFishPrefab, SafeOceanPoint(goldCentre - forward * goldenDistance, .7f), Quaternion.LookRotation(forward));
             gold.name = "GoldenFish_RhythmOpportunity";
             var ai = gold.GetComponent<FishAI>();
             if (ai != null)
@@ -345,22 +362,9 @@ namespace AKI.Rhythm
             if (phase != GamePhase.BossFight || arrow == null || !arrow.IsRhythmShot || arrow.RhythmSession != conductor.Session) return;
             if (!rewardedBeats.Add(arrow.RhythmBeat)) return;
             SuccessfulBossHits++; breath.RestoreFullBreath(); naga?.PlayHitReaction();
-            bossHitAttackRemaining = Mathf.Max(0f, bossHitAttackSeconds);
-            bossHitPulse = bossHitAttackRemaining > 0f ? 0f : 1f;
-            ApplyBossHitVignette(); // same frame as the hit, not one Update later
+            bossHitPulse = 1f;
             PlayConfig(soundConfig != null ? soundConfig.HitSound : null, arrow.transform.position);
             onBossHit.Invoke();
-        }
-
-        void ApplyBossHitVignette()
-        {
-            Shader.SetGlobalVector("_RhythmHitVignette", new Vector4(bossHitColour.r, bossHitColour.g, bossHitColour.b, bossHitPulse * bossHitIntensity));
-            Shader.SetGlobalFloat("_RhythmHitInner", bossHitVignetteInner);
-            Shader.SetGlobalTexture("_RhythmHitMask", bossHitMask != null ? bossHitMask : Texture2D.whiteTexture);
-            Shader.SetGlobalVector("_RhythmHitMaskParams", new Vector4(bossHitMask != null ? bossHitMaskStrength : 0f,
-                bossHitMaskPower, bossHitMaskInvert ? 1f : 0f, Mathf.Max(bossHitVignetteInner + .01f, bossHitVignetteOuter)));
-            Shader.SetGlobalFloat("_RhythmHitGlow", bossHitGlow);
-            WaterLensFeature.RhythmHitActive = bossHitPulse > .001f || bossHitAttackRemaining > 0f;
         }
         void OnMusicFinished()
         {
@@ -379,13 +383,26 @@ namespace AKI.Rhythm
             SetPhase(GamePhase.Ended); naga.StopMotion(false);
             if (nagaAmbient != null) nagaAmbient.Stop();
             ownsEndFade = true; Shader.SetGlobalFloat("_ScreenFade", 1f); WaterLensFeature.ScreenActive = true;
+            if (eatenEnding != null) EndingScreen.Show(eatenEnding);
             onEnded.Invoke();
         }
         void OnOutOfAir()
         {
             if (phase == GamePhase.Failed || phase == GamePhase.Ended) return;
+            if (phase == GamePhase.BossFight && drownedEnding != null) { ShowEnding(drownedEnding); return; }
             SetPhase(GamePhase.Failed); conductor.StopMusic(); fishSpawner?.StopSpawning();
             naga?.StopMotion(false);
+        }
+        // The game is over for good: no music, no shooting, no passing out (BreathHolding reads that flag right
+        // after its out-of-air event, so the ending replaces the reload), and the ending's subtitles on black.
+        void ShowEnding(EndingData ending)
+        {
+            SetPhase(GamePhase.Ended); conductor.StopMusic(); fishSpawner?.StopSpawning();
+            naga?.StopMotion(false);
+            if (nagaAmbient != null) nagaAmbient.Stop();
+            breath.passOutWhenOutOfAir = false; playerWeapon.enabled = false;
+            EndingScreen.Show(ending);
+            onEnded.Invoke();
         }
         [ContextMenu("Restart game")]
         public void RestartGame()

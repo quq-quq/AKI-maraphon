@@ -126,9 +126,18 @@ namespace AKI.Fish
         /// <summary>Configure a freshly spawned special fish at the player's depth, without another path system.</summary>
         public void SetDepth(float metres) => depth = Mathf.Max(1f, metres);
 
+        /// <summary>A fish the player hunts entered the water (spawner tuna or the golden fish).</summary>
+        public static event System.Action<Transform> Spawned;
+        /// <summary>A hunted fish took a harpoon.</summary>
+        public static event System.Action<Transform> Harpooned;
+
+        /// <summary>Reports a harpoon hit on a hunted fish (its own collision, or a special target on it).</summary>
+        public static void ReportHarpooned(Transform fish) => Harpooned?.Invoke(fish);
+
         /// <summary>Called by the spawner right after the fish is created.</summary>
         public void Init(Transform player)
         {
+            Spawned?.Invoke(transform);
             target = player;
             centre = player != null ? player.position : transform.position;
             angle = AngleAround(transform.position);

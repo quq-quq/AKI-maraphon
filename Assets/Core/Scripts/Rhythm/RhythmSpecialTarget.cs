@@ -12,7 +12,7 @@ namespace AKI.Rhythm
         public void OnHarpoonHit(HarpoonProjectile arrow, Vector3 point, Vector3 direction)
         {
             if (game == null || arrow == null) return;
-            if (goldenFish) game.OnGoldenFishHit(arrow);
+            if (goldenFish) { AKI.Fish.FishAI.ReportHarpooned(transform); game.OnGoldenFishHit(arrow); }
             else game.OnNagaHit(arrow);
             arrow.RetireAfterSpecialHit();
         }

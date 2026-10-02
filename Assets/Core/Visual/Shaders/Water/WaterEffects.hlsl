@@ -137,6 +137,21 @@ half3 WaterUnderFogColor(float camDepth, float endDepth, float3 viewDir, float3 
     return c * scatterLight * 0.75;
 }
 
+// Under water, how far a view ray is looked at: as far as the eye sees, at most to where everything is lost in the haze.
+float WaterUnderViewDistance(float dist)
+{
+    return min(dist, min(_UnderMaxDistance, max(_UnderFogEnd, 1.0)));
+}
+
+// Share of what is along a view ray (dist, m) that is lost in the haze whatever its colour. The water absorbs blue
+// slowly, so on its own the far terrain would stay visible for a hundred metres and the empty water past the edge of
+// the world would show as a different shade; this melts both into the haze by _UnderFogEnd.
+float WaterUnderHaze(float dist)
+{
+    float end = max(_UnderFogEnd, 1.0);
+    return smoothstep(end * 0.3, end, dist);
+}
+
 // Underwater volume: same idea but with very soft band edges, so distance haze fades smoothly instead of in layers.
 float3 WaterTransmittanceSoft(float dist, float densityScale)
 {

@@ -91,6 +91,7 @@ Shader "Hidden/AKI/WaterLens"
         _UnderFogScale     ("Underwater Fog Density", Range(0.05, 6)) = 0.6
         _UnderWobble       ("Underwater Wobble", Range(0, 3)) = 1
         _UnderMaxDistance  ("Underwater Visibility (m)", Range(5, 300)) = 120
+        _UnderFogEnd       ("Underwater Fog End (m)", Range(10, 300)) = 60
         _UnderFogColor     ("Underwater Haze Colour", Color) = (0.02, 0.19, 0.44, 1)
         _UnderDeepColor    ("Underwater Deep Colour", Color) = (0.00, 0.02, 0.08, 1)
         _UnderDepthFalloff ("Haze Darkening With Depth (1/m)", Range(0.005, 0.2)) = 0.05
@@ -108,16 +109,7 @@ Shader "Hidden/AKI/WaterLens"
         Cull Off
         Blend Off
 
-        Pass
-        {
-            Name "WaterLens"
-
-            HLSLPROGRAM
-            #pragma target 3.5
-            #pragma vertex LensVert
-            #pragma fragment Frag
-            #pragma multi_compile_local _ _FFT_WAVES
-
+        HLSLINCLUDE
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
 
@@ -142,12 +134,12 @@ Shader "Hidden/AKI/WaterLens"
             float  _ScreenFade;              // 0..1 towards black
             float  _WakeBlur;                // 0..1 gaussian blur of a view that isn't in focus yet
             float  _EyeClosed;               // 0 = eyes open .. 1 = lids shut
-            float4 _RhythmHitVignette;       // hit colour + success pulse, no additional render pass
+            float  _DivingMask;              // 0..1 the diving mask's glass under water (UnderwaterPostVolume)
+            float4 _RhythmHitVignette;       // warm light colour + success pulse, no additional render pass
             float  _RhythmHitInner;
-            TEXTURE2D(_RhythmHitMask);
-            SAMPLER(sampler_RhythmHitMask);
-            float4 _RhythmHitMaskParams;    // strength, power, invert, radial outer
-            float _RhythmHitGlow;
+            // set by WaterLensFeature while the lens is wet
+            TEXTURE2D(_WaterLensFilm);       // FragFilm's output at half resolution: (height, sheets)
+            float4 _WaterLensFilmTexel;      // 1 / its size
 
             struct LensVaryings
             {
@@ -343,11 +335,13 @@ Shader "Hidden/AKI/WaterLens"
                 return h;
             }
 
-            float FilmHeight(float2 q, float since, float wet, LensRunOff run)
+            // sheets: the sheets alone (before the wetness scale), for the defocus
+            float FilmHeight(float2 q, float since, float wet, LensRunOff run, out float sheets)
             {
                 q.x += run.slant * (1.0 - q.y);   // this time it runs a little sideways
                 float flow = since * 0.9;
-                float h = Sheets(q, since, run);
+                sheets = Sheets(q, since, run);
+                float h = sheets;
                 // a thin streaky wet layer behind the sheet, running down and drying off
                 float behind = saturate((q.y - SheetEdge(q.x, since, _WaterLensSeed, run.tongues)) / 0.05);
                 h += behind * saturate(1.0 - since / 2.5) * 0.003
@@ -364,15 +358,14 @@ Shader "Hidden/AKI/WaterLens"
 
             // Gaussian blur in one pass: taps on a sunflower (Vogel) spiral, weighted by a gaussian of their distance.
             // radius = 2-sigma reach as a share of the screen height.
-            half3 SampleGaussian(float2 uv, float radius, float aspect)
+            half3 GaussianTaps(float2 uv, float radius, float aspect, const int taps)
             {
-                const int Taps = 40;
                 half3 sum = 0;
                 float weights = 0;
                 [unroll]
-                for (int i = 0; i < Taps; i++)
+                for (int i = 0; i < taps; i++)
                 {
-                    float r = sqrt((i + 0.5) / Taps);
+                    float r = sqrt((i + 0.5) / taps);
                     float a = i * 2.39996323;                 // golden angle
                     float2 o = float2(cos(a), sin(a)) * r * radius;
                     o.x /= aspect;
@@ -381,6 +374,15 @@ Shader "Hidden/AKI/WaterLens"
                     weights += w;
                 }
                 return sum / weights;
+            }
+
+            // a small blur (the meniscus film, a running sheet) is smooth with a third of the taps
+            half3 SampleGaussian(float2 uv, float radius, float aspect, bool wide)
+            {
+                half3 col = 0;
+                [branch] if (wide) col = GaussianTaps(uv, radius, aspect, 40);
+                else col = GaussianTaps(uv, radius, aspect, 16);
+                return col;
             }
 
             half4 Frag(LensVaryings input) : SV_Target
@@ -463,24 +465,34 @@ Shader "Hidden/AKI/WaterLens"
                 float film = 0;
                 float2 filmOffset = 0;
                 half3 filmTint = 1;
-                float wet = _WaterLensWetness * _WaterLensDrops * (1.0 - underLens);
-                if (wet > 0.001)
+                float wetAll = _WaterLensWetness * _WaterLensDrops;
+                LensRunOff run = RollRunOff();
+                float since = _WaterLensSinceExit * run.speed;
+                float first = saturate(1.0 - since / 0.5);
+                float second = run.second > 0.0 ? saturate(1.0 - (since - run.second) / 0.6) * step(run.second, since) : 0.0;
+                if (wetAll > 0.001)
                 {
-                    LensRunOff run = RollRunOff();
-                    float since = _WaterLensSinceExit * run.speed;
-
-                    float h0 = FilmHeight(q, since, wet, run);
+                    // The height field from FragFilm (half resolution), its slope from the texels on either side: the
+                    // same as evaluating it here and a couple of pixels away, smoothed over the edges where the water
+                    // ends. Taken over the whole lens and masked after, so the waterline doesn't add a slope.
+                    float2 e = _WaterLensFilmTexel.xy;
+                    float2 f0 = SAMPLE_TEXTURE2D_LOD(_WaterLensFilm, sampler_LinearClamp, uv, 0).xy;
+                    float hx = SAMPLE_TEXTURE2D_LOD(_WaterLensFilm, sampler_LinearClamp, uv + float2(e.x, 0), 0).x
+                             - SAMPLE_TEXTURE2D_LOD(_WaterLensFilm, sampler_LinearClamp, uv - float2(e.x, 0), 0).x;
+                    float hy = SAMPLE_TEXTURE2D_LOD(_WaterLensFilm, sampler_LinearClamp, uv + float2(0, e.y), 0).x
+                             - SAMPLE_TEXTURE2D_LOD(_WaterLensFilm, sampler_LinearClamp, uv - float2(0, e.y), 0).x;
+                    float h0 = f0.x;
+                    float sheets = f0.y;
+                    float2 grad = float2(hx / (2.0 * e.x * aspect), hy / (2.0 * e.y));   // per unit of q
+                    float mask = saturate(wetAll * (1.0 - underLens) * 1.5) / max(saturate(wetAll * 1.5), 1e-5);
+                    h0 *= mask;
+                    grad *= mask;
                     if (h0 > 1e-5)
                     {
-                        const float e = 0.0025;
-                        float hx = FilmHeight(q + float2(e, 0), since, wet, run);
-                        float hy = FilmHeight(q + float2(0, e), since, wet, run);
-                        float2 grad = float2(hx - h0, hy - h0) / e;
                         float slope = length(grad);
 
                         // the slope of the water refracts the view
                         // (while the view is fully out of focus the fine ripples would only add a screen-door pattern)
-                        float first = saturate(1.0 - since / 0.5);
                         filmOffset = -grad * (0.035 * (1.0 - 0.6 * first * first) * _WaterLensDistortion);
                         float len = length(filmOffset);
                         if (len > 0.06) filmOffset *= 0.06 / len;
@@ -498,17 +510,34 @@ Shader "Hidden/AKI/WaterLens"
 
                         // Looking through the sheet is out of focus: strongly the instant the head leaves the water (that
                         // hides the jump from the underwater view), clearing as the sheet runs off.
-                        float2 qs = float2(q.x + run.slant * (1.0 - q.y), q.y);
-                        float sheet = saturate(Sheets(qs, since, run) * 25.0);
-                        float second = run.second > 0.0 ? saturate(1.0 - (since - run.second) / 0.6) * step(run.second, since) : 0.0;
+                        float sheet = saturate(sheets * 25.0);
                         defocus = max(defocus, 0.035 * first * first + 0.012 * second * second * sheet + 0.006 * sheet);
                     }
                 }
 
+                // ---- under water: the rim of the diving mask's glass. Right at the edges of the screen the view is
+                // magnified a touch and its colours split a little - no frame or mist that would hide the breath vignette.
+                float maskEdge = 0;
+                float2 maskDir = 0;
+                if (_DivingMask > 0.001)
+                {
+                    float2 p = (uv - 0.5) * float2(aspect, 1.0);
+                    float2 b = abs(p) - (float2(0.5 * aspect, 0.5) - 0.28);
+                    float d = length(max(b, 0.0)) + min(max(b.x, b.y), 0.0) - 0.28;   // rounded box: 0 at the screen edge
+                    maskEdge = smoothstep(-0.15, 0.03, d) * _DivingMask;
+                    maskDir = p / max(length(p), 1e-4);
+                    offset -= maskDir * (maskEdge * maskEdge * 0.006);
+                }
+
+                // the most blur anywhere on the screen this frame: picks the tap count for all pixels alike (switching it
+                // per pixel would draw a seam where the blur crosses over)
+                float widest = max(max(_WakeBlur * 0.06, 0.025 * dive),
+                                   wetAll > 0.001 ? 0.035 * first * first + 0.012 * second * second + 0.006 : 0.0);
+                bool wide = widest > 0.008;
                 half3 col;
-                if (_WakeBlur > 0.001) col = SampleGaussian(uv + offset, _WakeBlur * 0.06, aspect);
-                else if (defocus > 0.0015) col = SampleGaussian(uv + offset, defocus, aspect);
-                else col = blur > 0.0005 ? SampleGaussian(uv + offset, blur, aspect) : FragBlitSample(uv + offset);
+                if (_WakeBlur > 0.001) col = SampleGaussian(uv + offset, _WakeBlur * 0.06, aspect, wide);
+                else if (defocus > 0.0015) col = SampleGaussian(uv + offset, defocus, aspect, wide);
+                else col = blur > 0.0005 ? SampleGaussian(uv + offset, blur, aspect, wide) : FragBlitSample(uv + offset);
                 if (film > 0.001)
                 {
                     // water splits the colours where it bends the view most (more where it is thick)
@@ -522,6 +551,12 @@ Shader "Hidden/AKI/WaterLens"
                 {
                     col.r = FragBlitSample(uv + offset + lineFringe).r;
                     col.b = FragBlitSample(uv + offset - lineFringe).b;
+                }
+                if (maskEdge > 0.001)
+                {
+                    float2 split = maskDir * (maskEdge * maskEdge * 0.0025);
+                    col.r = lerp(col.r, FragBlitSample(uv + offset + split).r, (half)maskEdge);
+                    col.b = lerp(col.b, FragBlitSample(uv + offset - split).b, (half)maskEdge);
                 }
                 col *= 1.0h - saturate(dark);
                 col += light;
@@ -553,20 +588,45 @@ Shader "Hidden/AKI/WaterLens"
                     col *= 1.0h - (half)lid;
                 }
 
-                if (_RhythmHitVignette.a > 0.001)
-                {
-                    float hitEdge = smoothstep(_RhythmHitInner, max(_RhythmHitInner + .01, _RhythmHitMaskParams.w), length(uv - .5));
-                    float hitMask = SAMPLE_TEXTURE2D(_RhythmHitMask, sampler_RhythmHitMask, uv).r;
-                    hitMask = lerp(hitMask, 1.0 - hitMask, _RhythmHitMaskParams.z);
-                    hitMask = pow(saturate(hitMask), max(.25, _RhythmHitMaskParams.y));
-                    float hitAlpha = saturate(_RhythmHitVignette.a * lerp(hitEdge, hitMask, _RhythmHitMaskParams.x));
-                    col = lerp(col, _RhythmHitVignette.rgb, hitAlpha);
-                    col += _RhythmHitVignette.rgb * (hitAlpha * _RhythmHitGlow);
-                }
+                float hitEdge = smoothstep(_RhythmHitInner, 0.78, length((uv-0.5)*float2(1.0, 1.0)));
+                col += _RhythmHitVignette.rgb * (_RhythmHitVignette.a * hitEdge);
                 col *= 1.0h - (half)saturate(_ScreenFade);
                 return half4(col, 1.0h);
             }
 
+            // The water film on the glass after surfacing, drawn at half resolution: (height, sheets alone).
+            float2 FragFilm(LensVaryings input) : SV_Target
+            {
+                float aspect = _ScreenParams.x / _ScreenParams.y;
+                float2 q = float2(input.texcoord.x * aspect, input.texcoord.y);
+                LensRunOff run = RollRunOff();
+                float sheets;
+                float h = FilmHeight(q, _WaterLensSinceExit * run.speed, _WaterLensWetness * _WaterLensDrops, run, sheets);
+                return float2(h, sheets);
+            }
+        ENDHLSL
+
+        Pass
+        {
+            Name "WaterLens"
+
+            HLSLPROGRAM
+            #pragma target 3.5
+            #pragma vertex LensVert
+            #pragma fragment Frag
+            #pragma multi_compile_local _ _FFT_WAVES
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "WaterLensFilm"
+
+            HLSLPROGRAM
+            #pragma target 3.5
+            #pragma vertex LensVert
+            #pragma fragment FragFilm
+            #pragma multi_compile_local _ _FFT_WAVES
             ENDHLSL
         }
     }

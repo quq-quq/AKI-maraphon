@@ -1,42 +1,61 @@
 using System.Collections;
+using System.Collections.Generic;
+using AKI.Fish;
+using AKI.Menu;
+using AKI.Player;
+using AKI.Rhythm;
+using AKI.Weapons;
+using DG.Tweening;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Core.Scripts.Sound
 {
+    /// <summary>
+    /// All game sound. Its private handlers subscribe in OnEnable to static game events (the manager outlives scene
+    /// reloads, so it never listens to one scene's objects) and unsubscribe in OnDisable:
+    /// <list type="bullet">
+    /// <item>OnStartGame — SceneManager.sceneLoaded</item>
+    /// <item>OnMenuEnded — MainMenuController.MenuEnded (he gets up to dive)</item>
+    /// <item>OnFishingStarted / OnFishingEnded — RhythmGameFlow.FishingStarted / FishingEnded (golden fish)</item>
+    /// <item>OnWaterDown — MainMenuController.EnteredWater, FirstPersonSwimController.HeadUnderwater</item>
+    /// <item>OnWaterUp — FirstPersonSwimController.HeadAboveWater</item>
+    /// <item>OnSwimming — FirstPersonSwimController.SwimStroke</item>
+    /// <item>OnHarpoomTrigger — PlayerSpeargun.TriggerPulled</item>
+    /// <item>OnArrowFired / OnArrowDissapeared / OnTargetHit — HarpoonProjectile.Launched / Vanished / TargetHit</item>
+    /// <item>OnFishSpawned / OnFishDied — FishAI.Spawned / Harpooned</item>
+    /// <item>OnNagaAppered / OnNagaDissapeared — RhythmGameFlow.NagaAppeared / NagaDisappeared</item>
+    /// </list>
+    /// Fishing and Naga music: where a <see cref="RhythmConductor"/> plays them (beat-synced), it owns them and this
+    /// manager does not start a second copy.
+    /// </summary>
     public partial class SoundManager : MonoBehaviour
     {
         public static SoundManager Instance { get; private set; }
         public SoundConfig Config => _soundConfig;
-        /// <summary>Only music is transferred to the DSP rhythm clock; ambient and one-shots keep playing.</summary>
-        public void TakeRhythmMusicControl()
-        {
-            OnMenuEnded(); OnFishingEnded(); OnNagaDissapeared();
-        }
 
         [SerializeField] private SoundConfig _soundConfig;
         [SerializeField] private Transform _wavesTransform;
         [SerializeField] private Transform _seagoolTransform;
         [SerializeField] private WaterListenerAudio _underwaterAudio = new WaterListenerAudio();
+        [Tooltip("Seconds music takes to fade out, and the next music to fade in, when it changes.")]
+        [SerializeField, Min(0f)] private float _musicFadeSeconds = 1.5f;
+        [Tooltip("The trigger and the shot happen in the player's hands and reach the ear through the body: under water " +
+                 "they skip the water's muffling (which leaves nothing of a click) and are only softened to this cutoff (Hz).")]
+        [SerializeField, Min(500f)] private float _inHandsUnderwaterCutoff = 3500f;
 
         private AudioSource _menuGamelanSource;
         private AudioSource _fishingGamelanSource;
+        private AudioSource _nagaGamelanSource;
         private AudioSource _waterAmbientSource;
-        private AudioSource _fishSwimmingSource;
         private AudioSource _nagaSwimmingSource;
         private AudioSource _arrowMoveSource;
         private AudioSource _wavesSource;
         private AudioSource _seagullSource;
-        private AudioListener _audiolistener;
         private Coroutine _nagaCoroutine;
         private bool _headUnderwater;
-
-        /// <summary>Scene player drives this; repeated notifications do not create duplicate ambient loops.</summary>
-        public void SetHeadUnderwater(bool underwater)
-        {
-            if (_soundConfig == null || _headUnderwater == underwater) return;
-            _headUnderwater = underwater;
-            if (underwater) OnWaterDown(); else OnWaterUp();
-        }
+        private bool _subscribed;
+        private int _startedSceneHandle;
 
         private void Awake()
         {
@@ -47,8 +66,9 @@ namespace Core.Scripts.Sound
             }
             else
             {
-                // Blackout reloads the gameplay scene. Keep the singleton, but bind the new scene's anchors.
-                Instance.RebindScene(_soundConfig, _wavesTransform, _seagoolTransform);
+                // Blackout reloads the gameplay scene. Keep the singleton; it takes this scene's anchors and
+                // restarts the scene sounds from sceneLoaded (OnStartGame).
+                Instance.BindScene(_soundConfig, _wavesTransform, _seagoolTransform);
                 Destroy(gameObject);
             }
         }
@@ -62,16 +82,59 @@ namespace Core.Scripts.Sound
                 return;
             }
 
-            OnMenuStarted();
-            OnStartGame(_wavesTransform, _seagoolTransform);
+            SceneManager.sceneLoaded += OnStartGame;
+            MainMenuController.MenuEnded += OnMenuEnded;
+            MainMenuController.EnteredWater += OnWaterDown;
+            RhythmGameFlow.FishingStarted += OnFishingStarted;
+            RhythmGameFlow.FishingEnded += OnFishingEnded;
+            RhythmGameFlow.NagaAppeared += OnNagaAppered;
+            RhythmGameFlow.NagaDisappeared += OnNagaDissapeared;
+            FirstPersonSwimController.HeadUnderwater += OnWaterDown;
+            FirstPersonSwimController.HeadAboveWater += OnWaterUp;
+            FirstPersonSwimController.SwimStroke += OnSwimming;
+            PlayerSpeargun.TriggerPulled += OnHarpoomTrigger;
+            HarpoonProjectile.Launched += OnArrowFired;
+            HarpoonProjectile.Vanished += OnArrowDissapeared;
+            HarpoonProjectile.TargetHit += OnTargetHit;
+            FishAI.Spawned += OnFishSpawned;
+            FishAI.Harpooned += OnFishDied;
+            _subscribed = true;
         }
 
         private void OnDisable()
         {
+            if (_subscribed)
+            {
+                SceneManager.sceneLoaded -= OnStartGame;
+                MainMenuController.MenuEnded -= OnMenuEnded;
+                MainMenuController.EnteredWater -= OnWaterDown;
+                RhythmGameFlow.FishingStarted -= OnFishingStarted;
+                RhythmGameFlow.FishingEnded -= OnFishingEnded;
+                RhythmGameFlow.NagaAppeared -= OnNagaAppered;
+                RhythmGameFlow.NagaDisappeared -= OnNagaDissapeared;
+                FirstPersonSwimController.HeadUnderwater -= OnWaterDown;
+                FirstPersonSwimController.HeadAboveWater -= OnWaterUp;
+                FirstPersonSwimController.SwimStroke -= OnSwimming;
+                PlayerSpeargun.TriggerPulled -= OnHarpoomTrigger;
+                HarpoonProjectile.Launched -= OnArrowFired;
+                HarpoonProjectile.Vanished -= OnArrowDissapeared;
+                HarpoonProjectile.TargetHit -= OnTargetHit;
+                FishAI.Spawned -= OnFishSpawned;
+                FishAI.Harpooned -= OnFishDied;
+                _subscribed = false;
+            }
+
             if (_nagaCoroutine != null)
                 StopCoroutine(_nagaCoroutine);
+            _nagaCoroutine = null;
 
             _underwaterAudio.Reset();
+        }
+
+        // The first scene may finish loading before OnEnable subscribed: start it here (once).
+        private void Start()
+        {
+            if (Instance == this && _soundConfig != null) OnStartGame(SceneManager.GetActiveScene(), LoadSceneMode.Single);
         }
 
         private void Update()
@@ -79,167 +142,260 @@ namespace Core.Scripts.Sound
             _underwaterAudio.Tick();
         }
 
+        // The rhythm conductor plays the fishing / Naga music in sync with its beat map.
+        private static bool RhythmOwnsMusic => RhythmConductor.Active != null && RhythmConductor.Active.IsPlaying;
+
+        private Transform Listener => Camera.main != null ? Camera.main.transform : transform;
+
         #region SoundsRealization
-        private void OnMenuStarted()
+        private void OnStartGame(Scene scene, LoadSceneMode mode)
         {
-            _menuGamelanSource = PlayLoopSound(_soundConfig.MenuGamelan, Camera.main != null ? Camera.main.transform : null);
+            if (mode != LoadSceneMode.Single || scene.handle == _startedSceneHandle) return;
+            _startedSceneHandle = scene.handle;
+
+            // a reloaded scene starts from scratch: nothing of the last run keeps playing
+            OnFishingEnded();
+            OnNagaDissapeared();
+            StopLoop(ref _menuGamelanSource);
+            StopLoop(ref _waterAmbientSource);
+            StopLoop(ref _arrowMoveSource);
+            StopLoop(ref _wavesSource);
+            StopLoop(ref _seagullSource);
+            _headUnderwater = false;
+            _underwaterAudio.Reset();
+
+            _wavesSource = PlayLoopSound(_soundConfig.WavesSound, _wavesTransform != null ? _wavesTransform : Listener);
+            _seagullSource = PlayLoopSound(_soundConfig.SeagoolSound, _seagoolTransform != null ? _seagoolTransform : Listener);
+            // menu music only where there is a menu (gameplay test scenes start straight in the water)
+            if (FindFirstObjectByType<MainMenuController>() != null)
+            {
+                _menuGamelanSource = PlayLoopSound(_soundConfig.MenuGamelan, Listener);
+                FadeIn(_menuGamelanSource);
+            }
+        }
+
+        private void BindScene(SoundConfig config, Transform waves, Transform seagulls)
+        {
+            if (config != null) _soundConfig = config;
+            _wavesTransform = waves;
+            _seagoolTransform = seagulls;
         }
 
         private void OnMenuEnded()
         {
-            if (_menuGamelanSource != null)
-                Destroy(_menuGamelanSource.gameObject);
-            _menuGamelanSource = null;
+            FadeOutLoop(ref _menuGamelanSource);
         }
 
         private void OnFishingStarted()
         {
-            _fishingGamelanSource = PlayLoopSound(_soundConfig.FishingGamelan, Camera.main.transform);
+            FadeOutLoop(ref _menuGamelanSource);
+
+            if (RhythmOwnsMusic)
+                FadeIn(RhythmConductor.Active.musicSource);
+            else if (_fishingGamelanSource == null)
+            {
+                _fishingGamelanSource = PlayLoopSound(_soundConfig.FishingGamelan, Listener);
+                FadeIn(_fishingGamelanSource);
+            }
         }
 
         private void OnFishingEnded()
         {
-            if (_fishingGamelanSource != null)
-                Destroy(_fishingGamelanSource.gameObject);
-            _fishingGamelanSource = null;
+            FadeOutLoop(ref _fishingGamelanSource);
+            FadeOutRhythmMusic();
         }
 
         private void OnWaterDown()
         {
+            // the dive and the player's own head report the same moment: one splash
+            if (_headUnderwater) return;
+            _headUnderwater = true;
+
             _underwaterAudio.Enter();
-            var listener = Camera.main != null ? Camera.main.transform : transform;
-            if (_waterAmbientSource == null) _waterAmbientSource = PlayLoopSound(_soundConfig.WaterAmbient, listener);
-            if (_soundConfig.SplashSound.Count > 0)
-                PlaySound(_soundConfig.SplashSound[Random.Range(0, _soundConfig.SplashSound.Count)], listener.position);
+            if (_waterAmbientSource == null) _waterAmbientSource = PlayLoopSound(_soundConfig.WaterAmbient, Listener);
+            PlayRandom(_soundConfig.SplashSound, Listener.position);
         }
 
         private void OnWaterUp()
         {
+            if (!_headUnderwater) return;
+            _headUnderwater = false;
+
             _underwaterAudio.Exit();
+            StopLoop(ref _waterAmbientSource);
 
-            if(_waterAmbientSource != null)
-                Destroy(_waterAmbientSource.gameObject);
-            _waterAmbientSource = null;
-
-            var listener = Camera.main != null ? Camera.main.transform : transform;
-            if (_soundConfig.SplashSound.Count > 0)
-                PlaySound(_soundConfig.SplashSound[Random.Range(0, _soundConfig.SplashSound.Count)], listener.position);
-            if (_soundConfig.BreatheOutSound.Count > 0)
-                PlaySound(_soundConfig.BreatheOutSound[Random.Range(0, _soundConfig.BreatheOutSound.Count)], listener.position);
-        }
-
-        private void OnStartGame(Transform wavesTransform, Transform seagoolTransform)
-        {
-            var fallback = Camera.main != null ? Camera.main.transform : transform;
-            _wavesSource = PlayLoopSound(_soundConfig.WavesSound, wavesTransform != null ? wavesTransform : fallback);
-            _seagullSource = PlayLoopSound(_soundConfig.SeagoolSound, seagoolTransform != null ? seagoolTransform : fallback);
-        }
-
-        private void RebindScene(SoundConfig config, Transform waves, Transform seagulls)
-        {
-            TakeRhythmMusicControl();
-            if (_wavesSource != null) Destroy(_wavesSource.gameObject);
-            if (_seagullSource != null) Destroy(_seagullSource.gameObject);
-            if (_waterAmbientSource != null) Destroy(_waterAmbientSource.gameObject);
-            _waterAmbientSource = null; _headUnderwater = false;
-            if (config != null) _soundConfig = config;
-            _wavesTransform = waves; _seagoolTransform = seagulls;
-            _underwaterAudio.Reset();
-            if (_soundConfig == null) return;
-            OnMenuStarted(); OnStartGame(waves, seagulls);
+            PlayRandom(_soundConfig.SplashSound, Listener.position);
+            PlayRandom(_soundConfig.BreatheOutSound, Listener.position);
         }
 
         private void OnArrowFired(Transform arrowTransform)
         {
-            _arrowMoveSource = PlayLoopSound(_soundConfig.ArrowMoveSound, arrowTransform);
+            StopLoop(ref _arrowMoveSource);
+            _arrowMoveSource = PlayLoopSound(_soundConfig.ArrowMoveSound, arrowTransform, true);
+            InHands(PlaySound(_soundConfig.ShootSound, Listener.position));
         }
 
         private void OnArrowDissapeared()
         {
-            if (_arrowMoveSource != null)
-                Destroy(_arrowMoveSource.gameObject);
-            _arrowMoveSource = null;
+            StopLoop(ref _arrowMoveSource);
         }
 
         private void OnFishSpawned(Transform fishTransform)
         {
-            _fishSwimmingSource = PlayLoopSound(_soundConfig.FishSwimmingSound, fishTransform);
+            // rides on the fish and goes with it; there can be two (the last tuna and the golden fish)
+            PlayLoopSound(_soundConfig.FishSwimmingSound, fishTransform, true);
         }
 
-        private void OnFishDied()
+        private void OnFishDied(Transform fishTransform)
         {
-            if (_fishSwimmingSource != null)
-                Destroy(_fishSwimmingSource.gameObject);
-            _fishSwimmingSource = null;
+            StopLoopsOn(fishTransform, _soundConfig.FishSwimmingSound);
+            PlaySound(_soundConfig.FishDeathSound, fishTransform.position);
         }
 
-        private void OnNagaAppered(Transform NagaTransform)
+        private void OnNagaAppered(Transform nagaTransform)
         {
-            _nagaSwimmingSource = PlayLoopSound(_soundConfig.NagaGamelan, Camera.main.transform);
+            // leftovers of an earlier Naga only; the music that has just started must stay
+            StopLoop(ref _nagaSwimmingSource);
+            if (_nagaCoroutine != null) StopCoroutine(_nagaCoroutine);
+            _nagaCoroutine = null;
 
-            PlayLoopSound(_soundConfig.NagaSwimmingSound, NagaTransform);
-            PlayLoopSound(_soundConfig.SeagoolSound, NagaTransform);
+            if (RhythmOwnsMusic)
+                FadeIn(RhythmConductor.Active.musicSource);
+            else if (_nagaGamelanSource == null)
+            {
+                _nagaGamelanSource = PlayLoopSound(_soundConfig.NagaGamelan, Listener);
+                FadeIn(_nagaGamelanSource);
+            }
+            _nagaSwimmingSource = PlayLoopSound(_soundConfig.NagaSwimmingSound, nagaTransform, true);
 
             _nagaCoroutine = StartCoroutine(GrowlLoop());
 
             IEnumerator GrowlLoop()
             {
-                while (true)
+                while (nagaTransform != null)
                 {
                     yield return new WaitForSeconds(_soundConfig.NagaDistanceSeconds);
 
-                    if (_soundConfig.NagaSounds != null && _soundConfig.NagaSounds.Count > 0)
-                    {
-                        int randomIndex = Random.Range(0, _soundConfig.NagaSounds.Count);
-                        PlaySound(_soundConfig.NagaSounds[randomIndex], NagaTransform.position);
-                    }
+                    if (nagaTransform != null)
+                        PlayRandom(_soundConfig.NagaSounds, nagaTransform.position);
                 }
+                _nagaCoroutine = null;
             }
         }
 
         private void OnNagaDissapeared()
         {
-            if (_nagaSwimmingSource != null)
-                Destroy(_nagaSwimmingSource.gameObject);
-            _nagaSwimmingSource = null;
+            FadeOutLoop(ref _nagaGamelanSource);
+            FadeOutRhythmMusic();
+            StopLoop(ref _nagaSwimmingSource);
 
             if (_nagaCoroutine != null)
                 StopCoroutine(_nagaCoroutine);
+            _nagaCoroutine = null;
         }
 
         private void OnSwimming()
         {
-            int randomIndex = Random.Range(0, _soundConfig.SwimmingSound.Count);
-            PlaySound(_soundConfig.SwimmingSound[randomIndex], Camera.main.transform.position);
+            PlayRandom(_soundConfig.SwimmingSound, Listener.position);
         }
 
         private void OnHarpoomTrigger()
         {
-            int randomIndex = Random.Range(0, _soundConfig.TriggerSound.Count);
-            PlaySound(_soundConfig.TriggerSound[randomIndex], Camera.main.transform.position);
+            InHands(PlaySound(_soundConfig.TriggerSound, Listener.position));
         }
 
         private void OnTargetHit(Transform targetTransform)
         {
-            PlaySound(_soundConfig.HitSound, targetTransform.position);
-        }
-
-        private void OnFishDeathSound(Transform targetTransform)
-        {
+            StopLoop(ref _arrowMoveSource);
             PlaySound(_soundConfig.HitSound, targetTransform.position);
         }
 
         #endregion
 
-        private AudioSource PlayLoopSound(AudioClipConfig clipConfig, Transform parentTransform)
+        private AudioSource PlayRandom(List<AudioClipConfig> clips, Vector3 position)
         {
-            // not wired in this scene (no camera yet, no waves / seagull anchor)
-            if (clipConfig == null || clipConfig.Clip == null || parentTransform == null)
+            if (clips == null || clips.Count == 0) return null;
+            return PlaySound(clips[Random.Range(0, clips.Count)], position);
+        }
+
+        // A sound made in the player's hands: under water it skips the listener's water filter, only softened.
+        private void InHands(AudioSource source)
+        {
+            if (source == null || !_headUnderwater || source.bypassListenerEffects) return;
+            source.bypassListenerEffects = true;
+            source.gameObject.AddComponent<AudioLowPassFilter>().cutoffFrequency = _inHandsUnderwaterCutoff;
+        }
+
+        private void FadeIn(AudioSource source)
+        {
+            if (source == null) return;
+            DOTween.Kill(source);
+            if (_musicFadeSeconds <= 0f) return;
+            float volume = source.volume;
+            source.volume = 0f;
+            DOTween.To(() => source.volume, v => source.volume = v, volume, _musicFadeSeconds)
+                .SetTarget(source).SetLink(source.gameObject);
+        }
+
+        private void FadeOutLoop(ref AudioSource source)
+        {
+            if (source == null) return;
+            AudioSource fading = source;
+            source = null;
+            DOTween.Kill(fading);
+            if (_musicFadeSeconds <= 0f)
+            {
+                Destroy(fading.gameObject);
+                return;
+            }
+            DOTween.To(() => fading.volume, v => fading.volume = v, 0f, _musicFadeSeconds)
+                .SetTarget(fading).SetLink(fading.gameObject)
+                .OnComplete(() => Destroy(fading.gameObject));
+        }
+
+        // The conductor stops its beat-synced track at once (its beat clock must end there): a copy picks the
+        // track up at the same sample and fades it away.
+        private void FadeOutRhythmMusic()
+        {
+            if (!RhythmOwnsMusic) return;
+            AudioSource music = RhythmConductor.Active.musicSource;
+            if (music == null || !music.isPlaying || music.clip == null) return;
+
+            AudioSource tail = new GameObject($"MusicFadeOut{music.clip.name}").AddComponent<AudioSource>();
+            tail.clip = music.clip;
+            tail.volume = music.volume;
+            tail.outputAudioMixerGroup = music.outputAudioMixerGroup;
+            tail.bypassListenerEffects = music.bypassListenerEffects;
+            tail.spatialBlend = 0f;
+            tail.timeSamples = music.timeSamples;
+            tail.Play();
+            FadeOutLoop(ref tail);
+        }
+
+        private static void StopLoop(ref AudioSource source)
+        {
+            if (source != null) Destroy(source.gameObject);
+            source = null;
+        }
+
+        private static void StopLoopsOn(Transform owner, AudioClipConfig clipConfig)
+        {
+            if (owner == null || clipConfig == null || clipConfig.Clip == null) return;
+            foreach (AudioSource source in owner.GetComponentsInChildren<AudioSource>())
+                if (source.loop && source.clip == clipConfig.Clip) Destroy(source.gameObject);
+        }
+
+        /// <param name="follow">Rides on <paramref name="anchor"/> (an arrow, a fish, the Naga) and is removed with it.
+        /// Otherwise it stays where it was started and belongs to the scene (not a child of the cutscene camera,
+        /// which is destroyed at hand-over).</param>
+        private AudioSource PlayLoopSound(AudioClipConfig clipConfig, Transform anchor, bool follow = false)
+        {
+            if (clipConfig == null || clipConfig.Clip == null || anchor == null)
                 return null;
 
             GameObject sourceObj = new GameObject($"LoopAudio{clipConfig.Clip.name}");
-            // Scene-owned loop, not a child of the cutscene camera (that camera is destroyed at hand-over).
-            sourceObj.transform.position = parentTransform.position;
+            if (follow) sourceObj.transform.SetParent(anchor, false);
+            else sourceObj.transform.position = anchor.position;
 
             AudioSource audioSource = sourceObj.AddComponent<AudioSource>();
             audioSource.loop = true;
@@ -252,11 +408,28 @@ namespace Core.Scripts.Sound
             return audioSource;
         }
 
-        public void PlaySound(AudioClipConfig clipConfig, Vector3 position)
+        public AudioSource PlaySound(AudioClipConfig clipConfig, Vector3 position)
+        {
+            if (clipConfig == null || clipConfig.Clip == null) return null;
+            GameObject tempObj = new GameObject("TempAudio");
+            tempObj.transform.position = position;
+
+            AudioSource audioSource = tempObj.AddComponent<AudioSource>();
+            audioSource.spatialBlend = clipConfig.Is3D ? 1f : 0f;
+            audioSource.bypassListenerEffects = clipConfig.IgnoreUnderwater;
+            audioSource.pitch = clipConfig.GetPitch();
+            audioSource.volume = clipConfig.GetVolume();
+            audioSource.PlayOneShot(clipConfig.Clip);
+
+            StartCoroutine(DestroyAfterPlay(audioSource, clipConfig.Clip.length));
+            return audioSource;
+        }
+
+        public void PlaySound(AudioClipConfig clipConfig, Transform parentTransform)
         {
             if (clipConfig == null || clipConfig.Clip == null) return;
             GameObject tempObj = new GameObject("TempAudio");
-            tempObj.transform.position = position;
+            tempObj.transform.SetParent(parentTransform, false);
 
             AudioSource audioSource = tempObj.AddComponent<AudioSource>();
             audioSource.spatialBlend = clipConfig.Is3D ? 1f : 0f;

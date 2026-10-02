@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87123b4dfe7e408e989c66be1cf2f234, type: 3}
+  m_Name: Ending_GoldenFishIgnored
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Endings.EndingData
+  subtitles:
+  - text: "Концовка 1: золотая рыба уплыла."
+    seconds: 4
+  - text: "Строка 2 — замените своим текстом."
+    seconds: 4
+  placement: 0
+  fontSize: 40
+  textColor: {r: 1, g: 0.85, b: 0.1, a: 1}
+  fontStyle: 0
+  font: {fileID: 0}
+  textWidth: 0.8
+  fadeToBlackSeconds: 3
+  textDelaySeconds: 1
+  textFadeSeconds: 0.6
+  after: 0
+  sceneName: 
+  waitForKey: 1
+  continueHint: "Нажмите любую клавишу"

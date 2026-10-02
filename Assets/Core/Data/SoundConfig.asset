@@ -133,10 +133,10 @@ MonoBehaviour:
     Pitch: 1
     RandomAdd: 0.1
   <TriggerSound>k__BackingField:
-  - Clip: {fileID: 8300000, guid: 1a13efab66659c648ac2fe9f553941ab, type: 3}
-    Is3D: 1
+    Clip: {fileID: 8300000, guid: 1a13efab66659c648ac2fe9f553941ab, type: 3}
+    Is3D: 0
     IgnoreUnderwater: 0
-    Volume: 1
+    Volume: 4
     Pitch: 1
     RandomAdd: 0.1
   <HitSound>k__BackingField:
@@ -151,6 +151,13 @@ MonoBehaviour:
     Is3D: 1
     IgnoreUnderwater: 0
     Volume: 1
+    Pitch: 1
+    RandomAdd: 0.1
+  <ShootSound>k__BackingField:
+    Clip: {fileID: 8300000, guid: 79a27ef2e1bf3b04487a2f25a7ea426f, type: 3}
+    Is3D: 0
+    IgnoreUnderwater: 0
+    Volume: 5
     Pitch: 1
     RandomAdd: 0.1
   <NagaDistanceSeconds>k__BackingField: 3

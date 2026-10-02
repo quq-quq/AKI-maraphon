@@ -83,9 +83,10 @@ Material:
     - _ToonBands: 4
     - _ToonSoftness: 0.2
     - _Turbidity: 1
-    - _UnderDepthFalloff: 0.05
-    - _UnderFogScale: 0.6
-    - _UnderLightAbsorb: 0.6
+    - _UnderDepthFalloff: 0.025
+    - _UnderFogEnd: 60
+    - _UnderFogScale: 0.2
+    - _UnderLightAbsorb: 0.2
     - _UnderMaxDistance: 120
     - _UnderWobble: 1
     - _WarpScale: 0.03

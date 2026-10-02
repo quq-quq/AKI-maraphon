@@ -85,6 +85,7 @@ CBUFFER_START(UnityPerMaterial)
     float  _UnderFogScale;       // fog density multiplier when the camera is under the surface
     float  _UnderWobble;         // screen-space refraction wobble
     float  _UnderMaxDistance;    // how far (m) the camera sees under water
+    float  _UnderFogEnd;         // nothing farther than this (m) shows through the haze: hides the edges of the world
     half4  _UnderFogColor;       // haze colour just below the surface
     half4  _UnderDeepColor;      // haze colour deep down
     float  _UnderDepthFalloff;   // how fast the haze darkens with depth (1/m)

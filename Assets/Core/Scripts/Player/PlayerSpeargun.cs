@@ -62,6 +62,8 @@ namespace AKI.Player
         [Tooltip("Degrees of the short shake on the shot.")]
         public float viewShake = 0.7f;
         [Min(0.01f)] public float shakeSeconds = 0.3f;
+        [Tooltip("The field of view jumps out by this share on a shot and snaps back.")]
+        [Range(0f, 0.1f)] public float fovPunch = 0.03f;
         [Header("Feel")]
         [Tooltip("Seconds of lag behind turning the view (0 = rigid).")]
         [Range(0f, 0.1f)] public float sway = 0.03f;
@@ -73,6 +75,8 @@ namespace AKI.Player
         InputAction attackAction;
         InputAction aimAction;
         CameraShake cameraShake;
+        GameplayCameraFX cameraFx;
+        float fovKick;
         bool wasLocked;
         float aim;
         // the gun's recoil spring: offset (m) and angles (degrees) from its pose, and their speeds
@@ -83,6 +87,9 @@ namespace AKI.Player
         Renderer[] weaponRenderers;
 
         public bool IsAiming { get; private set; }
+
+        /// <summary>The trigger was pulled, whether or not an arrow left the gun (not loaded, off the beat...).</summary>
+        public static event System.Action TriggerPulled;
 
         /// <summary>0 = at the hip, 1 = fully aimed.</summary>
         public float Aim01 => aim;
@@ -114,6 +121,7 @@ namespace AKI.Player
                 lastCamRotation = cam.transform.rotation;
                 cameraShake = cam.GetComponent<CameraShake>();
                 if (cameraShake == null) cameraShake = cam.gameObject.AddComponent<CameraShake>();
+                cameraFx = cam.GetComponentInChildren<GameplayCameraFX>();
             }
             PlaceGun(0f);
         }
@@ -139,11 +147,15 @@ namespace AKI.Player
             IsAiming = canUse && gun != null && aimAction != null && aimAction.IsPressed();
             aim = Mathf.MoveTowards(aim, IsAiming ? 1f : 0f, Time.deltaTime / aimTime);
             float s = Mathf.SmoothStep(0f, 1f, aim);
-            swimmer.FovScale = Mathf.Lerp(1f, aimZoom, s);
+            fovKick *= Mathf.Exp(-18f * Time.deltaTime);
+            swimmer.FovScale = Mathf.Lerp(1f, aimZoom, s) * (1f + fovKick);
             swimmer.LookScale = Mathf.Lerp(1f, aimLookScale, s);
 
             if (canUse && gun != null && attackAction != null && attackAction.WasPressedThisFrame())
+            {
+                TriggerPulled?.Invoke();
                 Fire();
+            }
         }
 
         public void Fire()
@@ -168,6 +180,8 @@ namespace AKI.Player
                 cameraShake.Kick(new Vector3(-viewKick, Random.Range(-viewKickRandom, viewKickRandom), Random.Range(-viewKickRandom, viewKickRandom)) * steady);
                 cameraShake.Shake(viewShake * steady, shakeSeconds);
             }
+            fovKick = fovPunch * steady;
+            if (cameraFx != null) cameraFx.ShotPunch(Mathf.Lerp(0.6f, 1f, steady));
         }
 
         // a damped spring pulling x back to zero

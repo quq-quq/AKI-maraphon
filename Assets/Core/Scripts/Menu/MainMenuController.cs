@@ -1,3 +1,4 @@
+using System;
 using AKI.Water;
 using UnityEngine;
 using UnityEngine.Events;
@@ -63,6 +64,11 @@ namespace AKI.Menu
         public UnityEvent onEnteredWater = new UnityEvent();
         [Tooltip("The player has control.")]
         public UnityEvent onGameStarted = new UnityEvent();
+
+        /// <summary>Scene-independent: the menu is over, he gets up to dive (for listeners that outlive the scene).</summary>
+        public static event Action MenuEnded;
+        /// <summary>Scene-independent: his head went under the water in the dive.</summary>
+        public static event Action EnteredWater;
 
         Phase phase = Phase.Menu;
         Vector3 diveDirection;      // flat, from the boat to where he ends
@@ -147,6 +153,7 @@ namespace AKI.Menu
             cutscene.Play();
             Enter(Phase.Cutscene);
             onCutsceneStarted.Invoke();
+            MenuEnded?.Invoke();
         }
 
         // The animation is posed in Update: the camera follows it here.
@@ -260,6 +267,7 @@ namespace AKI.Menu
             if (inWater || Depth(eye) <= 0f) return;
             inWater = true;
             onEnteredWater.Invoke();
+            EnteredWater?.Invoke();
         }
 
         float Depth(Vector3 point)

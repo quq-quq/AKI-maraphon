@@ -79,6 +79,9 @@ namespace AKI.Player
         public float waterHopSpeed = 3.6f;
         [Tooltip("How much the water's movement (WaterCurrent: swell push and pull, drift) carries the swimmer.")]
         [Min(0f)] public float currentInfluence = 1f;
+        [Tooltip("Placed above open water (nothing to stand on below), start floating at the surface instead of " +
+                 "dropping in from a height.")]
+        public bool startAtSurface = true;
 
         [Header("Climbing out")]
         public float climbMaxHeight = 1.6f;
@@ -105,6 +108,12 @@ namespace AKI.Player
         public UnityEvent onJump = new UnityEvent();
         public UnityEvent<float> onLand = new UnityEvent<float>();          // fall speed
         public UnityEvent onClimbOut = new UnityEvent();
+
+        /// <summary>Scene-independent mirrors of the head and stroke events (for listeners that outlive the scene).
+        /// Surfacing is not reported while the surface is cursed shut (<see cref="SurfaceBlocked"/>).</summary>
+        public static event System.Action HeadUnderwater;
+        public static event System.Action HeadAboveWater;
+        public static event System.Action SwimStroke;
 
         // ------------------------------------------------------------------ state (read-only for other scripts)
         public MoveState State { get; private set; }
@@ -149,6 +158,8 @@ namespace AKI.Player
         Vector3 climbFrom, climbTo;
         float climbT;
 
+        float placeAtSurfaceUntil = -1f;   // waiting for the wave height to start floating on it (Start)
+
         void Awake()
         {
             controller = GetComponent<CharacterController>();
@@ -157,6 +168,42 @@ namespace AKI.Player
             baseFov = playerCamera != null ? playerCamera.fieldOfView : 70f;
             yaw = transform.eulerAngles.y;
             SetupInput();
+        }
+
+        void Start()
+        {
+            placeAtSurfaceUntil = startAtSurface && OverOpenWater() ? Time.time + 1f : -1f;
+        }
+
+        // Placed above the water with nothing to stand on below (a deck or a shore keeps the player on it).
+        bool OverOpenWater()
+        {
+            WaterSurface water = WaterSurface.FindAt(transform.position);
+            if (water == null) return false;
+            Vector3 feet = transform.position;
+            float floatY = water.WaterLevel + surfaceEyeHeight - eyeHeight;
+            if (feet.y <= floatY) return false;
+            return !Physics.Raycast(feet + Vector3.up * 0.1f, Vector3.down, feet.y - floatY + 0.1f, ~0, QueryTriggerInteraction.Ignore);
+        }
+
+        // Puts the eyes where floating keeps them on the wave right here, so the first look isn't down at the sea from
+        // metres above. Waits for the GPU's first wave height (a frame or two), then gives up on it and uses the mean level.
+        // Not while the surface is cursed shut (SurfaceBlocked): that keeps the player under water itself.
+        bool PlacingAtSurface(float surfaceY)
+        {
+            if (placeAtSurfaceUntil < 0f) return false;
+            if (SurfaceBlocked) { placeAtSurfaceUntil = -1f; return false; }
+            if (!probe.HasData && Time.time < placeAtSurfaceUntil) return true;
+            placeAtSurfaceUntil = -1f;
+            WaterSurface water = probe.Water != null ? probe.Water : WaterSurface.FindAt(transform.position);
+            if (water == null) return false;
+
+            Vector3 feet = transform.position;
+            feet.y = (probe.HasData ? surfaceY : water.WaterLevel) + surfaceEyeHeight - eyeHeight;
+            controller.enabled = false;
+            transform.position = feet;
+            controller.enabled = true;
+            return false;
         }
 
         void SetupInput()
@@ -235,6 +282,7 @@ namespace AKI.Player
             probe.position = transform.position;
             float surfaceY = probe.HeightOr(float.NegativeInfinity);
             bool hasWater = probe.Water != null;
+            if (PlacingAtSurface(surfaceY)) return;
             if (SurfaceBlocked && State == MoveState.Climbing)
             {
                 controller.enabled = true;
@@ -358,8 +406,12 @@ namespace AKI.Player
             bool under = IsHeadUnderwater ? EyeDepth > -0.03f : EyeDepth > 0.03f;
             if (under == IsHeadUnderwater) return;
             IsHeadUnderwater = under;
-            if (under) onHeadUnderwater.Invoke();
-            else onHeadAboveWater.Invoke();
+            if (under) { onHeadUnderwater.Invoke(); HeadUnderwater?.Invoke(); }
+            else
+            {
+                onHeadAboveWater.Invoke();
+                if (!SurfaceBlocked) HeadAboveWater?.Invoke();
+            }
         }
 
         // ------------------------------------------------------------------ land
@@ -472,6 +524,7 @@ namespace AKI.Player
                 {
                     strokeKick = 1f;
                     onSwimStroke.Invoke();
+                    SwimStroke?.Invoke();
                 }
                 float wave = 0.5f + 0.5f * Mathf.Sin(strokePhase);
                 pulse = Mathf.Lerp(1f, 0.3f + 1.45f * wave * wave, strokePulse);

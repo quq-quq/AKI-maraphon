@@ -334122,6 +334122,67 @@ LODGroup:
     renderers:
     - renderer: {fileID: 1331070930}
   m_Enabled: 1
+--- !u!1 &1483804016
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1483804018}
+  - component: {fileID: 1483804017}
+  m_Layer: 0
+  m_Name: Fish Spawner (1)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1483804017
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1483804016}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0647b0d17cbb0946b025dffeab86158, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Fish.FishSpawner
+  fishPrefab: {fileID: 1888779596029478606, guid: ce2086f0aea24ec4cb71c47ecda2910f, type: 3}
+  player: {fileID: 539679234811341237}
+  spawnOnStart: 1
+  firstSpawnDelay: 1
+  respawnDelay: 2
+  spawnDistance: 22
+  hiddenAngle: 70
+  onFishSpawned:
+    m_PersistentCalls:
+      m_Calls: []
+  onFishHit:
+    m_PersistentCalls:
+      m_Calls: []
+  onFishCaught:
+    m_PersistentCalls:
+      m_Calls: []
+  drawGizmos: 1
+--- !u!4 &1483804018
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1483804016}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1484091932
 GameObject:
   m_ObjectHideFlags: 0
@@ -404686,12 +404747,12 @@ MonoBehaviour:
   material: {fileID: 2100000, guid: a12aeb61d0ad6468ca76fcceb1228d8e, type: 2}
   texture: {fileID: 0}
   nearDistance: 0.2
-  viewDistance: 8
+  viewDistance: 10
   margin: 0.2
   fadeDensity: 0.06
-  count: 650
-  size: {x: 0.008, y: 0.04}
-  smallBias: 2.5
+  count: 1100
+  size: {x: 0.006, y: 0.05}
+  smallBias: 2.2
   colorA: {r: 0.8, g: 0.95, b: 1, a: 0.75}
   colorB: {r: 0.62, g: 0.72, b: 0.62, a: 0.55}
   lifetime: {x: 5, y: 10}
@@ -404701,12 +404762,17 @@ MonoBehaviour:
   wobble: 0.05
   stretch: 0.05
   rhythm: {fileID: 365345908507205701}
+  rhythmicFraction: 0.33333334
   beatEmission: 6
+  beatSizeBoost: 1.5
   beatGlowColour: {r: 0.45, g: 0.85, b: 1, a: 1}
   accentAmplitude: 0.1
   accentFrequency: 8
   rhythmAttackTime: 0.012
-  rhythmReleaseTime: 0.12
+  rhythmReleaseTime: 0.22
+  maxRhythmLights: 4
+  rhythmLightIntensity: 2
+  rhythmLightRange: 4
 --- !u!114 &1789588076
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -432556,6 +432622,67 @@ LODGroup:
     renderers:
     - renderer: {fileID: 1835455769}
   m_Enabled: 1
+--- !u!1 &1921477600
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1921477602}
+  - component: {fileID: 1921477601}
+  m_Layer: 0
+  m_Name: Fish Spawner (2)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1921477601
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1921477600}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0647b0d17cbb0946b025dffeab86158, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AKI.Fish.FishSpawner
+  fishPrefab: {fileID: 1888779596029478606, guid: ce2086f0aea24ec4cb71c47ecda2910f, type: 3}
+  player: {fileID: 539679234811341237}
+  spawnOnStart: 1
+  firstSpawnDelay: 1
+  respawnDelay: 2
+  spawnDistance: 22
+  hiddenAngle: 70
+  onFishSpawned:
+    m_PersistentCalls:
+      m_Calls: []
+  onFishHit:
+    m_PersistentCalls:
+      m_Calls: []
+  onFishCaught:
+    m_PersistentCalls:
+      m_Calls: []
+  drawGizmos: 1
+--- !u!4 &1921477602
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1921477600}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1922311652
 GameObject:
   m_ObjectHideFlags: 0
@@ -478403,6 +478530,10 @@ PrefabInstance:
       propertyPath: aimMask.m_Bits
       value: 51
       objectReference: {fileID: 0}
+    - target: {fileID: 4438505531933924308, guid: 91b9f75b1befe014091236f3226eeea7, type: 3}
+      propertyPath: m_RenderPostProcessing
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 5039913243124035252, guid: 91b9f75b1befe014091236f3226eeea7, type: 3}
       propertyPath: m_LocalRotation.w
       value: 1
@@ -478466,4 +478597,6 @@ SceneRoots:
   - {fileID: 833229214}
   - {fileID: 956445417}
   - {fileID: 760456566}
+  - {fileID: 1483804018}
+  - {fileID: 1921477602}
   - {fileID: 365345908507205700}
