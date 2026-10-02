@@ -79,21 +79,21 @@ MonoBehaviour:
   - Clip: {fileID: 8300000, guid: f9131bab2b9dea841ab1313644f92ebc, type: 3}
     Is3D: 0
     IgnoreUnderwater: 0
-    Volume: 0.5
+    Volume: 0.22
     Pitch: 1
-    RandomAdd: 0.1
+    RandomAdd: 0.05
   - Clip: {fileID: 8300000, guid: 86fb5f2f6bf55e549afde903f8ffe09f, type: 3}
     Is3D: 0
     IgnoreUnderwater: 0
-    Volume: 0.5
+    Volume: 0.22
     Pitch: 1
-    RandomAdd: 0.1
+    RandomAdd: 0.05
   - Clip: {fileID: 8300000, guid: 277fc9dc5e45b834caa8c30ac384bed7, type: 3}
     Is3D: 0
     IgnoreUnderwater: 0
-    Volume: 0.5
+    Volume: 0.22
     Pitch: 1
-    RandomAdd: 0.1
+    RandomAdd: 0.05
   <SplashSound>k__BackingField:
   - Clip: {fileID: 8300000, guid: f12e227108872bd4ca76c59084486b2b, type: 3}
     Is3D: 0
