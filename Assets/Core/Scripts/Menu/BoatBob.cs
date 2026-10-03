@@ -31,6 +31,8 @@ namespace AKI.Menu
         public float draft = 0f;
         [Tooltip("Maximum vertical lag behind the sampled hull waterline (m), on both rising and falling waves.")]
         [Min(0f)] public float maxHeightLag = 0.04f;
+        [Tooltip("In play mode the hull gets a solid box collider around its mesh, so the player can't swim through the boat.")]
+        public bool solidHull = true;
         [Tooltip("Maximum angular lag behind the water plane (degrees). Keeps a long hull from dipping its ends.")]
         [Range(0f, 10f)] public float maxTiltLagDegrees = 1.5f;
 
@@ -93,10 +95,24 @@ namespace AKI.Menu
 
         void Start()
         {
+            if (solidHull) MakeHullSolid();
             restPosition = transform.position;
             restRotation = transform.rotation;
             restScale = transform.lossyScale;
             InitializeGrid();
+        }
+
+        // A box around the hull's mesh (it rides along with the boat); skipped when the hull has a collider already.
+        // A box, not the mesh: the hull has too many faces for a convex mesh collider.
+        void MakeHullSolid()
+        {
+            Renderer body = hull != null ? hull : GetComponentInChildren<MeshRenderer>();
+            if (body == null || body.GetComponent<Collider>() != null) return;
+            MeshFilter filter = body.GetComponent<MeshFilter>();
+            if (filter == null || filter.sharedMesh == null) return;
+            BoxCollider solid = body.gameObject.AddComponent<BoxCollider>();
+            solid.center = filter.sharedMesh.bounds.center;
+            solid.size = filter.sharedMesh.bounds.size;
         }
 
         void InitializeGrid()
