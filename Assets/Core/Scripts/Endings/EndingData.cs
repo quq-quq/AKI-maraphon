@@ -19,14 +19,14 @@ namespace AKI.Endings
         {
             [Tooltip("The line. Several rows are fine; rich text tags (<b>, <i>, <color>) work too.")]
             [TextArea(2, 6)] public string text;
-            [Tooltip("Seconds the line stays after fading in. For the last line: before a key is accepted (or before going on by itself).")]
+            [Tooltip("All lines show together as one text. The lines' seconds add up to the least time it stays before a key is accepted (or before going on by itself); it always stays until the voices are over.")]
             [Min(0f)] public float seconds;
-            [Tooltip("Voice spoken with the line: it starts as the line fades in, and the line stays until it is over.")]
+            [Tooltip("Voice of this line. The voices of all lines play one after another while the text is on the screen.")]
             public AudioClip voice;
         }
 
         [Header("Subtitles")]
-        [Tooltip("Shown one after another; the last one stays on the screen.")]
+        [Tooltip("Shown together as one text, one line under another.")]
         public Subtitle[] subtitles = { new Subtitle { text = "Конец.", seconds = 4f } };
         [Tooltip("Loudness of the lines' voices. They are not muffled under water.")]
         [Range(0f, 1f)] public float voiceVolume = 1f;

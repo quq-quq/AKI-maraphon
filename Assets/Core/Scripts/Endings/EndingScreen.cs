@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -7,9 +8,9 @@ using UnityEngine.UI;
 namespace AKI.Endings
 {
     /// <summary>
-    /// The ending screen: the view goes black, then the subtitles of an <see cref="EndingData"/> fade in on it one
-    /// after another. After the last one it stays, or waits for a key / a few seconds and reloads the scene, loads
-    /// another one or quits
+    /// The ending screen: the view goes black and every sound of the game fades out with it, then the subtitles of an
+    /// <see cref="EndingData"/> fade in on it as one text while their voices play one after another. Then it stays,
+    /// or waits for a key / a few seconds and reloads the scene, loads another one or quits
     /// (<see cref="EndingData.after"/>). Builds its own overlay canvas on top of everything and runs on unscaled time.
     /// When a scene is loaded after it, the black lives through the load and clears over the new scene (the menu).
     /// </summary>
@@ -18,6 +19,7 @@ namespace AKI.Endings
         const int SortingOrder = 32000;            // above every other canvas
         const float LeaveFadeSeconds = 0.6f;       // the text fades out before the next scene
         const float ArriveFadeSeconds = 1.5f;      // the black clears over the next scene
+        const float BlackOverscan = 200f;          // the black reaches this far past every edge: no gap can show the game
 
         static EndingScreen current;
 
@@ -31,6 +33,8 @@ namespace AKI.Endings
         CanvasGroup words;
         CanvasGroup hint;
         AudioSource voice;
+        bool silencing;
+        readonly Dictionary<AudioSource, float> silenced = new Dictionary<AudioSource, float>();
 
         /// <summary>Shows <paramref name="ending"/>. Ignored while another ending is on the screen.</summary>
         public static void Show(EndingData ending)
@@ -75,6 +79,8 @@ namespace AKI.Endings
             voice.volume = ending.voiceVolume;
 
             RectTransform background = Panel("Black", transform, Vector2.zero, Vector2.one);
+            background.offsetMin = -Vector2.one * BlackOverscan;
+            background.offsetMax = Vector2.one * BlackOverscan;
             background.gameObject.AddComponent<Image>().color = Color.black;
             black = background.gameObject.AddComponent<CanvasGroup>();
             black.alpha = 0f;
@@ -83,7 +89,8 @@ namespace AKI.Endings
             float side = (1f - ending.textWidth) * 0.5f;
             bool bottom = ending.placement == EndingData.Placement.Bottom;
 
-            line = Label("Subtitle", background, new Vector2(side, bottom ? 0.09f : 0.12f),
+            // on the canvas, not on the black: the black reaches past the screen edges, the text must not
+            line = Label("Subtitle", transform, new Vector2(side, bottom ? 0.09f : 0.12f),
                 new Vector2(1f - side, bottom ? 0.4f : 0.88f), font, ending.fontSize, ending.textColor);
             line.alignment = bottom ? TextAnchor.LowerCenter : TextAnchor.MiddleCenter;
             line.fontStyle = ending.fontStyle;
@@ -93,7 +100,7 @@ namespace AKI.Endings
 
             Color hintColor = ending.textColor;
             hintColor.a *= 0.55f;
-            Text hintText = Label("Hint", background, new Vector2(0f, 0.02f), new Vector2(1f, 0.07f), font,
+            Text hintText = Label("Hint", transform, new Vector2(0f, 0.02f), new Vector2(1f, 0.07f), font,
                 Mathf.Max(8, Mathf.RoundToInt(ending.fontSize * 0.5f)), hintColor);
             hintText.text = ending.continueHint;
             hint = hintText.gameObject.AddComponent<CanvasGroup>();
@@ -129,24 +136,33 @@ namespace AKI.Endings
 
         IEnumerator Run()
         {
+            StartCoroutine(Silence(ending.fadeToBlackSeconds));
             yield return Fade(black, 0f, 1f, ending.fadeToBlackSeconds);
             if (ending.textDelaySeconds > 0f) yield return new WaitForSecondsRealtime(ending.textDelaySeconds);
 
+            // all the lines as one text, shown once; their voices play one after another under it
             EndingData.Subtitle[] subtitles = ending.subtitles ?? new EndingData.Subtitle[0];
-            for (int i = 0; i < subtitles.Length; i++)
+            var text = new System.Text.StringBuilder();
+            foreach (EndingData.Subtitle subtitle in subtitles)
             {
-                line.text = subtitles[i].text;
-                float hold = subtitles[i].seconds;
-                if (subtitles[i].voice != null)
-                {
-                    voice.clip = subtitles[i].voice;
-                    voice.Play();
-                    hold = Mathf.Max(hold, subtitles[i].voice.length - ending.textFadeSeconds);   // the line outlasts its voice
-                }
-                yield return Fade(words, 0f, 1f, ending.textFadeSeconds);
-                if (hold > 0f) yield return new WaitForSecondsRealtime(hold);
-                if (i < subtitles.Length - 1) yield return Fade(words, 1f, 0f, ending.textFadeSeconds);   // the last line stays
+                if (string.IsNullOrEmpty(subtitle.text)) continue;
+                if (text.Length > 0) text.Append('\n');
+                text.Append(subtitle.text);
             }
+            line.text = text.ToString();
+            yield return Fade(words, 0f, 1f, ending.textFadeSeconds);
+            // the voices start right away, back to back; the lines' seconds add up to the least time the text stays
+            float least = 0f, spoken = 0f;
+            foreach (EndingData.Subtitle subtitle in subtitles)
+            {
+                least += subtitle.seconds;
+                if (subtitle.voice == null) continue;
+                voice.clip = subtitle.voice;
+                voice.Play();
+                yield return new WaitForSecondsRealtime(subtitle.voice.length);
+                spoken += subtitle.voice.length;
+            }
+            if (least > spoken) yield return new WaitForSecondsRealtime(least - spoken);
             if (ending.after == EndingData.AfterEnding.StayOnScreen) yield break;
 
             if (ending.waitForKey)
@@ -160,6 +176,24 @@ namespace AKI.Endings
             hint.alpha = 0f;
             yield return Fade(words, 1f, 0f, LeaveFadeSeconds);
             yield return Leave();
+        }
+
+        // Every sound but the ending's voice fades out with the view and stays silent while the ending is on the
+        // screen (sounds that start meanwhile too). Stops when the next scene loads: its sounds start fresh.
+        IEnumerator Silence(float seconds)
+        {
+            silencing = true;
+            for (float t = 0f; silencing; t += Time.unscaledDeltaTime)
+            {
+                float k = seconds > 0f ? 1f - Mathf.SmoothStep(0f, 1f, t / seconds) : 0f;
+                foreach (AudioSource source in FindObjectsByType<AudioSource>(FindObjectsSortMode.None))
+                {
+                    if (source == voice) continue;
+                    if (!silenced.TryGetValue(source, out float volume)) silenced[source] = volume = source.volume;
+                    source.volume = volume * k;
+                }
+                yield return null;
+            }
         }
 
         static IEnumerator Fade(CanvasGroup group, float from, float to, float seconds)
@@ -209,6 +243,7 @@ namespace AKI.Endings
         // the next scene starts from scratch behind the black, then the black clears
         IEnumerator Arrive(AsyncOperation load)
         {
+            silencing = false;
             DontDestroyOnLoad(gameObject);
             while (load != null && !load.isDone) yield return null;
             yield return null;   // let the new scene set itself up behind the black
@@ -229,6 +264,9 @@ namespace AKI.Endings
 
         void OnDestroy()
         {
+            // sounds that outlived the ending (Hide, or ones kept through the load) get their volume back
+            foreach (KeyValuePair<AudioSource, float> pair in silenced)
+                if (pair.Key != null) pair.Key.volume = pair.Value;
             if (current == this) current = null;
         }
     }
