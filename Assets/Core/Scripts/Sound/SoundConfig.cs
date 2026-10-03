@@ -49,9 +49,10 @@ namespace Core.Scripts.Sound
             return Pitch + UnityEngine.Random.Range(-RandomAdd, RandomAdd);
         }
 
+        // a share of the volume, so a quiet sound varies as much as a loud one
         public float GetVolume()
         {
-            return Volume + UnityEngine.Random.Range(-RandomAdd, RandomAdd);
+            return Volume * (1f + UnityEngine.Random.Range(-RandomAdd, RandomAdd));
         }
     }
 }
