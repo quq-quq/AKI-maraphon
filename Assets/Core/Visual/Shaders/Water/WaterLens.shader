@@ -140,8 +140,8 @@ Shader "Hidden/AKI/WaterLens"
             TEXTURE2D(_RhythmHitMask); SAMPLER(sampler_RhythmHitMask);
             float4 _RhythmHitMaskParams; // mask blend, power, invert, outer radius
             float _RhythmHitGlow;
-            float4 _RhythmBeatEdge;          // the music's beat, pulsing in from the screen edges: colour + strength (RhythmBeatFX)
-            float  _RhythmBeatWidth;         // how far that glow reaches in, share of the screen height
+            float4 _RhythmBeatEdge;          // the music's beat, pulsing down from the top edge: colour + strength (RhythmBeatFX)
+            float  _RhythmBeatWidth;         // how far that glow reaches down, share of the screen height
             // set by WaterLensFeature while the lens is wet
             TEXTURE2D(_WaterLensFilm);       // FragFilm's output at half resolution: (height, sheets)
             float4 _WaterLensFilmTexel;      // 1 / its size
@@ -604,13 +604,11 @@ Shader "Hidden/AKI/WaterLens"
                     col += _RhythmHitVignette.rgb*(hitAmount*_RhythmHitGlow);
                 }
 
-                // ---- the music's beat: a soft glow pulsing in from all four edges of the screen
+                // ---- the music's beat: a soft glow pulsing down from the top edge of the screen only (uv.y = 1 is the top)
                 if (_RhythmBeatEdge.a > 0.0)
                 {
-                    float2 e = min(uv, 1.0 - uv) * float2(aspect, 1.0);         // distance to the sides, in screen heights
-                    float2 g = 1.0 - smoothstep(0.0, max(_RhythmBeatWidth, 1e-3), e);
-                    float glow = 1.0 - (1.0 - g.x * g.x) * (1.0 - g.y * g.y);   // both sides blend in the corners, no seams
-                    col += (half3)(_RhythmBeatEdge.rgb * (_RhythmBeatEdge.a * glow));
+                    float g = 1.0 - smoothstep(0.0, max(_RhythmBeatWidth, 1e-3), 1.0 - uv.y);
+                    col += (half3)(_RhythmBeatEdge.rgb * (_RhythmBeatEdge.a * g * g));
                 }
                 col *= 1.0h - (half)saturate(_ScreenFade);
                 return half4(col, 1.0h);

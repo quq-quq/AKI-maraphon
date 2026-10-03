@@ -5,7 +5,7 @@ namespace AKI.Rhythm
 {
     /// <summary>
     /// Lets the player feel the music's beat: on every beat of the <see cref="RhythmConductor"/> the camera's field of
-    /// view gives a short kick and a soft glow pulses in from the edges of the screen (drawn by the water lens pass,
+    /// view gives a short kick and a soft glow pulses down from the top edge of the screen (drawn by the water lens pass,
     /// <see cref="WaterLensFeature"/>). Lives on the player camera; <see cref="RhythmGameFlow"/> adds one when the
     /// camera has none, so add it to the camera yourself to keep tuned settings.
     /// The kick sits on top of whatever else sets the field of view (swimming speed, aiming): it is added after them
@@ -29,13 +29,13 @@ namespace AKI.Rhythm
         [Tooltip("Seconds the kick takes to settle back.")]
         [Min(0.01f)] public float fovReleaseSeconds = 0.3f;
 
-        [Header("Pulse from the screen edges")]
+        [Header("Pulse from the top edge of the screen")]
         [ColorUsage(false, true)] public Color edgeColour = new Color(0.55f, 0.9f, 1f, 1f);
-        [Tooltip("Brightness of the glow right at the edges on a beat. 0 = off.")]
+        [Tooltip("Brightness of the glow right at the top edge on a beat. 0 = off.")]
         [Range(0f, 2f)] public float edgeIntensity = 0.06f;
-        [Tooltip("How far the glow reaches in from the edges, share of the screen height.")]
+        [Tooltip("How far the glow reaches down from the top edge, share of the screen height.")]
         [Range(0.02f, 0.5f)] public float edgeWidth = 0.07f;
-        [Tooltip("While it fades the glow moves this much further in (share of Edge Width), so it reads as a pulse coming from the edges.")]
+        [Tooltip("While it fades the glow moves this much further in (share of Edge Width), so it reads as a pulse coming from the top.")]
         [Range(0f, 2f)] public float edgeTravel = 0.2f;
         [Tooltip("Seconds the glow takes to rise.")]
         [Min(0f)] public float edgeAttackSeconds = 0.07f;

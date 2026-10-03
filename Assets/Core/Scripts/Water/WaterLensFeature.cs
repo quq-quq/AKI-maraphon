@@ -30,7 +30,7 @@ namespace AKI.Water
         public static bool ScreenActive;
         public static bool RhythmHitActive;
 
-        /// <summary>Set by RhythmBeatFX while the beat glow pulses in from the screen edges.</summary>
+        /// <summary>Set by RhythmBeatFX while the beat glow pulses down from the top edge of the screen.</summary>
         public static bool RhythmBeatActive;
 
         /// <summary>Set by UnderwaterPostVolume while the diving mask's rim shows (under water).</summary>
