@@ -399,6 +399,7 @@ namespace AKI.Rhythm
             if (phase == GamePhase.BossFight && drownedEnding != null) { ShowEnding(drownedEnding); return; }
             SetPhase(GamePhase.Failed); conductor.StopMusic(); fishSpawner?.StopSpawning();
             naga?.StopMotion(false);
+            if (menu != null) MainMenuController.RespawnInBoat = true;   // he passes out and comes to in the boat, no menu
         }
         // The game is over for good: no music, no shooting, no passing out (BreathHolding reads that flag right
         // after its out-of-air event, so the ending replaces the reload), and the ending's subtitles on black.
@@ -415,6 +416,7 @@ namespace AKI.Rhythm
         {
             if (!Application.isPlaying || !initialized || Blackout.IsRunning) return;
             conductor.StopMusic(); SetPhase(GamePhase.Failed); fishSpawner?.StopSpawning();
+            if (menu != null) MainMenuController.RespawnInBoat = true;
             Blackout.ReloadScene(.3f, 2f);
         }
         Vector3 SafeOceanPoint(Vector3 p, float clearance)
