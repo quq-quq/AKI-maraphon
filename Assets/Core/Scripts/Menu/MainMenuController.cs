@@ -266,6 +266,7 @@ namespace AKI.Menu
         {
             if (inWater || Depth(eye) <= 0f) return;
             inWater = true;
+            cutscene.SetCarriedHarpoonVisible(false);
             onEnteredWater.Invoke();
             EnteredWater?.Invoke();
         }
