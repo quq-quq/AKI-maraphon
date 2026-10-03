@@ -1,5 +1,6 @@
 using System;
 using AKI.Player;
+using AKI.UI;
 using AKI.Water;
 using UnityEngine;
 using UnityEngine.Events;
@@ -59,7 +60,7 @@ namespace AKI.Menu
         [Header("Start hint")]
         [Tooltip("Shown at the bottom of the menu until he gets up. Empty = no hint.")]
         public string startHint = "Нажмите любую кнопку";
-        [Min(8)] public int startHintSize = 34;
+        [Min(8)] public int startHintSize = 42;
         public Color startHintColour = new Color(1f, 1f, 1f, 0.85f);
         [Tooltip("Seconds for the view to level out under the water.")]
         [Min(0.05f)] public float settleSeconds = 0.6f;
@@ -228,7 +229,7 @@ namespace AKI.Menu
             rect.anchorMin = new Vector2(0f, 0.06f);
             rect.anchorMax = new Vector2(1f, 0.14f);
             rect.offsetMin = rect.offsetMax = Vector2.zero;
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            label.font = GameFont.Get();
             label.fontSize = startHintSize;
             label.color = startHintColour;
             label.alignment = TextAnchor.MiddleCenter;

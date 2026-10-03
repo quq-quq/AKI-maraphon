@@ -34,7 +34,7 @@ namespace AKI.Endings
         [Min(8)] public int fontSize = 40;
         public Color textColor = new Color(1f, 0.85f, 0.1f, 1f);
         public FontStyle fontStyle = FontStyle.Normal;
-        [Tooltip("Empty = Unity's built-in font.")]
+        [Tooltip("Empty = the game's font (Kurale, see GameFont).")]
         public Font font;
         [Tooltip("Width of the subtitles, part of the screen width (0..1).")]
         [Range(0.2f, 1f)] public float textWidth = 0.8f;
