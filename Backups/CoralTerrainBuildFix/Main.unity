@@ -201347,7 +201347,7 @@ Terrain:
   m_StaticShadowCaster: 0
   m_IgnoreQualitySettings: 0
   m_ReflectionProbeUsage: 1
-  m_MaterialTemplate: {fileID: 2100000, guid: c6ce478ed763fb74ea333d1706bdbbbf, type: 2}
+  m_MaterialTemplate: {fileID: 2100000, guid: 0e18e79a018c44a409d435e4b82871fc, type: 2}
   m_BakeLightProbesForTrees: 1
   m_PreserveTreePrototypeLayers: 0
   m_DeringLightProbesForTrees: 1
@@ -269873,67 +269873,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1203461984}
   m_Mesh: {fileID: -5901118995069572125, guid: 3ca9e0e9ad6e7044ba15e85879b32dc2, type: 3}
---- !u!1 &1203662158
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1203662160}
-  - component: {fileID: 1203662159}
-  m_Layer: 0
-  m_Name: Fish Spawner (2)
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1203662159
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1203662158}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f0647b0d17cbb0946b025dffeab86158, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AKI.Fish.FishSpawner
-  fishPrefab: {fileID: 1888779596029478606, guid: ce2086f0aea24ec4cb71c47ecda2910f, type: 3}
-  player: {fileID: 0}
-  spawnOnStart: 1
-  firstSpawnDelay: 1
-  respawnDelay: 2
-  spawnDistance: 22
-  hiddenAngle: 70
-  onFishSpawned:
-    m_PersistentCalls:
-      m_Calls: []
-  onFishHit:
-    m_PersistentCalls:
-      m_Calls: []
-  onFishCaught:
-    m_PersistentCalls:
-      m_Calls: []
-  drawGizmos: 1
---- !u!4 &1203662160
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1203662158}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1203688736
 GameObject:
   m_ObjectHideFlags: 0
@@ -282502,67 +282441,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1252002756}
   m_Mesh: {fileID: 461153079233229735, guid: ca794ff9d24c18b48a70ba7c10b2ed0b, type: 3}
---- !u!1 &1252448104
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1252448106}
-  - component: {fileID: 1252448105}
-  m_Layer: 0
-  m_Name: Fish Spawner (1)
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1252448105
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1252448104}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f0647b0d17cbb0946b025dffeab86158, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AKI.Fish.FishSpawner
-  fishPrefab: {fileID: 1888779596029478606, guid: ce2086f0aea24ec4cb71c47ecda2910f, type: 3}
-  player: {fileID: 0}
-  spawnOnStart: 1
-  firstSpawnDelay: 1
-  respawnDelay: 2
-  spawnDistance: 22
-  hiddenAngle: 70
-  onFishSpawned:
-    m_PersistentCalls:
-      m_Calls: []
-  onFishHit:
-    m_PersistentCalls:
-      m_Calls: []
-  onFishCaught:
-    m_PersistentCalls:
-      m_Calls: []
-  drawGizmos: 1
---- !u!4 &1252448106
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1252448104}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1252984574
 GameObject:
   m_ObjectHideFlags: 0
@@ -307423,67 +307301,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1363084954}
   m_Mesh: {fileID: -453742476730849336, guid: 487463501ff660e4c8a6f21e1f1db073, type: 3}
---- !u!1 &1363094824
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1363094826}
-  - component: {fileID: 1363094825}
-  m_Layer: 0
-  m_Name: Fish Spawner (4)
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1363094825
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1363094824}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f0647b0d17cbb0946b025dffeab86158, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AKI.Fish.FishSpawner
-  fishPrefab: {fileID: 1888779596029478606, guid: ce2086f0aea24ec4cb71c47ecda2910f, type: 3}
-  player: {fileID: 0}
-  spawnOnStart: 1
-  firstSpawnDelay: 1
-  respawnDelay: 2
-  spawnDistance: 22
-  hiddenAngle: 70
-  onFishSpawned:
-    m_PersistentCalls:
-      m_Calls: []
-  onFishHit:
-    m_PersistentCalls:
-      m_Calls: []
-  onFishCaught:
-    m_PersistentCalls:
-      m_Calls: []
-  drawGizmos: 1
---- !u!4 &1363094826
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1363094824}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1363122412
 GameObject:
   m_ObjectHideFlags: 0
@@ -404886,67 +404703,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1786643226}
   m_Mesh: {fileID: 1673014024060510217, guid: 7cd32c34f5e8b884a961312a96f51526, type: 3}
---- !u!1 &1787236411
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1787236413}
-  - component: {fileID: 1787236412}
-  m_Layer: 0
-  m_Name: Fish Spawner (3)
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1787236412
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1787236411}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f0647b0d17cbb0946b025dffeab86158, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AKI.Fish.FishSpawner
-  fishPrefab: {fileID: 1888779596029478606, guid: ce2086f0aea24ec4cb71c47ecda2910f, type: 3}
-  player: {fileID: 0}
-  spawnOnStart: 1
-  firstSpawnDelay: 1
-  respawnDelay: 2
-  spawnDistance: 22
-  hiddenAngle: 70
-  onFishSpawned:
-    m_PersistentCalls:
-      m_Calls: []
-  onFishHit:
-    m_PersistentCalls:
-      m_Calls: []
-  onFishCaught:
-    m_PersistentCalls:
-      m_Calls: []
-  drawGizmos: 1
---- !u!4 &1787236413
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1787236411}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1787519214
 GameObject:
   m_ObjectHideFlags: 0
@@ -479404,10 +479160,6 @@ SceneRoots:
   - {fileID: 501039099}
   - {fileID: 23182051}
   - {fileID: 420528236}
-  - {fileID: 1252448106}
-  - {fileID: 1203662160}
-  - {fileID: 1787236413}
-  - {fileID: 1363094826}
   - {fileID: 1685433926}
   - {fileID: 1134407221}
   - {fileID: 450581829}
