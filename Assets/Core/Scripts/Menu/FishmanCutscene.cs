@@ -33,14 +33,21 @@ namespace AKI.Menu
         [Tooltip("Share of the back's straightening the neck takes back, so the head stays level instead of nodding.")]
         [Range(0f,1f)] public float breathingNeckCompensation = .8f;
         [Header("Seated idle life (stops when standing up)")]
-        [Tooltip("He slowly looks around: largest turn of the head left / right (degrees).")]
-        [Range(0f,30f)] public float idleHeadYawDegrees = 12f;
+        [Tooltip("He glances around now and then: largest turn left / right (degrees, head, neck and chest together). " +
+                 "Seen from behind, a glance has to be this big to read at all.")]
+        [Range(0f,60f)] public float idleLookYawDegrees = 38f;
         [Tooltip("Largest look up / down (degrees).")]
-        [Range(0f,15f)] public float idleHeadPitchDegrees = 4f;
-        [Tooltip("The upper body sways gently side to side with the boat (degrees).")]
-        [Range(0f,5f)] public float idleSwayDegrees = 1.5f;
-        [Tooltip("How quickly he looks around and sways; low = an old man's calm.")]
-        [Range(.02f,.5f)] public float idleSpeed = .09f;
+        [Range(0f,20f)] public float idleLookPitchDegrees = 10f;
+        [Tooltip("Seconds he holds a glance before the next one (random between X and Y).")]
+        public Vector2 idleGlanceSeconds = new Vector2(2f, 6f);
+        [Tooltip("Seconds a glance takes to turn.")]
+        [Min(.1f)] public float idleGlanceTurnSeconds = .55f;
+        [Tooltip("Share of the glances that look back to straight ahead, so he doesn't stare sideways all the time.")]
+        [Range(0f,1f)] public float idleLookAheadShare = .35f;
+        [Tooltip("The upper body sways side to side with the boat (degrees).")]
+        [Range(0f,8f)] public float idleSwayDegrees = 3.5f;
+        [Tooltip("How quickly he sways; low = an old man's calm.")]
+        [Range(.02f,.5f)] public float idleSwaySpeed = .18f;
         [Tooltip("Humanoid bones don't take scale from animation, so this has no visible effect on a Humanoid rig.")]
         [Range(0f,.03f)] public float breathingChestExpansion = .012f;
         [Min(.05f)] public float breathingBlendOutSeconds = .25f;
@@ -65,6 +72,8 @@ namespace AKI.Menu
         Quaternion seatedSpineRotation, seatedChestRotation;
         Vector3 spineBreathingAxis, chestBreathingAxis;
         float breathingWeight = 1f;
+        Vector2 look, lookTarget, lookVelocity;   // -1..1 of the glance yaw / pitch
+        float nextGlanceTime;
         Vector3 actorBaseLocalPosition;
         Vector3 seatedActorCorrection;
 
@@ -73,9 +82,9 @@ namespace AKI.Menu
         {
             public TransformStreamHandle spine, chest, neck, leftShoulder, rightShoulder, head;
             public Vector3 spineAxis, chestAxis, neckAxis, leftShoulderAxis, rightShoulderAxis;
-            public Vector3 swayAxis, headYawAxis, headPitchAxis;
+            public Vector3 swayAxis, headYawAxis, headPitchAxis, neckYawAxis, chestYawAxis;
             public float spineBend, chestBend, chestExpansion, neckBend, shoulderRaise;
-            public float sway, headYaw, headPitch;
+            public float sway, headYaw, headPitch, neckYaw, chestYaw;
             public bool hasSpine, hasChest, hasNeck, hasShoulders, hasHead;
             public void ProcessRootMotion(AnimationStream stream) { }
             public void ProcessAnimation(AnimationStream stream)
@@ -84,11 +93,11 @@ namespace AKI.Menu
                     spine.SetLocalRotation(stream, Quaternion.AngleAxis(sway,swayAxis) * Quaternion.AngleAxis(spineBend,spineAxis) * spine.GetLocalRotation(stream));
                 if (hasChest && chest.IsValid(stream))
                 {
-                    chest.SetLocalRotation(stream, Quaternion.AngleAxis(chestBend,chestAxis) * chest.GetLocalRotation(stream));
+                    chest.SetLocalRotation(stream, Quaternion.AngleAxis(chestYaw,chestYawAxis) * Quaternion.AngleAxis(chestBend,chestAxis) * chest.GetLocalRotation(stream));
                     chest.SetLocalScale(stream, chest.GetLocalScale(stream) * (1f + chestExpansion));
                 }
                 if (hasNeck && neck.IsValid(stream))
-                    neck.SetLocalRotation(stream, Quaternion.AngleAxis(neckBend,neckAxis) * neck.GetLocalRotation(stream));
+                    neck.SetLocalRotation(stream, Quaternion.AngleAxis(neckYaw,neckYawAxis) * Quaternion.AngleAxis(neckBend,neckAxis) * neck.GetLocalRotation(stream));
                 if (hasHead && head.IsValid(stream))
                     head.SetLocalRotation(stream, Quaternion.AngleAxis(headYaw,headYawAxis) * Quaternion.AngleAxis(headPitch,headPitchAxis) * head.GetLocalRotation(stream));
                 if (hasShoulders && leftShoulder.IsValid(stream) && rightShoulder.IsValid(stream))
@@ -183,7 +192,10 @@ namespace AKI.Menu
                     breathingJob.hasNeck = true;
                     breathingJob.neck = actor.BindStreamTransform(neck);
                     breathingJob.neckAxis = neck.parent.InverseTransformDirection(actor.transform.right).normalized;
+                    breathingJob.neckYawAxis = neck.parent.InverseTransformDirection(actor.transform.up).normalized;
                 }
+                if (breathingChest != null)
+                    breathingJob.chestYawAxis = breathingChest.parent.InverseTransformDirection(actor.transform.up).normalized;
                 if (breathingSpine != null)
                     breathingJob.swayAxis = breathingSpine.parent.InverseTransformDirection(actor.transform.forward).normalized;
                 if (head != null && head != actor.transform)
@@ -212,6 +224,22 @@ namespace AKI.Menu
         }
 
         static float Wander(float t, float seed) => (Mathf.PerlinNoise(t, seed) - .5f) * 2f;
+
+        // Glances: hold a look, then turn to a new one (often back ahead), like someone waiting and watching the sea.
+        void UpdateGlance()
+        {
+            if (Time.time >= nextGlanceTime)
+            {
+                bool ahead = Random.value < idleLookAheadShare;
+                float side = lookTarget.x >= 0f ? -1f : 1f;   // mostly to the other side, so he doesn't stare one way
+                if (Random.value < .25f) side = -side;
+                lookTarget = ahead
+                    ? new Vector2(Random.Range(-.15f, .15f), Random.Range(-.2f, .2f))
+                    : new Vector2(side * Random.Range(.45f, 1f), Random.Range(-.6f, .5f));
+                nextGlanceTime = Time.time + Random.Range(idleGlanceSeconds.x, Mathf.Max(idleGlanceSeconds.x, idleGlanceSeconds.y));
+            }
+            look = Vector2.SmoothDamp(look, lookTarget, ref lookVelocity, idleGlanceTurnSeconds * .5f);
+        }
 
         // The axis (in the shoulder's parent space) that swings the upper arm upwards for a positive angle.
         static Vector3 ShoulderRaiseAxis(Transform shoulder, Transform upperArm)
@@ -273,11 +301,14 @@ namespace AKI.Menu
             breathingJob.chestBend = -bend * breathingChestDegrees;
             breathingJob.neckBend = bend * (breathingSpineDegrees + breathingChestDegrees) * breathingNeckCompensation;
             breathingJob.shoulderRaise = bend * breathingShoulderDegrees;
-            // idle life: slow, never-repeating looks around and a gentle sway (Perlin noise, -1..1)
-            float t = Time.time * idleSpeed;
-            breathingJob.headYaw = Wander(t, 3.1f) * idleHeadYawDegrees * breathingWeight;
-            breathingJob.headPitch = Wander(t * .8f, 7.7f) * idleHeadPitchDegrees * breathingWeight;
-            breathingJob.sway = Wander(t * .6f, 12.3f) * idleSwayDegrees * breathingWeight;
+            // idle life: glances around (the head turns most, the neck and chest follow) and sways with the boat
+            UpdateGlance();
+            float yaw = look.x * idleLookYawDegrees * breathingWeight;
+            breathingJob.headYaw = yaw * .55f;
+            breathingJob.neckYaw = yaw * .3f;
+            breathingJob.chestYaw = yaw * .15f;
+            breathingJob.headPitch = look.y * idleLookPitchDegrees * breathingWeight;
+            breathingJob.sway = Wander(Time.time * idleSwaySpeed, 12.3f) * idleSwayDegrees * breathingWeight;
             breathingJob.chestExpansion = bend * breathingChestExpansion;
             breathingPlayable.SetJobData(breathingJob);
             Sample(playing ? time : 0f);
