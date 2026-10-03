@@ -160,7 +160,7 @@ MonoBehaviour:
     Volume: 1
     Pitch: 1
     RandomAdd: 0.1
-  <NagaDistanceSeconds>k__BackingField: 3
+  <NagaDistanceSeconds>k__BackingField: 8
   <NagaSounds>k__BackingField:
   - Clip: {fileID: 8300000, guid: b036177edd02f994ebe6efa814eeb1c2, type: 3}
     Is3D: 1

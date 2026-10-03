@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using AKI.UI;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -85,7 +86,7 @@ namespace AKI.Endings
             black = background.gameObject.AddComponent<CanvasGroup>();
             black.alpha = 0f;
 
-            Font font = ending.font != null ? ending.font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            Font font = ending.font != null ? ending.font : GameFont.Get();
             float side = (1f - ending.textWidth) * 0.5f;
             bool bottom = ending.placement == EndingData.Placement.Bottom;
 

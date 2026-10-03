@@ -305,7 +305,8 @@ namespace Core.Scripts.Sound
             {
                 while (nagaTransform != null)
                 {
-                    yield return new WaitForSeconds(_soundConfig.NagaDistanceSeconds);
+                    // a while between the roars, never the same twice, so it doesn't tick like a clock
+                    yield return new WaitForSeconds(_soundConfig.NagaDistanceSeconds * UnityEngine.Random.Range(0.75f, 1.25f));
 
                     // it roars from its mouth, not from the middle of its body
                     if (nagaTransform != null)

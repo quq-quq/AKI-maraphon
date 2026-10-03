@@ -28,7 +28,8 @@ namespace Core.Scripts.Sound
         [field: SerializeField] public AudioClipConfig FishDeathSound { get; private set; }
         [field: SerializeField] public AudioClipConfig ShootSound { get; private set; }
         [Header("Naga settings")]
-        [field: SerializeField] public float NagaDistanceSeconds { get; private set; } = 3;
+        [field: Tooltip("Average seconds between the Naga's roars (each pause varies by a quarter).")]
+        [field: SerializeField] public float NagaDistanceSeconds { get; private set; } = 8;
         [field: SerializeField] public List<AudioClipConfig> NagaSounds { get; private set; }
     }
 

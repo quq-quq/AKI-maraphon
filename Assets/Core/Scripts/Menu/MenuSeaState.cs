@@ -4,8 +4,8 @@ using UnityEngine;
 namespace AKI.Menu
 {
     /// <summary>
-    /// Put next to the <see cref="OceanFFT"/>. The sea stays as calm as the scene has it while the menu and the cutscene
-    /// play, then, once the player takes over, rises over <see cref="riseSeconds"/> to the game's sea: big rolling waves
+    /// Put next to the <see cref="OceanFFT"/>. The sea is calm (<see cref="menuWaveScale"/>) while the menu and the
+    /// cutscene play, then, once the player takes over, rises over <see cref="riseSeconds"/> to the game's sea: big rolling waves
     /// with whitecaps breaking on their crests (the foam follows the waves by itself).
     /// </summary>
     [DisallowMultipleComponent]
@@ -14,7 +14,9 @@ namespace AKI.Menu
     {
         [Tooltip("Starts the rise when its player takes over. Found in the scene when empty.")]
         public MainMenuController menu;
-        [Tooltip("Wave height of the game (OceanFFT wave scale); the menu keeps the one set on the ocean.")]
+        [Tooltip("Wave height while the menu and the dive play (OceanFFT wave scale): a calm sea to start with.")]
+        [Range(0f, 3f)] public float menuWaveScale = 0.3f;
+        [Tooltip("Wave height of the game (OceanFFT wave scale).")]
         [Range(0f, 3f)] public float gameWaveScale = 1f;
         [Tooltip("Seconds for the sea to rise from the menu's calm to the game's.")]
         [Min(0f)] public float riseSeconds = 12f;
@@ -26,7 +28,8 @@ namespace AKI.Menu
         void Start()
         {
             ocean = GetComponent<OceanFFT>();
-            calmScale = ocean.waveScale;
+            calmScale = menuWaveScale;
+            ocean.SetWaveScale(calmScale);
             if (menu == null) menu = FindFirstObjectByType<MainMenuController>();
             if (menu != null) menu.onGameStarted.AddListener(Rise);
             else Rise();   // no menu: the game starts right away
