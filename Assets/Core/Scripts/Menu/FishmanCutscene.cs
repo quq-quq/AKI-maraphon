@@ -57,6 +57,8 @@ namespace AKI.Menu
         public bool alignSeatedHips;
         public Vector3 seatedHipsLocalPosition;
         [Min(.1f)] public float seatedAlignmentBlendOutSeconds = 1f;
+        [Header("Carried equipment (until entering the water)")]
+        public GameObject carriedHarpoon;
 
         PlayableGraph graph;
         AnimationMixerPlayable mixer;
@@ -264,7 +266,13 @@ namespace AKI.Menu
         public void SetActorVisible(bool visible)
         {
             if (skins == null) return;
-            foreach (SkinnedMeshRenderer skin in skins) skin.enabled = visible;
+            foreach (SkinnedMeshRenderer skin in skins)
+                if (carriedHarpoon == null || !skin.transform.IsChildOf(carriedHarpoon.transform)) skin.enabled = visible;
+        }
+
+        public void SetCarriedHarpoonVisible(bool visible)
+        {
+            if (carriedHarpoon != null) carriedHarpoon.SetActive(visible);
         }
 
         /// <summary>Where the head is sitting in the boat and at the very end of the dive (world, at the current pose of this object).</summary>

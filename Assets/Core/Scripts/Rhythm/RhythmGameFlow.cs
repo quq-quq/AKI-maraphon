@@ -179,15 +179,7 @@ namespace AKI.Rhythm
         {
             if (!initialized) return;
             bossHitPulse = Mathf.MoveTowards(bossHitPulse, 0f, Time.unscaledDeltaTime / Mathf.Max(.05f,bossHitFadeSeconds));
-            float holdShare = Mathf.Clamp(bossHitHoldSeconds / Mathf.Max(.05f,bossHitFadeSeconds), 0f, .95f);
-            float hitStrength = Mathf.Clamp01(bossHitPulse / (1f-holdShare));
-            Shader.SetGlobalVector("_RhythmHitVignette", new Vector4(bossHitColour.r,bossHitColour.g,bossHitColour.b,hitStrength*bossHitIntensity));
-            Shader.SetGlobalFloat("_RhythmHitInner", bossHitVignetteInner);
-            Shader.SetGlobalTexture("_RhythmHitMask", bossHitMask != null ? bossHitMask : Texture2D.whiteTexture);
-            Shader.SetGlobalVector("_RhythmHitMaskParams", new Vector4(bossHitMask != null ? bossHitMaskStrength : 0f,
-                bossHitMaskPower, bossHitMaskInvert ? 1f : 0f, Mathf.Max(bossHitVignetteInner+.01f,bossHitVignetteOuter)));
-            Shader.SetGlobalFloat("_RhythmHitGlow", bossHitGlow);
-            WaterLensFeature.RhythmHitActive = bossHitPulse > .001f;
+            ApplyBossHitVignette();
             if (phase == GamePhase.Ended) return;   // nothing may restart the scene under an ending
             if(naga!=null)
             {
@@ -359,12 +351,25 @@ namespace AKI.Rhythm
             lastDeepBossPosition = safe; hasDeepBossPosition = true;
             return true;
         }
+        void ApplyBossHitVignette()
+        {
+            float holdShare = Mathf.Clamp(bossHitHoldSeconds / Mathf.Max(.05f,bossHitFadeSeconds),0f,.95f);
+            float hitStrength = Mathf.Clamp01(bossHitPulse / (1f-holdShare));
+            Shader.SetGlobalVector("_RhythmHitVignette",new Vector4(bossHitColour.r,bossHitColour.g,bossHitColour.b,hitStrength*bossHitIntensity));
+            Shader.SetGlobalFloat("_RhythmHitInner",bossHitVignetteInner);
+            Shader.SetGlobalTexture("_RhythmHitMask",bossHitMask != null ? bossHitMask : Texture2D.whiteTexture);
+            Shader.SetGlobalVector("_RhythmHitMaskParams",new Vector4(bossHitMask != null ? bossHitMaskStrength : 0f,bossHitMaskPower,bossHitMaskInvert ? 1f : 0f,Mathf.Max(bossHitVignetteInner+.01f,bossHitVignetteOuter)));
+            Shader.SetGlobalFloat("_RhythmHitGlow",bossHitGlow);
+            WaterLensFeature.RhythmHitActive = bossHitPulse > .001f;
+        }
+
         public void OnNagaHit(HarpoonProjectile arrow)
         {
             if (phase != GamePhase.BossFight || arrow == null || !arrow.IsRhythmShot || arrow.RhythmSession != conductor.Session) return;
             if (!rewardedBeats.Add(arrow.RhythmBeat)) return;
             SuccessfulBossHits++; breath.RestoreFullBreath(); naga?.PlayHitReaction();
             bossHitPulse = 1f;
+            ApplyBossHitVignette();
             onBossHit.Invoke();
         }
         void OnMusicFinished()
