@@ -4,6 +4,7 @@ using AKI.Water;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 namespace AKI.Menu
 {
@@ -54,6 +55,12 @@ namespace AKI.Menu
         [Tooltip("After he passed out (not an ending): seconds he sits in the boat once his eyes are open, then he " +
                  "dives again by himself - no menu.")]
         [Min(0f)] public float respawnDiveDelay = 1.2f;
+
+        [Header("Start hint")]
+        [Tooltip("Shown at the bottom of the menu until he gets up. Empty = no hint.")]
+        public string startHint = "Нажмите любую кнопку";
+        [Min(8)] public int startHintSize = 34;
+        public Color startHintColour = new Color(1f, 1f, 1f, 0.85f);
         [Tooltip("Seconds for the view to level out under the water.")]
         [Min(0.05f)] public float settleSeconds = 0.6f;
         [Tooltip("How quickly the water slows the dive down (1/s).")]
@@ -102,6 +109,8 @@ namespace AKI.Menu
         float currentVariation;
         float releaseTime = -1f;
         float respawnTime = -1f;    // >= 0: coming to in the boat, counting to the dive
+        CanvasGroup hint;
+        float hintFade = -1f;       // >= 0: the hint is fading out
 
         void Start()
         {
@@ -118,6 +127,7 @@ namespace AKI.Menu
                 RespawnInBoat = false;
                 respawnTime = 0f;
             }
+            else BuildHint();   // he came to in the boat and dives by himself: nothing to press
 
             // which way he dives: where the view looks if his head isn't moving yet
             cutscene.MeasureDive(out Vector3 seated, out Vector3 end);
@@ -128,7 +138,8 @@ namespace AKI.Menu
 
         void Update()
         {
-            if (phase == Phase.Menu && Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame) StartCutscene();
+            if (phase == Phase.Menu && AnyPress()) StartCutscene();
+            UpdateHint();
             // came to in the boat: once the eyes are open (the blackout is over), a moment, then he dives again
             if (respawnTime >= 0f && phase == Phase.Menu && !Blackout.IsRunning)
             {
@@ -180,6 +191,68 @@ namespace AKI.Menu
             Enter(Phase.Cutscene);
             onCutsceneStarted.Invoke();
             MenuEnded?.Invoke();
+            if (hint != null) hintFade = 0f;
+        }
+
+        // any key, a click of any mouse button or a gamepad button
+        static bool AnyPress()
+        {
+            return (Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame)
+                || (Mouse.current != null && (Mouse.current.leftButton.wasPressedThisFrame
+                    || Mouse.current.rightButton.wasPressedThisFrame || Mouse.current.middleButton.wasPressedThisFrame))
+                || (Gamepad.current != null && (Gamepad.current.buttonSouth.wasPressedThisFrame
+                    || Gamepad.current.startButton.wasPressedThisFrame));
+        }
+
+        // ------------------------------------------------------------------ start hint
+
+        void BuildHint()
+        {
+            if (string.IsNullOrEmpty(startHint)) return;
+            var root = new GameObject("Start Hint", typeof(RectTransform));
+            root.transform.SetParent(transform, false);
+            var canvas = root.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 100;
+            var scaler = root.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+            hint = root.AddComponent<CanvasGroup>();
+            hint.blocksRaycasts = false;
+            hint.interactable = false;
+
+            var label = new GameObject("Text", typeof(RectTransform)).AddComponent<Text>();
+            var rect = label.rectTransform;
+            rect.SetParent(root.transform, false);
+            rect.anchorMin = new Vector2(0f, 0.06f);
+            rect.anchorMax = new Vector2(1f, 0.14f);
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            label.fontSize = startHintSize;
+            label.color = startHintColour;
+            label.alignment = TextAnchor.MiddleCenter;
+            label.text = startHint;
+            label.raycastTarget = false;
+            label.gameObject.AddComponent<Shadow>().effectDistance = new Vector2(2f, -2f);
+        }
+
+        // breathes softly while waiting, fades out when he gets up
+        void UpdateHint()
+        {
+            if (hint == null) return;
+            if (hintFade < 0f)
+            {
+                hint.alpha = 0.65f + 0.35f * Mathf.Sin(Time.unscaledTime * 2.2f);
+                return;
+            }
+            hintFade += Time.unscaledDeltaTime;
+            hint.alpha = Mathf.Min(hint.alpha, 1f - hintFade / 0.4f);
+            if (hintFade >= 0.4f)
+            {
+                Destroy(hint.gameObject);
+                hint = null;
+            }
         }
 
         // The animation is posed in Update: the camera follows it here.
