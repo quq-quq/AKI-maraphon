@@ -32,6 +32,15 @@ namespace AKI.Menu
         [Range(0f,10f)] public float breathingShoulderDegrees = 8f;
         [Tooltip("Share of the back's straightening the neck takes back, so the head stays level instead of nodding.")]
         [Range(0f,1f)] public float breathingNeckCompensation = .8f;
+        [Header("Seated idle life (stops when standing up)")]
+        [Tooltip("He slowly looks around: largest turn of the head left / right (degrees).")]
+        [Range(0f,30f)] public float idleHeadYawDegrees = 12f;
+        [Tooltip("Largest look up / down (degrees).")]
+        [Range(0f,15f)] public float idleHeadPitchDegrees = 4f;
+        [Tooltip("The upper body sways gently side to side with the boat (degrees).")]
+        [Range(0f,5f)] public float idleSwayDegrees = 1.5f;
+        [Tooltip("How quickly he looks around and sways; low = an old man's calm.")]
+        [Range(.02f,.5f)] public float idleSpeed = .09f;
         [Tooltip("Humanoid bones don't take scale from animation, so this has no visible effect on a Humanoid rig.")]
         [Range(0f,.03f)] public float breathingChestExpansion = .012f;
         [Min(.05f)] public float breathingBlendOutSeconds = .25f;
@@ -62,15 +71,17 @@ namespace AKI.Menu
         // Pose the bones inside the animation stream so the skinned mesh receives the final animated pose.
         struct SeatedBreathingJob : IAnimationJob
         {
-            public TransformStreamHandle spine, chest, neck, leftShoulder, rightShoulder;
+            public TransformStreamHandle spine, chest, neck, leftShoulder, rightShoulder, head;
             public Vector3 spineAxis, chestAxis, neckAxis, leftShoulderAxis, rightShoulderAxis;
+            public Vector3 swayAxis, headYawAxis, headPitchAxis;
             public float spineBend, chestBend, chestExpansion, neckBend, shoulderRaise;
-            public bool hasSpine, hasChest, hasNeck, hasShoulders;
+            public float sway, headYaw, headPitch;
+            public bool hasSpine, hasChest, hasNeck, hasShoulders, hasHead;
             public void ProcessRootMotion(AnimationStream stream) { }
             public void ProcessAnimation(AnimationStream stream)
             {
                 if (hasSpine && spine.IsValid(stream))
-                    spine.SetLocalRotation(stream, Quaternion.AngleAxis(spineBend,spineAxis) * spine.GetLocalRotation(stream));
+                    spine.SetLocalRotation(stream, Quaternion.AngleAxis(sway,swayAxis) * Quaternion.AngleAxis(spineBend,spineAxis) * spine.GetLocalRotation(stream));
                 if (hasChest && chest.IsValid(stream))
                 {
                     chest.SetLocalRotation(stream, Quaternion.AngleAxis(chestBend,chestAxis) * chest.GetLocalRotation(stream));
@@ -78,6 +89,8 @@ namespace AKI.Menu
                 }
                 if (hasNeck && neck.IsValid(stream))
                     neck.SetLocalRotation(stream, Quaternion.AngleAxis(neckBend,neckAxis) * neck.GetLocalRotation(stream));
+                if (hasHead && head.IsValid(stream))
+                    head.SetLocalRotation(stream, Quaternion.AngleAxis(headYaw,headYawAxis) * Quaternion.AngleAxis(headPitch,headPitchAxis) * head.GetLocalRotation(stream));
                 if (hasShoulders && leftShoulder.IsValid(stream) && rightShoulder.IsValid(stream))
                 {
                     leftShoulder.SetLocalRotation(stream, Quaternion.AngleAxis(shoulderRaise,leftShoulderAxis) * leftShoulder.GetLocalRotation(stream));
@@ -171,6 +184,15 @@ namespace AKI.Menu
                     breathingJob.neck = actor.BindStreamTransform(neck);
                     breathingJob.neckAxis = neck.parent.InverseTransformDirection(actor.transform.right).normalized;
                 }
+                if (breathingSpine != null)
+                    breathingJob.swayAxis = breathingSpine.parent.InverseTransformDirection(actor.transform.forward).normalized;
+                if (head != null && head != actor.transform)
+                {
+                    breathingJob.hasHead = true;
+                    breathingJob.head = actor.BindStreamTransform(head);
+                    breathingJob.headYawAxis = head.parent.InverseTransformDirection(actor.transform.up).normalized;
+                    breathingJob.headPitchAxis = head.parent.InverseTransformDirection(actor.transform.right).normalized;
+                }
                 Transform left = actor.GetBoneTransform(HumanBodyBones.LeftShoulder), leftArm = actor.GetBoneTransform(HumanBodyBones.LeftUpperArm);
                 Transform right = actor.GetBoneTransform(HumanBodyBones.RightShoulder), rightArm = actor.GetBoneTransform(HumanBodyBones.RightUpperArm);
                 if (left != null && leftArm != null && right != null && rightArm != null)
@@ -188,6 +210,8 @@ namespace AKI.Menu
             ((AnimationPlayableOutput)graph.GetOutput(0)).SetSourcePlayable(breathingPlayable);
             ApplySeatedHeight(1f);
         }
+
+        static float Wander(float t, float seed) => (Mathf.PerlinNoise(t, seed) - .5f) * 2f;
 
         // The axis (in the shoulder's parent space) that swings the upper arm upwards for a positive angle.
         static Vector3 ShoulderRaiseAxis(Transform shoulder, Transform upperArm)
@@ -249,6 +273,11 @@ namespace AKI.Menu
             breathingJob.chestBend = -bend * breathingChestDegrees;
             breathingJob.neckBend = bend * (breathingSpineDegrees + breathingChestDegrees) * breathingNeckCompensation;
             breathingJob.shoulderRaise = bend * breathingShoulderDegrees;
+            // idle life: slow, never-repeating looks around and a gentle sway (Perlin noise, -1..1)
+            float t = Time.time * idleSpeed;
+            breathingJob.headYaw = Wander(t, 3.1f) * idleHeadYawDegrees * breathingWeight;
+            breathingJob.headPitch = Wander(t * .8f, 7.7f) * idleHeadPitchDegrees * breathingWeight;
+            breathingJob.sway = Wander(t * .6f, 12.3f) * idleSwayDegrees * breathingWeight;
             breathingJob.chestExpansion = bend * breathingChestExpansion;
             breathingPlayable.SetJobData(breathingJob);
             Sample(playing ? time : 0f);
