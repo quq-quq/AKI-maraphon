@@ -161,8 +161,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AKI.Rhythm.RhythmGameFlow
   conductor: {fileID: 6821533460490447493}
-  fishingTrack: {fileID: 11400000, guid: 10a346949c6064c458a8520298169ab1, type: 2}
-  nagaTrack: {fileID: 11400000, guid: 5caaca266336c3342946f0da544d003e, type: 2}
+  fishingTrack: {fileID: 11400000, guid: a2321c1c5b2343b48aeab33aeb514918, type: 2}
+  nagaTrack: {fileID: 11400000, guid: d3fd66d0e993d3d4099258d7e1a22a93, type: 2}
   swimmer: {fileID: 0}
   breath: {fileID: 0}
   playerWeapon: {fileID: 0}

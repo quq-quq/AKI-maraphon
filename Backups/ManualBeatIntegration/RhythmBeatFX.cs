@@ -79,14 +79,11 @@ namespace AKI.Rhythm
             // a new beat: another index, or the same one again in the next loop of the track or in a new track
             if (beat >= 0 && (beat != lastBeat || loop != lastLoop || session != lastSession))
             {
+                sinceBeat = 0f;
                 fovFrom = fovLevel;
                 edgeFrom = edgeLevel;
             }
-            // Use the same recorded beat and DSP clock as the shot gate. A slow frame or a
-            // pause must not start a late pulse or accumulate drift from the music.
-            sinceBeat = beat >= 0
-                ? Mathf.Max(0f, (float)(clock.ClipSeconds - clock.Track.beatTimes[beat]))
-                : float.MaxValue;
+            else if (sinceBeat < float.MaxValue) sinceBeat += Time.unscaledDeltaTime;
             lastBeat = beat;
             lastLoop = loop;
             lastSession = session;
