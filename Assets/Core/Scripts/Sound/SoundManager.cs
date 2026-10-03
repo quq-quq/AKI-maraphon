@@ -186,6 +186,19 @@ namespace Core.Scripts.Sound
             FadeOutLoop(ref _menuGamelanSource);
         }
 
+        public void TakeRhythmMusicControl()
+        {
+            FadeOutLoop(ref _menuGamelanSource);
+            FadeOutLoop(ref _fishingGamelanSource);
+            FadeOutLoop(ref _nagaGamelanSource);
+        }
+
+        public void SetHeadUnderwater(bool underwater)
+        {
+            if (underwater) OnWaterDown();
+            else OnWaterUp();
+        }
+
         private void OnFishingStarted()
         {
             FadeOutLoop(ref _menuGamelanSource);

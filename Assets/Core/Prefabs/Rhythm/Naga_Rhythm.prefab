@@ -114,6 +114,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AKI.Rhythm.NagaRhythmMotion
   headBone: {fileID: 1304180112753144011}
   jawBone: {fileID: 1064694575366388451}
+  upperJawBone: {fileID: 8302829191688234092}
   headPointLocalOffset: {x: -0.0000027911008, y: 2.2441804, z: 1.0642453}
   modelForwardAxis: {x: 0, y: 0, z: 1}
   modelUpAxis: {x: 0, y: 1, z: 0}
@@ -133,10 +134,14 @@ MonoBehaviour:
   swimWaveDegrees: 6
   swimWaveFrequency: 0.45
   trailSpacing: 0.3
+  swimJawDegrees: 14
+  swimJawFrequency: 0.18
+  upperJawMotionShare: 0.25
   chargeDuration: 1.05
   chargeStopDistance: 0.2
   jawLocalAxis: {x: 1, y: 0, z: 0}
   jawOpenDegrees: 48
+  chargeHeadLiftDegrees: 9
 --- !u!114 &367847889550235013
 MonoBehaviour:
   m_ObjectHideFlags: 0

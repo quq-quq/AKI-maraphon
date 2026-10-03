@@ -26,13 +26,22 @@ namespace AKI.Menu
         public bool seatedBreathing = true;
         [Range(4f,30f)] public float breathsPerMinute = 12f;
         [Tooltip("Small back bend in degrees; no root, boat or leg movement.")]
-        [Range(0f,3f)] public float breathingSpineDegrees = .55f;
-        [Range(0f,3f)] public float breathingChestDegrees = .8f;
+        [Range(0f,5f)] public float breathingSpineDegrees = 1.4f;
+        [Range(0f,5f)] public float breathingChestDegrees = 2.2f;
+        [Range(0f,.03f)] public float breathingChestExpansion = .012f;
         [Min(.05f)] public float breathingBlendOutSeconds = .25f;
+        [Tooltip("Actor-only seated height offset in metres; smoothly removed when standing up.")]
+        [Range(-.2f,.1f)] public float seatedHeightOffset = -.055f;
+        [Tooltip("Keep the pelvis on the seat shown in the edited scene, despite Humanoid root normalization.")]
+        public bool alignSeatedHips;
+        public Vector3 seatedHipsLocalPosition;
+        [Min(.1f)] public float seatedAlignmentBlendOutSeconds = 1f;
 
         PlayableGraph graph;
         AnimationMixerPlayable mixer;
         AnimationClipPlayable sitPlayable, divePlayable;
+        AnimationScriptPlayable breathingPlayable;
+        SeatedBreathingJob breathingJob;
         float time;
         float diveTime;
         bool playing;
@@ -42,6 +51,28 @@ namespace AKI.Menu
         Quaternion seatedSpineRotation, seatedChestRotation;
         Vector3 spineBreathingAxis, chestBreathingAxis;
         float breathingWeight = 1f;
+        Vector3 actorBaseLocalPosition;
+        Vector3 seatedActorCorrection;
+
+        // Pose the bones inside the animation stream so the skinned mesh receives the final animated pose.
+        struct SeatedBreathingJob : IAnimationJob
+        {
+            public TransformStreamHandle spine, chest;
+            public Vector3 spineAxis, chestAxis;
+            public float spineBend, chestBend, chestExpansion;
+            public bool hasSpine, hasChest;
+            public void ProcessRootMotion(AnimationStream stream) { }
+            public void ProcessAnimation(AnimationStream stream)
+            {
+                if (hasSpine && spine.IsValid(stream))
+                    spine.SetLocalRotation(stream, Quaternion.AngleAxis(spineBend,spineAxis) * spine.GetLocalRotation(stream));
+                if (hasChest && chest.IsValid(stream))
+                {
+                    chest.SetLocalRotation(stream, Quaternion.AngleAxis(chestBend,chestAxis) * chest.GetLocalRotation(stream));
+                    chest.SetLocalScale(stream, chest.GetLocalScale(stream) * (1f + chestExpansion));
+                }
+            }
+        }
 
         public bool IsPlaying => playing;
 
@@ -70,6 +101,7 @@ namespace AKI.Menu
             }
 
             actor.runtimeAnimatorController = null;
+            actorBaseLocalPosition = actor.transform.localPosition;
             actor.applyRootMotion = false;
             actor.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             head = actor.isHuman ? actor.GetBoneTransform(HumanBodyBones.Head) : null;
@@ -91,6 +123,11 @@ namespace AKI.Menu
             AnimationPlayableOutput.Create(graph, "Fishman", actor).SetSourcePlayable(mixer);
             graph.Play();
             Sample(0f);   // seated
+            if (alignSeatedHips && actor.isHuman)
+            {
+                Vector3 delta = transform.TransformPoint(seatedHipsLocalPosition) - actor.GetBoneTransform(HumanBodyBones.Hips).position;
+                seatedActorCorrection = actor.transform.parent.InverseTransformVector(delta);
+            }
             if (actor.isHuman)
             {
                 breathingSpine = actor.GetBoneTransform(HumanBodyBones.Spine);
@@ -106,6 +143,18 @@ namespace AKI.Menu
                     chestBreathingAxis = breathingChest.parent.InverseTransformDirection(actor.transform.right).normalized;
                 }
             }
+            breathingJob = new SeatedBreathingJob
+            {
+                hasSpine = breathingSpine != null, hasChest = breathingChest != null,
+                spineAxis = spineBreathingAxis, chestAxis = chestBreathingAxis
+            };
+            if (breathingSpine != null) breathingJob.spine = actor.BindStreamTransform(breathingSpine);
+            if (breathingChest != null) breathingJob.chest = actor.BindStreamTransform(breathingChest);
+            breathingPlayable = AnimationScriptPlayable.Create(graph,breathingJob,1);
+            graph.Connect(mixer,0,breathingPlayable,0);
+            breathingPlayable.SetInputWeight(0,1f);
+            ((AnimationPlayableOutput)graph.GetOutput(0)).SetSourcePlayable(breathingPlayable);
+            ApplySeatedHeight(1f);
         }
 
         void OnDestroy()
@@ -131,36 +180,37 @@ namespace AKI.Menu
         public void MeasureDive(out Vector3 headSeated, out Vector3 headAtEnd)
         {
             Sample(0f);
+            ApplySeatedHeight(1f);
             headSeated = head.position;
             Sample(Duration);
+            ApplySeatedHeight(0f);
             headAtEnd = head.position;
             Sample(playing ? time : 0f);
+            ApplySeatedHeight(SeatWeight);
         }
 
         void Update()
         {
-            if (!playing) return;
-            time = Mathf.Min(Duration, time + Time.deltaTime);
-            Sample(time);
+            if (!graph.IsValid()) return;
+            if (playing) time = Mathf.Min(Duration, time + Time.deltaTime);
         }
+
+        float SeatWeight => playing ? 1f - Mathf.SmoothStep(0f,1f,time / Mathf.Max(.1f,seatedAlignmentBlendOutSeconds)) : 1f;
 
         void LateUpdate()
         {
             if (!graph.IsValid()) return;
+            ApplySeatedHeight(SeatWeight);
             breathingWeight = Mathf.MoveTowards(breathingWeight, seatedBreathing && !playing ? 1f : 0f,
                 Time.deltaTime / Mathf.Max(.05f, breathingBlendOutSeconds));
-            // Frozen/manual idle: start from the seated pose every frame, never accumulate rotations.
-            // During the cutscene Sample writes a fresh animated pose and the additive offset fades away.
-            if (!playing)
-            {
-                if (breathingSpine != null) breathingSpine.localRotation = seatedSpineRotation;
-                if (breathingChest != null) breathingChest.localRotation = seatedChestRotation;
-            }
-            if (breathingWeight <= 0f) return;
             float inhale = .5f - .5f * Mathf.Cos(Time.time * Mathf.Max(0f, breathsPerMinute) / 60f * 2f * Mathf.PI);
             float bend = inhale * breathingWeight;
-            if (breathingSpine != null) breathingSpine.localRotation = Quaternion.AngleAxis(bend*breathingSpineDegrees,spineBreathingAxis) * breathingSpine.localRotation;
-            if (breathingChest != null) breathingChest.localRotation = Quaternion.AngleAxis(bend*breathingChestDegrees,chestBreathingAxis) * breathingChest.localRotation;
+            breathingJob.spineBend = bend * breathingSpineDegrees;
+            breathingJob.chestBend = bend * breathingChestDegrees;
+            breathingJob.chestExpansion = bend * breathingChestExpansion;
+            breathingPlayable.SetJobData(breathingJob);
+            Sample(playing ? time : 0f);
+            ApplySeatedHeight(SeatWeight);
         }
 
         // Seated first frame -> Sit_Stand -> SmoothStep blend into the run (no pose pop) with the run's time
@@ -188,6 +238,12 @@ namespace AKI.Menu
             diveTime = Mathf.Clamp(runTime, 0f, runToDive.length);
             divePlayable.SetTime(diveTime);
             graph.Evaluate(0f);
+        }
+
+        void ApplySeatedHeight(float weight)
+        {
+            if (actor != null && actor.transform != transform)
+                actor.transform.localPosition = actorBaseLocalPosition + (seatedActorCorrection + Vector3.up * seatedHeightOffset) * weight;
         }
     }
 }

@@ -17,6 +17,8 @@ namespace AKI.Rhythm
         [Header("Head and model axes")]
         [SerializeField] private Transform headBone;
         [SerializeField] private Transform jawBone;
+        [Tooltip("Upper mouth branch from the same head joint; complements the lower jaw.")]
+        [SerializeField] private Transform upperJawBone;
         [Tooltip("Offset in head-bone coordinates, e.g. the centre of the mouth. With no head bone, uses root coordinates.")]
         [SerializeField] private Vector3 headPointLocalOffset;
         [SerializeField] private Vector3 modelForwardAxis = Vector3.forward;
@@ -51,6 +53,10 @@ namespace AKI.Rhythm
         [Min(0f)] [SerializeField] private float swimWaveFrequency = .45f;
         [Tooltip("Metres between recorded points of the head's path.")]
         [Min(.05f)] [SerializeField] private float trailSpacing = .3f;
+        [Tooltip("Slow, small mouth movement while swimming, around the verified jaw axis.")]
+        [Range(0f,25f)] [SerializeField] private float swimJawDegrees = 14f;
+        [Min(0f)] [SerializeField] private float swimJawFrequency = .18f;
+        [Range(0f,.5f)] [SerializeField] private float upperJawMotionShare = .25f;
 
         [Header("Final charge")]
         [Min(0.1f)] [SerializeField] private float chargeDuration = 1.05f;
@@ -58,6 +64,8 @@ namespace AKI.Rhythm
         [Min(0f)] [SerializeField] private float chargeStopDistance = 0.2f;
         [SerializeField] private Vector3 jawLocalAxis = Vector3.right;
         [Range(-90f, 90f)] [SerializeField] private float jawOpenDegrees = 38f;
+        [Tooltip("Raise the head slightly for the final bite; keep the mouth anchored on its approach path.")]
+        [Range(0f,20f)] [SerializeField] private float chargeHeadLiftDegrees = 9f;
 
         private struct SpineBone
         {
@@ -86,6 +94,7 @@ namespace AKI.Rhythm
         private Quaternion originalLocalRotation;
         private Vector3 originalLocalScale;
         private Quaternion jawRestRotation;
+        private Quaternion upperJawRestRotation;
 
         // Spine, ordered mouth (0) -> tail tip. Root-space rest joints; world lengths between them.
         private RestPose[] restPoses = new RestPose[0];
@@ -315,6 +324,13 @@ namespace AKI.Rhythm
 
             RecordTrail();
             PoseFromTrail();
+            if (jawBone != null)
+            {
+                float open = .5f - .5f * Mathf.Cos(motionTime * swimJawFrequency * Mathf.PI * 2f);
+                jawBone.localRotation = jawRestRotation * Quaternion.AngleAxis(Mathf.Sign(jawOpenDegrees) * swimJawDegrees * open, SafeDirection(jawLocalAxis, Vector3.right));
+                if (upperJawBone != null)
+                    upperJawBone.localRotation = upperJawRestRotation * Quaternion.AngleAxis(-Mathf.Sign(jawOpenDegrees) * swimJawDegrees * upperJawMotionShare * open,SafeDirection(jawLocalAxis,Vector3.right));
+            }
             if (safety != null)
             {
                 // Whole-skin clearance: shift the serpent and its path together, so it keeps swimming.
@@ -367,8 +383,23 @@ namespace AKI.Rhythm
             heading = moveDirection = SafeDirection(tangent, heading);
             RecordTrail();
             PoseFromTrail();
+            if (headBone != null)
+            {
+                Vector3 mouthAnchor = HeadWorldPosition;
+                Vector3 right = SafeDirection(Vector3.Cross(Vector3.up, moveDirection), transform.right);
+                headBone.rotation = Quaternion.AngleAxis(-chargeHeadLiftDegrees * Mathf.SmoothStep(0f,1f,ChargeProgress), right) * headBone.rotation;
+                transform.position += mouthAnchor - HeadWorldPosition;
+            }
             if (jawBone != null)
                 jawBone.localRotation = jawRestRotation * Quaternion.AngleAxis(jawOpenDegrees * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(ChargeProgress * 2.5f)), SafeDirection(jawLocalAxis, Vector3.right));
+            if (upperJawBone != null)
+                upperJawBone.localRotation = upperJawRestRotation * Quaternion.AngleAxis(-jawOpenDegrees * upperJawMotionShare * Mathf.SmoothStep(0f,1f,Mathf.Clamp01(ChargeProgress*2.5f)),SafeDirection(jawLocalAxis,Vector3.right));
+            if (safety != null)
+            {
+                float lift;
+                safety.SolveLift(out lift);
+                if (lift != 0f) ShiftPath(lift);
+            }
             if (ChargeProgress >= 1f) state = MotionState.Arrived;
         }
 
@@ -574,11 +605,13 @@ namespace AKI.Rhythm
                 if (jawBone == null && (all[i].name.ToLowerInvariant() == "jaw" || all[i].name.ToLowerInvariant() == "lowerjaw")) jawBone = all[i];
             }
             bool importedNaga = byName.ContainsKey("Naga_Rig") && byName.ContainsKey("Bone.001") && byName.ContainsKey("Bone.032");
+            if (importedNaga && upperJawBone == null) byName.TryGetValue("Bone.033", out upperJawBone);
             if (headBone == null && importedNaga) byName.TryGetValue("Bone.032", out headBone);
             if (headBone == null)
                 for (int i = 0; i < all.Length; i++)
                     if (all[i].name.ToLowerInvariant() == "head") { headBone = all[i]; break; }
             if (jawBone != null) jawRestRotation = jawBone.localRotation;
+            if (upperJawBone != null) upperJawRestRotation = upperJawBone.localRotation;
 
             // Every skinned bone's rest pose, so stopping always returns to the bind-like straight body.
             var bones = new HashSet<Transform>();
@@ -600,6 +633,7 @@ namespace AKI.Rhythm
                 restPoses[i].bone.localScale = restPoses[i].scale;
             }
             if (jawBone != null) jawBone.localRotation = jawRestRotation;
+            if (upperJawBone != null) upperJawBone.localRotation = upperJawRestRotation;
         }
 
         private void ExpandRendererBounds()

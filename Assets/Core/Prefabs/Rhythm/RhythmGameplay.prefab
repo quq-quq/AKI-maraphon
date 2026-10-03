@@ -193,7 +193,7 @@ MonoBehaviour:
   bossHitHoldSeconds: 0.12
   bossHitVignetteInner: 0.32
   bossHitVignetteOuter: 0.7
-  bossHitMask: {fileID: 2800000, guid: 7133837eb2c6ff143bcdede6a571fa18, type: 3}
+  bossHitMask: {fileID: 2800000, guid: cb928429735d4fc469c57f785ef83432, type: 3}
   bossHitMaskStrength: 1
   bossHitMaskPower: 0.8
   bossHitMaskInvert: 0
