@@ -62,10 +62,10 @@ MonoBehaviour:
     Pitch: 1
     RandomAdd: 0.1
   <FishSwimmingSound>k__BackingField:
-    Clip: {fileID: 8300000, guid: 50da547e46b94a34b8041f020226bbfa, type: 3}
+    Clip: {fileID: 8300000, guid: e8d058b5d77d36640a915bffdd01bcad, type: 3}
     Is3D: 1
     IgnoreUnderwater: 0
-    Volume: 1
+    Volume: 0.55
     Pitch: 1
     RandomAdd: 0.1
   <NagaSwimmingSound>k__BackingField:
