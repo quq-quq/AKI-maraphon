@@ -1,4 +1,5 @@
 using System;
+using AKI.Player;
 using AKI.Water;
 using UnityEngine;
 using UnityEngine.Events;
@@ -45,6 +46,14 @@ namespace AKI.Menu
         [Header("Into the water")]
         [Tooltip("Depth under the sea level where the view settles and the player takes over (m).")]
         [Min(0.1f)] public float handOverDepth = 1.2f;
+        [Tooltip("Seconds under water after which the player takes over even if the dive was too shallow to reach " +
+                 "Hand Over Depth (the water stops a weak dive short, and the game would wait forever).")]
+        [Min(0.1f)] public float handOverAfterSeconds = 1f;
+
+        [Header("Coming to in the boat")]
+        [Tooltip("After he passed out (not an ending): seconds he sits in the boat once his eyes are open, then he " +
+                 "dives again by himself - no menu.")]
+        [Min(0f)] public float respawnDiveDelay = 1.2f;
         [Tooltip("Seconds for the view to level out under the water.")]
         [Min(0.05f)] public float settleSeconds = 0.6f;
         [Tooltip("How quickly the water slows the dive down (1/s).")]
@@ -70,6 +79,10 @@ namespace AKI.Menu
         /// <summary>Scene-independent: his head went under the water in the dive.</summary>
         public static event Action EnteredWater;
 
+        /// <summary>Set before a reload after passing out: the next menu skips itself - he comes to in the boat and
+        /// dives again by himself. Read (and cleared) by the menu of the reloaded scene.</summary>
+        public static bool RespawnInBoat;
+
         Phase phase = Phase.Menu;
         Vector3 diveDirection;      // flat, from the boat to where he ends
         float phaseTime;
@@ -80,6 +93,7 @@ namespace AKI.Menu
         Vector3 headVelocity;
         Vector3 eyeVelocity;        // the view's own motion once it no longer follows the animation
         bool inWater;
+        float inWaterTime;
         float playerFieldOfView = 72f;
         Vector3 playerEyeOffset = new Vector3(0f, 1.65f, 0f);
         Wind heldWind;              // the menu's steady current: what was changed, and the values to give back
@@ -87,6 +101,7 @@ namespace AKI.Menu
         WaterCurrent heldCurrent;
         float currentVariation;
         float releaseTime = -1f;
+        float respawnTime = -1f;    // >= 0: coming to in the boat, counting to the dive
 
         void Start()
         {
@@ -98,6 +113,11 @@ namespace AKI.Menu
             }
             if (player != null) player.SetActive(false);
             if (steadyCurrentInMenu) HoldCurrent();
+            if (RespawnInBoat)
+            {
+                RespawnInBoat = false;
+                respawnTime = 0f;
+            }
 
             // which way he dives: where the view looks if his head isn't moving yet
             cutscene.MeasureDive(out Vector3 seated, out Vector3 end);
@@ -109,6 +129,12 @@ namespace AKI.Menu
         void Update()
         {
             if (phase == Phase.Menu && Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame) StartCutscene();
+            // came to in the boat: once the eyes are open (the blackout is over), a moment, then he dives again
+            if (respawnTime >= 0f && phase == Phase.Menu && !Blackout.IsRunning)
+            {
+                respawnTime += Time.deltaTime;
+                if (respawnTime >= respawnDiveDelay) StartCutscene();
+            }
             if (releaseTime >= 0f) ReleaseCurrent();
         }
 
@@ -210,7 +236,8 @@ namespace AKI.Menu
                         if (eyeVelocity.sqrMagnitude > 0.01f) cam.rotation = Quaternion.Slerp(cam.rotation, LookAlong(eyeVelocity), 1f - Mathf.Exp(-6f * dt));
                     }
                     CheckWater(cam.position);
-                    if (Depth(cam.position) >= handOverDepth) Enter(Phase.Settling);
+                    if (inWater) inWaterTime += dt;
+                    if (Depth(cam.position) >= handOverDepth || inWaterTime >= handOverAfterSeconds) Enter(Phase.Settling);
                     break;
                 }
                 case Phase.Settling:
