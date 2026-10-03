@@ -54,9 +54,9 @@ namespace AKI.Rhythm
         [Tooltip("Metres between recorded points of the head's path.")]
         [Min(.05f)] [SerializeField] private float trailSpacing = .3f;
         [Tooltip("Slow, small mouth movement while swimming, around the verified jaw axis.")]
-        [Range(0f,25f)] [SerializeField] private float swimJawDegrees = 14f;
+        [Range(0f,45f)] [SerializeField] private float swimJawDegrees = 24f;
         [Min(0f)] [SerializeField] private float swimJawFrequency = .18f;
-        [Range(0f,.5f)] [SerializeField] private float upperJawMotionShare = .25f;
+        [Range(0f,.6f)] [SerializeField] private float upperJawMotionShare = .35f;
 
         [Header("Final charge")]
         [Min(0.1f)] [SerializeField] private float chargeDuration = 1.05f;

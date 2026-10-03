@@ -134,13 +134,13 @@ MonoBehaviour:
   swimWaveDegrees: 6
   swimWaveFrequency: 0.45
   trailSpacing: 0.3
-  swimJawDegrees: 14
+  swimJawDegrees: 24
   swimJawFrequency: 0.18
-  upperJawMotionShare: 0.25
+  upperJawMotionShare: 0.35
   chargeDuration: 1.05
   chargeStopDistance: 0.2
   jawLocalAxis: {x: 1, y: 0, z: 0}
-  jawOpenDegrees: 48
+  jawOpenDegrees: 60
   chargeHeadLiftDegrees: 9
 --- !u!114 &367847889550235013
 MonoBehaviour:
