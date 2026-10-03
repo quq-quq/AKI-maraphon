@@ -225067,9 +225067,11 @@ MonoBehaviour:
   crossfadeSeconds: 0.25
   runAccelerationSeconds: 0.4
   seatedBreathing: 1
-  breathsPerMinute: 12
-  breathingSpineDegrees: 1.4
-  breathingChestDegrees: 2.2
+  breathsPerMinute: 11
+  breathingSpineDegrees: 2
+  breathingChestDegrees: 3.5
+  breathingShoulderDegrees: 8
+  breathingNeckCompensation: 0.8
   breathingChestExpansion: 0.012
   breathingBlendOutSeconds: 0.45
   seatedHeightOffset: 0

@@ -24,10 +24,15 @@ namespace AKI.Menu
 
         [Header("Seated breathing (additive, stops when standing up)")]
         public bool seatedBreathing = true;
-        [Range(4f,30f)] public float breathsPerMinute = 12f;
-        [Tooltip("Small back bend in degrees; no root, boat or leg movement.")]
-        [Range(0f,5f)] public float breathingSpineDegrees = 1.4f;
-        [Range(0f,5f)] public float breathingChestDegrees = 2.2f;
+        [Range(4f,30f)] public float breathsPerMinute = 11f;
+        [Tooltip("The back straightens on the inhale (degrees); no root, boat or leg movement.")]
+        [Range(0f,5f)] public float breathingSpineDegrees = 2f;
+        [Range(0f,5f)] public float breathingChestDegrees = 3.5f;
+        [Tooltip("The shoulders rise on the inhale (degrees) - what reads as breathing from the menu camera.")]
+        [Range(0f,10f)] public float breathingShoulderDegrees = 8f;
+        [Tooltip("Share of the back's straightening the neck takes back, so the head stays level instead of nodding.")]
+        [Range(0f,1f)] public float breathingNeckCompensation = .8f;
+        [Tooltip("Humanoid bones don't take scale from animation, so this has no visible effect on a Humanoid rig.")]
         [Range(0f,.03f)] public float breathingChestExpansion = .012f;
         [Min(.05f)] public float breathingBlendOutSeconds = .25f;
         [Tooltip("Actor-only seated height offset in metres; smoothly removed when standing up.")]
@@ -57,10 +62,10 @@ namespace AKI.Menu
         // Pose the bones inside the animation stream so the skinned mesh receives the final animated pose.
         struct SeatedBreathingJob : IAnimationJob
         {
-            public TransformStreamHandle spine, chest;
-            public Vector3 spineAxis, chestAxis;
-            public float spineBend, chestBend, chestExpansion;
-            public bool hasSpine, hasChest;
+            public TransformStreamHandle spine, chest, neck, leftShoulder, rightShoulder;
+            public Vector3 spineAxis, chestAxis, neckAxis, leftShoulderAxis, rightShoulderAxis;
+            public float spineBend, chestBend, chestExpansion, neckBend, shoulderRaise;
+            public bool hasSpine, hasChest, hasNeck, hasShoulders;
             public void ProcessRootMotion(AnimationStream stream) { }
             public void ProcessAnimation(AnimationStream stream)
             {
@@ -70,6 +75,13 @@ namespace AKI.Menu
                 {
                     chest.SetLocalRotation(stream, Quaternion.AngleAxis(chestBend,chestAxis) * chest.GetLocalRotation(stream));
                     chest.SetLocalScale(stream, chest.GetLocalScale(stream) * (1f + chestExpansion));
+                }
+                if (hasNeck && neck.IsValid(stream))
+                    neck.SetLocalRotation(stream, Quaternion.AngleAxis(neckBend,neckAxis) * neck.GetLocalRotation(stream));
+                if (hasShoulders && leftShoulder.IsValid(stream) && rightShoulder.IsValid(stream))
+                {
+                    leftShoulder.SetLocalRotation(stream, Quaternion.AngleAxis(shoulderRaise,leftShoulderAxis) * leftShoulder.GetLocalRotation(stream));
+                    rightShoulder.SetLocalRotation(stream, Quaternion.AngleAxis(shoulderRaise,rightShoulderAxis) * rightShoulder.GetLocalRotation(stream));
                 }
             }
         }
@@ -150,11 +162,38 @@ namespace AKI.Menu
             };
             if (breathingSpine != null) breathingJob.spine = actor.BindStreamTransform(breathingSpine);
             if (breathingChest != null) breathingJob.chest = actor.BindStreamTransform(breathingChest);
+            if (actor.isHuman)
+            {
+                Transform neck = actor.GetBoneTransform(HumanBodyBones.Neck);
+                if (neck != null)
+                {
+                    breathingJob.hasNeck = true;
+                    breathingJob.neck = actor.BindStreamTransform(neck);
+                    breathingJob.neckAxis = neck.parent.InverseTransformDirection(actor.transform.right).normalized;
+                }
+                Transform left = actor.GetBoneTransform(HumanBodyBones.LeftShoulder), leftArm = actor.GetBoneTransform(HumanBodyBones.LeftUpperArm);
+                Transform right = actor.GetBoneTransform(HumanBodyBones.RightShoulder), rightArm = actor.GetBoneTransform(HumanBodyBones.RightUpperArm);
+                if (left != null && leftArm != null && right != null && rightArm != null)
+                {
+                    breathingJob.hasShoulders = true;
+                    breathingJob.leftShoulder = actor.BindStreamTransform(left);
+                    breathingJob.rightShoulder = actor.BindStreamTransform(right);
+                    breathingJob.leftShoulderAxis = ShoulderRaiseAxis(left, leftArm);
+                    breathingJob.rightShoulderAxis = ShoulderRaiseAxis(right, rightArm);
+                }
+            }
             breathingPlayable = AnimationScriptPlayable.Create(graph,breathingJob,1);
             graph.Connect(mixer,0,breathingPlayable,0);
             breathingPlayable.SetInputWeight(0,1f);
             ((AnimationPlayableOutput)graph.GetOutput(0)).SetSourcePlayable(breathingPlayable);
             ApplySeatedHeight(1f);
+        }
+
+        // The axis (in the shoulder's parent space) that swings the upper arm upwards for a positive angle.
+        static Vector3 ShoulderRaiseAxis(Transform shoulder, Transform upperArm)
+        {
+            Vector3 outwards = upperArm.position - shoulder.position;
+            return shoulder.parent.InverseTransformDirection(Vector3.Cross(outwards, Vector3.up)).normalized;
         }
 
         void OnDestroy()
@@ -205,8 +244,11 @@ namespace AKI.Menu
                 Time.deltaTime / Mathf.Max(.05f, breathingBlendOutSeconds));
             float inhale = .5f - .5f * Mathf.Cos(Time.time * Mathf.Max(0f, breathsPerMinute) / 60f * 2f * Mathf.PI);
             float bend = inhale * breathingWeight;
-            breathingJob.spineBend = bend * breathingSpineDegrees;
-            breathingJob.chestBend = bend * breathingChestDegrees;
+            // negative: the back straightens (a positive bend leans the head forward, a nod, not a breath)
+            breathingJob.spineBend = -bend * breathingSpineDegrees;
+            breathingJob.chestBend = -bend * breathingChestDegrees;
+            breathingJob.neckBend = bend * (breathingSpineDegrees + breathingChestDegrees) * breathingNeckCompensation;
+            breathingJob.shoulderRaise = bend * breathingShoulderDegrees;
             breathingJob.chestExpansion = bend * breathingChestExpansion;
             breathingPlayable.SetJobData(breathingJob);
             Sample(playing ? time : 0f);
