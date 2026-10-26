@@ -67,8 +67,13 @@ namespace AKI.Menu
         [Tooltip("How quickly the water slows the dive down (1/s).")]
         [Min(0f)] public float waterDrag = 2.5f;
 
+        [Header("Legend")]
+        [Tooltip("While the camera flies into his head the view goes black and the game stops for the legend " +
+                 "(see IntroSequence). Not shown when he comes to in the boat after passing out.")]
+        public IntroSequence.Settings legend = new IntroSequence.Settings();
+
         [Header("Current")]
-        [Tooltip("While the menu plays, the wind (and the current it drives) doesn't turn and the current doesn't wander: it flows one way. Back to normal once the player takes over.")]
+        [Tooltip("While the menu plays,the wind (and the current it drives) doesn't turn and the current doesn't wander: it flows one way. Back to normal once the player takes over.")]
         public bool steadyCurrentInMenu = true;
         [Tooltip("Seconds over which the current's wandering comes back after the hand-over.")]
         [Min(0f)] public float currentReleaseSeconds = 3f;
@@ -110,6 +115,7 @@ namespace AKI.Menu
         float currentVariation;
         float releaseTime = -1f;
         float respawnTime = -1f;    // >= 0: coming to in the boat, counting to the dive
+        bool cameToInBoat;          // this dive follows passing out: nothing to explain again
         CanvasGroup hint;
         float hintFade = -1f;       // >= 0: the hint is fading out
 
@@ -127,6 +133,7 @@ namespace AKI.Menu
             {
                 RespawnInBoat = false;
                 respawnTime = 0f;
+                cameToInBoat = true;
             }
             else BuildHint();   // he came to in the boat and dives by himself: nothing to press
 
@@ -406,6 +413,8 @@ namespace AKI.Menu
                 fromPosition = cam.position;
                 fromRotation = cam.rotation;
                 fromFieldOfView = cutsceneCamera.fieldOfView;
+                // the view goes black as the camera flies in, and the legend is told on it
+                if (!cameToInBoat) IntroSequence.Begin(legend, possessSeconds);
             }
             if (next == Phase.Possessed) eyeVelocity = headVelocity;   // the dive goes on at his speed
             if (next == Phase.Settling && cam != null) fromRotation = cam.rotation;
