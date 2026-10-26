@@ -10,6 +10,8 @@ namespace AKI.Rhythm
         [Range(.01f, .2f)] public float lateWindowSeconds = .1f;
         [Tooltip("Every repeated click extends this quiet-time lockout. Holding Attack never repeats a shot.")]
         [Range(.05f, .5f)] public float spamQuietSeconds = .16f;
+        /// <summary>A shot was allowed because it came on the beat (not the golden fish's free shot).</summary>
+        public static event System.Action OnBeatShot;
         public long LastAcceptedBeat { get; private set; } = -1;
         public float LastTimingError { get; private set; }
         public string LastDecision { get; private set; }
@@ -38,7 +40,7 @@ namespace AKI.Rhythm
             if (beat == consumedBeat) { LastDecision = "This beat already attempted"; return false; }
             consumedBeat = beat; // off-beat attempts also consume the opportunity: clicks cannot sweep the window
             if (!timed) { LastDecision = "Off beat"; return false; }
-            LastAcceptedBeat = beat; LastDecision = "On beat"; return true;
+            LastAcceptedBeat = beat; LastDecision = "On beat"; OnBeatShot?.Invoke(); return true;
         }
     }
 }

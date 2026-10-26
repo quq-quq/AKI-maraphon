@@ -77,6 +77,13 @@ namespace AKI.Rhythm
         public EndingData drownedEnding;
         [Tooltip("The Naga track was survived and the Naga swallows the player, after the cut to black.")]
         public EndingData eatenEnding;
+        [Header("Hint under the beat pulse")]
+        [Tooltip("Shown at the top of the screen from the first beat of the fishing music, once per run of the game. Empty = no hint.")]
+        public string shootHint = "Стреляйте в ритм";
+        [Tooltip("The hint goes after this many shots on the beat...")]
+        [Min(1)] public int shootHintHits = 2;
+        [Tooltip("...or after this many seconds from the first beat.")]
+        [Min(1f)] public float shootHintSeconds = 20f;
         [Header("Events")]
         public UnityEvent onFishingStarted = new UnityEvent();
         public UnityEvent onGoldenAppeared = new UnityEvent();
@@ -168,6 +175,7 @@ namespace AKI.Rhythm
             if (!StartTrack(fishingTrack, true, soundConfig != null ? soundConfig.FishingGamelan : null)) return;
             SetPhase(GamePhase.Fishing);
             fishSpawner?.StartSpawning(); onFishingStarted.Invoke(); FishingStarted?.Invoke();
+            ShootHint.Show(conductor, shootHint, shootHintHits, shootHintSeconds);
         }
         bool StartTrack(RhythmTrack track, bool loop, AudioClipConfig config)
         {
