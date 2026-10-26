@@ -149,7 +149,7 @@ MonoBehaviour:
   penetration: 0.06
   hitMask:
     serializedVersion: 2
-    m_Bits: 4294967291
+    m_Bits: 51
   lifetime: 3.5
   vanishSeconds: 1
 --- !u!1001 &2254851468335429691

@@ -752,12 +752,15 @@ MonoBehaviour:
   aimDistance: 40
   aimMask:
     serializedVersion: 2
-    m_Bits: 4294967291
+    m_Bits: 51
   aimTipPosition: {x: 0.03, y: -0.09, z: 1.43}
   aimTime: 0.18
   aimZoom: 0.8
   aimLookScale: 0.6
   aimSteadiness: 0.35
+  loweredPosition: {x: 0.16, y: -0.8, z: 0.5}
+  loweredRotation: {x: 15, y: -10, z: 0}
+  lowerTime: 0.45
   preventNearPlaneClipping: 1
   nearPlaneMargin: 0.035
   weaponCastsShadows: 0
@@ -800,11 +803,13 @@ MonoBehaviour:
   - {x: -0.36, y: -0.16, z: 0.24}
   - {x: -0.32, y: -0.44, z: 0.02}
   - {x: -0.14, y: -0.3, z: 0.12}
+  restHand: {x: -0.26, y: -0.62, z: -0.06}
   leftElbowHint: {x: -1, y: -0.6, z: -0.3}
   strokeRate: {x: 0.9, y: 0.35}
   treadSize: 0.3
   handPointAxis: {x: 0, y: 1, z: 0}
   handPalmAxis: {x: 1, y: 0, z: 0}
+  leftHandPalmAxis: {x: -1, y: 0, z: 0}
 --- !u!1001 &2715087961179854863
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -10,6 +10,8 @@ namespace AKI.Player
     /// centre of the view, the view zooms in a little and turning gets steadier.
     /// The gun lags a little behind quick turns. On the shot it kicks back and up on a spring, twisting a little
     /// differently every time, and the view kicks up and shakes (<see cref="CameraShake"/> on the camera).
+    /// Out of the water (at the surface too) the gun goes down out of view with the hand that holds it and can neither
+    /// fire nor aim; it comes back up when the player dives.
     /// Uses the swim controller's input actions, so it is enabled and disabled together with it.
     /// </summary>
     [RequireComponent(typeof(FirstPersonSwimController))]
@@ -36,6 +38,13 @@ namespace AKI.Player
         [Range(0.1f, 1f)] public float aimLookScale = 0.6f;
         [Tooltip("Sway and recoil while aiming, as a share of the hip ones.")]
         [Range(0f, 1f)] public float aimSteadiness = 0.35f;
+        [Header("Put away out of the water")]
+        [Tooltip("Where the gun goes when it is put away (camera space): down below the view.")]
+        public Vector3 loweredPosition = new Vector3(0.16f, -0.8f, 0.5f);
+        [Tooltip("How the gun turns as it goes down (degrees): the muzzle dips.")]
+        public Vector3 loweredRotation = new Vector3(15f, -10f, 0f);
+        [Tooltip("Seconds to put the gun away or bring it back up.")]
+        [Min(0.01f)] public float lowerTime = 0.45f;
         [Header("First-person visibility")]
         public bool preventNearPlaneClipping = true;
         [Tooltip("Minimum space between the weapon mesh and the camera near plane. Keeps ADS and recoil visible without changing the ocean camera.")]
@@ -79,6 +88,7 @@ namespace AKI.Player
         float fovKick;
         bool wasLocked;
         float aim;
+        float lowered;   // 0 = in the hands, ready; 1 = put away (out of the water)
         // the gun's recoil spring: offset (m) and angles (degrees) from its pose, and their speeds
         Vector3 recoilOffset, recoilOffsetVelocity;
         Vector3 recoilAngles, recoilAnglesVelocity;
@@ -93,6 +103,9 @@ namespace AKI.Player
 
         /// <summary>0 = at the hip, 1 = fully aimed.</summary>
         public float Aim01 => aim;
+
+        /// <summary>The gun is up and can be used: only under water, once it has come all the way up.</summary>
+        public bool IsReady => lowered <= 0f;
 
         void Awake()
         {
@@ -141,7 +154,10 @@ namespace AKI.Player
         {
             // the click that locks the cursor again must not fire
             bool locked = Cursor.lockState == CursorLockMode.Locked;
-            bool canUse = locked && wasLocked && swimmer.State != FirstPersonSwimController.MoveState.Climbing;
+            // out of the water the gun goes down; under water it comes back up and is usable once it is all the way up
+            bool underwater = swimmer.State == FirstPersonSwimController.MoveState.Underwater;
+            lowered = Mathf.MoveTowards(lowered, underwater ? 0f : 1f, Time.deltaTime / lowerTime);
+            bool canUse = locked && wasLocked && underwater && IsReady;
             wasLocked = locked;
 
             IsAiming = canUse && gun != null && aimAction != null && aimAction.IsPressed();
@@ -234,8 +250,9 @@ namespace AKI.Player
             lastCamRotation = camRotation;
 
             // hip pose, or the pose that puts the arrow on the line of sight
-            Vector3 position = holdPosition;
-            Quaternion rotation = Quaternion.Euler(holdRotation);
+            float down = Mathf.SmoothStep(0f, 1f, lowered);
+            Vector3 position = Vector3.Lerp(holdPosition, loweredPosition, down);
+            Quaternion rotation = Quaternion.Slerp(Quaternion.Euler(holdRotation), Quaternion.Euler(loweredRotation), down);
             if (s > 0f && gun.muzzle != null)
             {
                 Quaternion aimRotation = Quaternion.Inverse(LocalToGun(gun.muzzle, out Vector3 muzzleInGun));
@@ -248,10 +265,11 @@ namespace AKI.Player
             t.localScale = Vector3.one * gunScale;
             t.localPosition = position + recoilOffset;
             t.localRotation = rotation * Quaternion.Euler(swayAngles * shake) * Quaternion.Euler(recoilAngles);
-            if (preventNearPlaneClipping) KeepWeaponBeyondNearPlane();
+            if (preventNearPlaneClipping) KeepWeaponBeyondNearPlane(1f - down);
         }
 
-        void KeepWeaponBeyondNearPlane()
+        // weight: how much of the push to apply (none once the gun is put away: below the view it may come close)
+        void KeepWeaponBeyondNearPlane(float weight)
         {
             if (weaponRenderers == null) return;
             float nearest = float.PositiveInfinity;
@@ -267,7 +285,7 @@ namespace AKI.Player
             }
             float shift = cam.nearClipPlane + nearPlaneMargin - nearest;
             if (shift > 0f && !float.IsInfinity(shift))
-                gun.transform.position += cam.transform.forward * shift;
+                gun.transform.position += cam.transform.forward * (shift * weight);
         }
 
         // Pose of a gun child relative to the gun root (the muzzle may sit under other children).

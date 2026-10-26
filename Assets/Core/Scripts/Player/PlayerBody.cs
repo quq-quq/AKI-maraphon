@@ -10,8 +10,9 @@ namespace AKI.Player
     /// leaning into the stroke when swimming fast), and two arms are posed on top every frame:
     ///  - the right hand holds the speargun by its grip, wherever <see cref="PlayerSpeargun"/> puts the gun: the elbow
     ///    bends and the wrist turns as the gun comes up to the eye to aim,
-    ///  - the left arm strokes while swimming (reach, glide, catch, pull, recover) at the pace of the swim and treads
-    ///    water in small circles when holding still; while aiming (or out of the water) it hangs down by the side.
+    ///  - the left arm strokes under water (reach, glide, catch, pull, recover) at the pace of the swim and treads
+    ///    water in small circles when holding still; while aiming it hangs down by the side. Coming up to the surface
+    ///    it finishes the stroke it is in and then hangs down too, until the head goes under again.
     /// Runs after the gun and the camera have been placed this frame, so the hand never lags behind the grip.
     /// </summary>
     [DefaultExecutionOrder(200)]
@@ -76,6 +77,7 @@ namespace AKI.Player
         AnimationClipPlayable clipPlayable;
         Transform head, upperR, lowerR, handR, upperL, lowerL, handL;
         float lean, speed01, phase, swimWeight, aimWeight;
+        bool stroking;   // the left arm is going round its loop: always under water, at the surface to the end of a stroke
 
         void Start()
         {
@@ -117,9 +119,11 @@ namespace AKI.Player
         {
             float dt = Time.deltaTime;
             bool swimming = swimmer.IsSwimming;
+            bool underwater = swimmer.State == FirstPersonSwimController.MoveState.Underwater;
+            if (underwater) stroking = true;
             float speed = swimming ? swimmer.Velocity.magnitude : 0f;
             speed01 = Mathf.MoveTowards(speed01, Mathf.Clamp01(speed / fullSpeed), dt * 2f);
-            swimWeight = Mathf.MoveTowards(swimWeight, swimming ? 1f : 0f, dt * 3f);
+            swimWeight = Mathf.MoveTowards(swimWeight, swimming && stroking ? 1f : 0f, dt * 3f);
             // aiming: the free hand stops stroking and drops out of the line of sight
             aimWeight = Mathf.MoveTowards(aimWeight, speargun != null && speargun.IsAiming ? 1f : 0f, dt * 4f);
             if (clipPlayable.IsValid()) clipPlayable.SetSpeed(Mathf.Lerp(0.6f, 1.4f, speed01));
@@ -134,7 +138,7 @@ namespace AKI.Player
             body.transform.position += cam.TransformPoint(headOffset) - head.position;
 
             HoldGun();
-            Stroke(dt);
+            Stroke(dt, underwater);
         }
 
         // ------------------------------------------------------------------ right hand
@@ -157,14 +161,25 @@ namespace AKI.Player
 
         // ------------------------------------------------------------------ left arm
 
-        void Stroke(float dt)
+        void Stroke(float dt, bool underwater)
         {
             if (strokePath == null || strokePath.Length < 3) return;
-            // stroking while swimming; out of the water or aiming the arm hangs down by the side, out of view
+            // stroking under water; at the surface (once the stroke is over), out of the water or aiming the arm
+            // hangs down by the side, out of view
             float weight = swimWeight * (1f - aimWeight);
 
-            float rate = Mathf.Lerp(strokeRate.y, strokeRate.x, speed01);
-            phase = Mathf.Repeat(phase + dt * rate, 1f);
+            if (stroking)
+            {
+                float rate = Mathf.Lerp(strokeRate.y, strokeRate.x, speed01);
+                phase += dt * rate;
+                // at the surface the stroke under way is the last one: it ends where the next would start
+                if (phase >= 1f && !underwater)
+                {
+                    stroking = false;
+                    phase = 0f;
+                }
+                phase = Mathf.Repeat(phase, 1f);
+            }
             float size = Mathf.Lerp(treadSize, 1f, speed01);
 
             // the loop, shrunk towards its middle when treading water

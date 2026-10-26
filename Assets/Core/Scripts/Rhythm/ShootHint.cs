@@ -8,8 +8,8 @@ namespace AKI.Rhythm
     /// <summary>
     /// The hint that teaches the rhythm: a line at the top of the screen, right under the beat pulse of
     /// <see cref="RhythmBeatFX"/>, once the first beat has sounded. It goes when the player has shot on the beat a few
-    /// times or after a while, and is not shown again in this run of the game. Started by
-    /// <see cref="RhythmGameFlow"/> when fishing begins; builds its own overlay canvas.
+    /// times or after a while. Shown at the start of every game (the first one, a new one after an ending, the one
+    /// after passing out). Started by <see cref="RhythmGameFlow"/> when fishing begins; builds its own overlay canvas.
     /// </summary>
     public sealed class ShootHint : MonoBehaviour
     {
@@ -17,7 +17,6 @@ namespace AKI.Rhythm
         const float FadeSeconds = 0.6f;
 
         static ShootHint current;
-        static bool done;                // shown once: not again after passing out or a restart
 
         RhythmConductor conductor;
         int hitsNeeded;
@@ -25,10 +24,10 @@ namespace AKI.Rhythm
         int hits;
         CanvasGroup group;
 
-        /// <summary>Starts the hint unless it is on the screen already or has been shown before.</summary>
+        /// <summary>Starts the hint unless it is on the screen already.</summary>
         public static void Show(RhythmConductor conductor, string text, int hitsNeeded, float seconds)
         {
-            if (done || current != null || conductor == null || string.IsNullOrEmpty(text)) return;
+            if (current != null || conductor == null || string.IsNullOrEmpty(text)) return;
             var go = new GameObject("Shoot Hint");
             current = go.AddComponent<ShootHint>();
             current.conductor = conductor;
@@ -93,7 +92,6 @@ namespace AKI.Rhythm
                 shown += Time.unscaledDeltaTime;
                 yield return null;
             }
-            done = true;
             yield return Fade(1f, 0f);
             Destroy(gameObject);
         }
@@ -111,7 +109,6 @@ namespace AKI.Rhythm
         // the music is over (the golden fish): the hint goes at once
         void Finish()
         {
-            done = true;
             Destroy(gameObject);
         }
 

@@ -232,6 +232,8 @@ namespace Core.Scripts.Sound
         {
             FadeOutLoop(ref _fishingGamelanSource);
             FadeOutRhythmMusic();
+            // the golden fish: the seagulls fall silent and stay so, at the surface too (a new game brings them back)
+            FadeOutLoop(ref _seagullSource);
         }
 
         private void OnWaterDown()

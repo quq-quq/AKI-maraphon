@@ -14,6 +14,8 @@ namespace AKI.Endings
     /// or waits for a key / a few seconds and reloads the scene, loads another one or quits
     /// (<see cref="EndingData.after"/>). Builds its own overlay canvas on top of everything and runs on unscaled time.
     /// When a scene is loaded after it, the black lives through the load and clears over the new scene (the menu).
+    /// Every ending also shows the team's contact: a QR code a little above the middle, soft at the edges, with a
+    /// line over it.
     /// </summary>
     public class EndingScreen : MonoBehaviour
     {
@@ -21,6 +23,11 @@ namespace AKI.Endings
         const float LeaveFadeSeconds = 0.6f;       // the text fades out before the next scene
         const float ArriveFadeSeconds = 1.5f;      // the black clears over the next scene
         const float BlackOverscan = 200f;          // the black reaches this far past every edge: no gap can show the game
+        const string ContactQr = "Endings/contact_qr";               // Resources path without extension
+        const string ContactText = "Связаться с нами: https://t.me/quq1quq";
+        const float ContactSize = 0.34f;           // the QR code's share of the screen height
+        const float ContactCentreY = 0.6f;         // a little above the middle
+        const float ContactFeather = 0.12f;        // its edges melt into the black over this share of its size
 
         static EndingScreen current;
 
@@ -33,6 +40,7 @@ namespace AKI.Endings
         Text line;
         CanvasGroup words;
         CanvasGroup hint;
+        CanvasGroup contact;
         AudioSource voice;
         bool silencing;
         readonly Dictionary<AudioSource, float> silenced = new Dictionary<AudioSource, float>();
@@ -106,6 +114,39 @@ namespace AKI.Endings
             hintText.text = ending.continueHint;
             hint = hintText.gameObject.AddComponent<CanvasGroup>();
             hint.alpha = 0f;
+
+            BuildContact(font);
+        }
+
+        // The QR code hangs a little above the middle (its edges soft, like the legend's pictures), the line over it.
+        void BuildContact(Font font)
+        {
+            var texture = Resources.Load<Texture2D>(ContactQr);
+            if (texture == null)
+            {
+                Debug.LogWarning("EndingScreen: no picture '" + ContactQr + "' in Resources.", this);
+                return;
+            }
+            RectTransform area = Panel("Contact", transform, new Vector2(0.5f, ContactCentreY), new Vector2(0.5f, ContactCentreY));
+            const float Height = 1080f * ContactSize;   // the canvas is laid out for 1920 x 1080
+            float width = Height * texture.width / Mathf.Max(1f, (float)texture.height);
+            area.sizeDelta = new Vector2(width, Height);
+            contact = area.gameObject.AddComponent<CanvasGroup>();
+            contact.alpha = 0f;
+
+            RectTransform frame = Panel("QR", area, Vector2.zero, Vector2.one);
+            frame.gameObject.AddComponent<RectMask2D>().softness =
+                new Vector2Int(Mathf.RoundToInt(width * ContactFeather), Mathf.RoundToInt(Height * ContactFeather));
+            var image = Panel("Picture", frame, Vector2.zero, Vector2.one).gameObject.AddComponent<RawImage>();
+            image.texture = texture;
+            image.raycastTarget = false;
+
+            Text caption = Label("Contact line", area, new Vector2(-1f, 1f), new Vector2(2f, 1f), font,
+                Mathf.Max(8, Mathf.RoundToInt(ending.fontSize * 0.75f)), ending.textColor);
+            caption.rectTransform.offsetMin = new Vector2(0f, 12f);
+            caption.rectTransform.offsetMax = new Vector2(0f, 80f);
+            caption.alignment = TextAnchor.LowerCenter;
+            caption.text = ContactText;
         }
 
         static RectTransform Panel(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax)
@@ -151,6 +192,7 @@ namespace AKI.Endings
                 text.Append(subtitle.text);
             }
             line.text = text.ToString();
+            if (contact != null) StartCoroutine(Fade(contact, 0f, 1f, ending.textFadeSeconds));
             yield return Fade(words, 0f, 1f, ending.textFadeSeconds);
             // the voices start right away, back to back; the lines' seconds add up to the least time the text stays
             float least = 0f, spoken = 0f;
@@ -175,6 +217,7 @@ namespace AKI.Endings
             }
 
             hint.alpha = 0f;
+            if (contact != null) StartCoroutine(Fade(contact, 1f, 0f, LeaveFadeSeconds));
             yield return Fade(words, 1f, 0f, LeaveFadeSeconds);
             yield return Leave();
         }

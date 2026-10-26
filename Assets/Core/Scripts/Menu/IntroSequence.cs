@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using AKI.UI;
 using Core.Scripts.Sound;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace AKI.Menu
@@ -16,6 +17,8 @@ namespace AKI.Menu
     /// on from the same frame, the black clears and the bare keyboard and mouse stay over the game for a while.
     /// Started by <see cref="MainMenuController"/>. Builds its own overlay canvas and runs on unscaled time.
     /// Pictures and the voice are loaded from Resources/Intro by the names in <see cref="Settings"/>.
+    /// Once it has been seen in this run of the game, holding any key skips the rest of it (a ring at the top right
+    /// fills while the key is held).
     /// </summary>
     public class IntroSequence : MonoBehaviour
     {
@@ -111,9 +114,21 @@ namespace AKI.Menu
             [Min(0f)] public float tailSeconds = 1f;
             [Tooltip("The black clears over the game, which goes on from where it stopped (as the controls' captions go).")]
             [Min(0f)] public float resumeFadeSeconds = 1.5f;
+
+            [Header("Skipping (once the legend has been seen in this run of the game)")]
+            [Tooltip("The line at the top right while the legend can be skipped.")]
+            public string skipText = "Зажмите любую кнопку, чтобы продолжить...";
+            [Tooltip("Seconds a key has to be held to skip the legend and the controls.")]
+            [Min(0.1f)] public float skipHoldSeconds = 1.5f;
+            [Min(8)] public int skipFontSize = 30;
         }
 
         static IntroSequence current;
+        static bool seen;   // the legend has played through once in this run of the game: it may be skipped now
+
+        // statics outlive play mode in the editor when the domain isn't reloaded
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetSession() => seen = false;
 
         public static bool IsRunning => current != null;
 
@@ -135,6 +150,10 @@ namespace AKI.Menu
         AudioSource ambient;
         readonly List<AudioSource> heldSources = new List<AudioSource>();
         readonly List<float> heldVolumes = new List<float>();
+        CanvasGroup skip;
+        Image skipRing;
+        float skipHeld;
+        bool skipping;
         float timeScaleBefore = 1f;
         bool frozen;
 
@@ -214,6 +233,7 @@ namespace AKI.Menu
             line.gameObject.AddComponent<Shadow>().effectDistance = new Vector2(2f, -2f);
 
             if (settings.showControls) BuildControls();
+            if (seen) BuildSkip();
 
             voice = Source(false);
             voice.volume = settings.voiceVolume;
@@ -227,6 +247,72 @@ namespace AKI.Menu
         {
             controlsPlain = ControlsImage("Controls plain", settings.controlsPlain);
             controlsLabelled = ControlsImage("Controls labelled", settings.controlsLabelled);
+        }
+
+        // Top right: the line, and a ring beside it that fills while a key is held.
+        void BuildSkip()
+        {
+            const float Ring = 46f, Margin = 48f;
+            RectTransform area = Panel("Skip", transform, Vector2.one, Vector2.one);
+            area.pivot = Vector2.one;
+            area.sizeDelta = new Vector2(1100f, Ring);
+            area.anchoredPosition = new Vector2(-Margin, -Margin);
+            skip = area.gameObject.AddComponent<CanvasGroup>();
+            skip.alpha = 0f;
+            skip.blocksRaycasts = false;
+
+            Sprite ringSprite = RingSprite();
+            RectTransform track = Panel("Ring track", area, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f));
+            track.pivot = new Vector2(1f, 0.5f);
+            track.sizeDelta = new Vector2(Ring, Ring);
+            Image trackImage = track.gameObject.AddComponent<Image>();
+            trackImage.sprite = ringSprite;
+            trackImage.color = new Color(settings.textColour.r, settings.textColour.g, settings.textColour.b, 0.25f);
+            trackImage.raycastTarget = false;
+
+            RectTransform fill = Panel("Ring", track, Vector2.zero, Vector2.one);
+            skipRing = fill.gameObject.AddComponent<Image>();
+            skipRing.sprite = ringSprite;
+            skipRing.color = settings.textColour;
+            skipRing.type = Image.Type.Filled;
+            skipRing.fillMethod = Image.FillMethod.Radial360;
+            skipRing.fillOrigin = (int)Image.Origin360.Top;
+            skipRing.fillClockwise = true;
+            skipRing.fillAmount = 0f;
+            skipRing.raycastTarget = false;
+
+            Text label = Label("Skip line", area, Vector2.zero, Vector2.one, GameFont.Get(), settings.skipFontSize,
+                settings.textColour);
+            label.rectTransform.offsetMax = new Vector2(-(Ring + 18f), 0f);
+            label.alignment = TextAnchor.MiddleRight;
+            label.horizontalOverflow = HorizontalWrapMode.Overflow;
+            label.text = settings.skipText;
+            label.gameObject.AddComponent<Shadow>().effectDistance = new Vector2(2f, -2f);
+        }
+
+        // a thin white ring with smooth edges, filled radially by the Image
+        static Sprite RingSprite()
+        {
+            const int Size = 128;
+            const float Outer = 0.5f, Inner = 0.4f;   // share of the size
+            var texture = new Texture2D(Size, Size, TextureFormat.RGBA32, false)
+            {
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            const float Pixel = 1f / Size;
+            for (int y = 0; y < Size; y++)
+                for (int x = 0; x < Size; x++)
+                {
+                    float r = Vector2.Distance(new Vector2((x + 0.5f) / Size, (y + 0.5f) / Size), new Vector2(0.5f, 0.5f));
+                    float a = Mathf.Clamp01((Outer - r) / Pixel) * Mathf.Clamp01((r - Inner) / Pixel);
+                    texture.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+                }
+            texture.Apply(false, true);
+            Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, Size, Size), new Vector2(0.5f, 0.5f));
+            sprite.hideFlags = HideFlags.HideAndDontSave;
+            return sprite;
         }
 
         CanvasGroup ControlsImage(string name, string path)
@@ -330,6 +416,7 @@ namespace AKI.Menu
                 yield return new WaitForSecondsRealtime(settings.blackSeconds);
                 // the game goes on from the frame it stopped at
                 Unfreeze();
+                seen = true;
                 yield return Fade(ResumeStep, settings.resumeFadeSeconds);
             }
             Destroy(gameObject);
@@ -393,6 +480,7 @@ namespace AKI.Menu
             // the arrows and captions go and the black goes with them: the game goes on under the bare drawing
             StartCoroutine(FadeAmbient(settings.resumeFadeSeconds));
             Unfreeze();
+            seen = true;
             float labelFade = settings.controlsLabelFadeSeconds, resumeFade = settings.resumeFadeSeconds;
             float span = Mathf.Max(labelFade, resumeFade);
             for (float t = 0f; t < span; t += Time.unscaledDeltaTime)
@@ -503,6 +591,61 @@ namespace AKI.Menu
         {
             if (seconds <= 0f) return since >= 0f ? 1f : 0f;
             return Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(since / seconds));
+        }
+
+        // ------------------------------------------------------------------ skipping
+
+        // While the game is held (the legend and the controls on the black) a held key fills the ring; let go and
+        // it drains. Full: the rest is skipped.
+        void Update()
+        {
+            if (skip == null || skipping) return;
+            float dt = Time.unscaledDeltaTime;
+            skip.alpha = Mathf.MoveTowards(skip.alpha, frozen ? 1f : 0f, dt / 0.4f);
+            if (!frozen)
+            {
+                skipHeld = 0f;
+                skipRing.fillAmount = 0f;
+                return;
+            }
+            skipHeld = AnyKeyHeld() ? skipHeld + dt : Mathf.Max(0f, skipHeld - dt * 2f);
+            skipRing.fillAmount = Mathf.Clamp01(skipHeld / settings.skipHoldSeconds);
+            if (skipHeld >= settings.skipHoldSeconds) StartSkip();
+        }
+
+        static bool AnyKeyHeld()
+        {
+            return (Keyboard.current != null && Keyboard.current.anyKey.isPressed)
+                || (Mouse.current != null && (Mouse.current.leftButton.isPressed || Mouse.current.rightButton.isPressed
+                    || Mouse.current.middleButton.isPressed));
+        }
+
+        void StartSkip()
+        {
+            skipping = true;
+            StopAllCoroutines();
+            voice.Stop();
+            StartCoroutine(SkipOut());
+        }
+
+        // everything on the canvas fades away with the black; the game and its sound come back
+        IEnumerator SkipOut()
+        {
+            var groups = new List<CanvasGroup>(slideGroups) { words, controlsPlain, controlsLabelled, skip };
+            groups.RemoveAll(g => g == null);
+            var from = new List<float>();
+            foreach (CanvasGroup g in groups) from.Add(g.alpha);
+            float blackFrom = black.alpha, ambientFrom = ambient.volume;
+            Unfreeze();
+            yield return Fade(k =>
+            {
+                for (int i = 0; i < groups.Count; i++) groups[i].alpha = from[i] * (1f - k);
+                black.alpha = blackFrom * (1f - k);
+                ambient.volume = ambientFrom * (1f - k);
+                SetGameSound(k);
+            }, settings.resumeFadeSeconds);
+            ambient.Stop();
+            Destroy(gameObject);
         }
 
         // ------------------------------------------------------------------ holding the game
