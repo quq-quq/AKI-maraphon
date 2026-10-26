@@ -12,7 +12,8 @@ namespace AKI.Menu
     /// The legend, told in the middle of the grandfather's jump. The view goes black while the camera flies into his
     /// head, the game stops (time and every sound of it) and the legend plays on the black: two pictures that fade in
     /// and out and slowly come closer, the grandfather's voice, a soft ambient and the lines of the voice as subtitles
-    /// at the bottom, one sentence at a time. Then the game goes on from the same frame and the black clears.
+    /// at the bottom, one sentence at a time. Then the controls show on the black; as their captions go, the game goes
+    /// on from the same frame, the black clears and the bare keyboard and mouse stay over the game for a while.
     /// Started by <see cref="MainMenuController"/>. Builds its own overlay canvas and runs on unscaled time.
     /// Pictures and the voice are loaded from Resources/Intro by the names in <see cref="Settings"/>.
     /// </summary>
@@ -20,6 +21,7 @@ namespace AKI.Menu
     {
         const int SortingOrder = 31000;     // above the game's canvases, below the ending screen
         const float BlackOverscan = 200f;   // the black reaches this far past every edge: no gap can show the game
+        const float FeatherEdge = 0.16f;    // a hanging picture melts into the dark over this share of its size
 
         [Serializable]
         public struct Cue
@@ -64,7 +66,7 @@ namespace AKI.Menu
             public Slide[] slides =
             {
                 new Slide { image = "Intro/legend_1", from = 0f, to = 17.4f, fill = false, size = 0.62f, focus = new Vector2(0.5f, 0.3f) },
-                new Slide { image = "Intro/legend_2", from = 17.4f, to = -1f, fill = true, size = 1f, focus = new Vector2(0.5f, 0.5f) }
+                new Slide { image = "Intro/legend_2", from = 17.4f, to = -1f, fill = false, size = 0.62f, focus = new Vector2(0.5f, 0.5f) }
             };
             public Cue[] cues =
             {
@@ -84,7 +86,7 @@ namespace AKI.Menu
             [Min(8)] public int fontSize = 44;
             public Color textColour = new Color(1f, 0.93f, 0.75f, 1f);
 
-            [Header("Controls (after the legend, on the same black)")]
+            [Header("Controls (after the legend: on the black, then over the game)")]
             [Tooltip("Off = the game goes on right after the legend.")]
             public bool showControls = true;
             [Tooltip("Keyboard and mouse with arrows and captions (Resources path without extension).")]
@@ -97,9 +99,9 @@ namespace AKI.Menu
             [Min(0f)] public float controlsFadeSeconds = 1.2f;
             [Tooltip("Seconds the arrows and captions stay.")]
             [Min(0f)] public float controlsLabelSeconds = 4f;
-            [Tooltip("Seconds the arrows and captions take to go.")]
+            [Tooltip("Seconds the arrows and captions take to go (the black clears and the game goes on meanwhile).")]
             [Min(0f)] public float controlsLabelFadeSeconds = 1f;
-            [Tooltip("Seconds the bare keyboard and mouse hang on the black.")]
+            [Tooltip("Seconds the bare keyboard and mouse hang over the game.")]
             [Min(0f)] public float controlsPlainSeconds = 5f;
 
             [Header("Timing (seconds)")]
@@ -107,7 +109,7 @@ namespace AKI.Menu
             [Min(0f)] public float blackSeconds = 0.8f;
             [Tooltip("The last picture stays this long after the voice has ended.")]
             [Min(0f)] public float tailSeconds = 1f;
-            [Tooltip("The black clears over the game, which goes on from where it stopped.")]
+            [Tooltip("The black clears over the game, which goes on from where it stopped (as the controls' captions go).")]
             [Min(0f)] public float resumeFadeSeconds = 1.5f;
         }
 
@@ -115,11 +117,16 @@ namespace AKI.Menu
 
         public static bool IsRunning => current != null;
 
+        /// <summary>The game is stopped for the legend: nothing of it may count time meanwhile.</summary>
+        public static bool IsHoldingGame => current != null && current.frozen;
+
         Settings settings;
         CanvasGroup black;
         CanvasGroup[] slideGroups;
         RectTransform[] slideRects;
         Texture2D[] slideTextures;
+        RawImage[] slideImages;
+        RectMask2D[] slideMasks;
         Text line;
         CanvasGroup words;
         CanvasGroup controlsPlain;
@@ -169,6 +176,8 @@ namespace AKI.Menu
             slideGroups = new CanvasGroup[slides.Length];
             slideRects = new RectTransform[slides.Length];
             slideTextures = new Texture2D[slides.Length];
+            slideImages = new RawImage[slides.Length];
+            slideMasks = new RectMask2D[slides.Length];
             for (int i = 0; i < slides.Length; i++)
             {
                 slideTextures[i] = Resources.Load<Texture2D>(slides[i].image);
@@ -179,17 +188,14 @@ namespace AKI.Menu
                 }
                 RectTransform rect = Panel("Slide " + i, transform, Vector2.zero, Vector2.one);
                 slideRects[i] = rect;
-                var image = rect.gameObject.AddComponent<RawImage>();
+                // the picture's own alpha falls off at its edges (a soft mask, not black laid over it), so the edges
+                // stay just as soft while it fades in and out
+                if (!slides[i].fill) slideMasks[i] = rect.gameObject.AddComponent<RectMask2D>();
+                var image = Panel("Picture", rect, Vector2.zero, Vector2.one).gameObject.AddComponent<RawImage>();
                 image.texture = slideTextures[i];
                 image.raycastTarget = false;
-                if (!slides[i].fill)
-                {
-                    // black closes in on the picture's edges, so it melts into the dark instead of ending in a frame
-                    var feather = Panel("Feather", rect, Vector2.zero, Vector2.one).gameObject.AddComponent<RawImage>();
-                    feather.texture = FeatherTexture();
-                    feather.raycastTarget = false;
-                }
-                slideGroups[i] =rect.gameObject.AddComponent<CanvasGroup>();
+                slideImages[i] = image;
+                slideGroups[i] = rect.gameObject.AddComponent<CanvasGroup>();
                 slideGroups[i].alpha = 0f;
             }
 
@@ -317,21 +323,23 @@ namespace AKI.Menu
             Freeze();
             yield return new WaitForSecondsRealtime(settings.blackSeconds);
             yield return Legend();
-            if (settings.showControls) yield return Controls();
-            yield return FadeAmbient(1f);
-            yield return new WaitForSecondsRealtime(settings.blackSeconds);
-
-            // the game goes on from the frame it stopped at
-            Unfreeze();
-            for (float t = 0f; t < settings.resumeFadeSeconds; t += Time.unscaledDeltaTime)
+            if (settings.showControls) yield return Controls();   // it lets the game go on halfway through
+            else
             {
-                float k = Ramp(t, settings.resumeFadeSeconds);
-                black.alpha = 1f - k;
-                SetGameSound(k);
-                yield return null;
+                yield return FadeAmbient(1f);
+                yield return new WaitForSecondsRealtime(settings.blackSeconds);
+                // the game goes on from the frame it stopped at
+                Unfreeze();
+                yield return Fade(ResumeStep, settings.resumeFadeSeconds);
             }
-            SetGameSound(1f);
             Destroy(gameObject);
+        }
+
+        // the black clears over the game and its sound comes back: 0 -> 1
+        void ResumeStep(float k)
+        {
+            black.alpha = 1f - k;
+            SetGameSound(k);
         }
 
         IEnumerator Legend()
@@ -370,8 +378,8 @@ namespace AKI.Menu
             voice.Stop();
         }
 
-        // Keyboard and mouse come out of the dark with their arrows and captions, which then go and leave the bare
-        // keyboard and mouse hanging for a few seconds before they too fade away.
+        // Keyboard and mouse come out of the dark with their arrows and captions. As those go, so does the black: the
+        // game goes on and the bare keyboard and mouse hang over it for a few seconds before they too fade away.
         IEnumerator Controls()
         {
             // the labelled drawing comes first; the plain one takes its place (the keyboard and mouse stay put)
@@ -381,12 +389,23 @@ namespace AKI.Menu
                 if (first != null) first.alpha = k;
             }, settings.controlsFadeSeconds);
             if (settings.controlsLabelSeconds > 0f) yield return new WaitForSecondsRealtime(settings.controlsLabelSeconds);
-            yield return Fade(k =>
+
+            // the arrows and captions go and the black goes with them: the game goes on under the bare drawing
+            StartCoroutine(FadeAmbient(settings.resumeFadeSeconds));
+            Unfreeze();
+            float labelFade = settings.controlsLabelFadeSeconds, resumeFade = settings.resumeFadeSeconds;
+            float span = Mathf.Max(labelFade, resumeFade);
+            for (float t = 0f; t < span; t += Time.unscaledDeltaTime)
             {
+                float k = Ramp(t, labelFade);
                 if (first != null) first.alpha = 1f - k;
                 if (controlsPlain != null && controlsPlain != first) controlsPlain.alpha = k;
-            }, settings.controlsLabelFadeSeconds);
+                ResumeStep(Ramp(t, resumeFade));
+                yield return null;
+            }
+            if (first != null && first != controlsPlain) first.alpha = 0f;
             if (controlsPlain != null) controlsPlain.alpha = 1f;
+            ResumeStep(1f);
             if (settings.controlsPlainSeconds > 0f) yield return new WaitForSecondsRealtime(settings.controlsPlainSeconds);
             yield return Fade(k =>
             {
@@ -426,8 +445,14 @@ namespace AKI.Menu
                 float end = slide.to < 0f ? total : Mathf.Min(slide.to, total);
                 slideGroups[i].alpha = Ramp(t - slide.from, fade) * Ramp(end - t, fade);
                 float zoom = 1f + settings.zoomPerSecond * Mathf.Max(0f, t - slide.from);
-                if (slide.fill) Cover(slideRects[i].GetComponent<RawImage>(), slideTextures[i], slide.focus, zoom);
-                else Hang(slideRects[i], slideTextures[i], slide.size * zoom);
+                if (slide.fill) Cover(slideImages[i], slideTextures[i], slide.focus, zoom);
+                else
+                {
+                    Hang(slideRects[i], slideTextures[i], slide.size * zoom);
+                    Rect area = slideRects[i].rect;
+                    slideMasks[i].softness = new Vector2Int(Mathf.RoundToInt(area.width * FeatherEdge),
+                        Mathf.RoundToInt(area.height * FeatherEdge));
+                }
             }
         }
 
@@ -442,28 +467,6 @@ namespace AKI.Menu
             rect.anchorMin = new Vector2(0.5f - width * 0.5f, CentreY - height * 0.5f);
             rect.anchorMax = new Vector2(0.5f + width * 0.5f, CentreY + height * 0.5f);
             rect.offsetMin = rect.offsetMax = Vector2.zero;
-        }
-
-        // black at the edges, clear inside: laid over a picture it softens the edges
-        static Texture2D FeatherTexture()
-        {
-            const int Size = 64;
-            const float Edge = 0.16f;
-            var texture = new Texture2D(Size, Size, TextureFormat.RGBA32, false)
-            {
-                wrapMode = TextureWrapMode.Clamp,
-                filterMode = FilterMode.Bilinear,
-                hideFlags = HideFlags.HideAndDontSave
-            };
-            for (int y = 0; y < Size; y++)
-                for (int x = 0; x < Size; x++)
-                {
-                    float fx = x / (Size - 1f), fy = y / (Size - 1f);
-                    float inside = Mathf.Min(Mathf.Min(fx, 1f - fx), Mathf.Min(fy, 1f - fy)) / Edge;
-                    texture.SetPixel(x, y, new Color(0f, 0f, 0f, 1f - Mathf.SmoothStep(0f, 1f, inside)));
-                }
-            texture.Apply(false, true);
-            return texture;
         }
 
         // the sentence being spoken: in as it starts, out before the next one (or the end) takes its place

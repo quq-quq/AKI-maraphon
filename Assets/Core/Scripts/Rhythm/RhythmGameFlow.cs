@@ -171,7 +171,7 @@ namespace AKI.Rhythm
         [ContextMenu("Debug/Begin fishing")]
         public void BeginFishing()
         {
-            if (!initialized || phase != GamePhase.AwaitDive) return;
+            if (!initialized || phase != GamePhase.AwaitDive || IntroSequence.IsHoldingGame) return;
             if (!StartTrack(fishingTrack, true, soundConfig != null ? soundConfig.FishingGamelan : null)) return;
             SetPhase(GamePhase.Fishing);
             fishSpawner?.StartSpawning(); onFishingStarted.Invoke(); FishingStarted?.Invoke();
@@ -189,6 +189,8 @@ namespace AKI.Rhythm
             bossHitPulse = Mathf.MoveTowards(bossHitPulse, 0f, Time.unscaledDeltaTime / Mathf.Max(.05f,bossHitFadeSeconds));
             ApplyBossHitVignette();
             if (phase == GamePhase.Ended) return;   // nothing may restart the scene under an ending
+            // the legend holds the game: the music clock runs on, so the phase timers (the golden fish) wait it out
+            if (IntroSequence.IsHoldingGame) { phaseStarted += Time.unscaledDeltaTime; return; }
             if(naga!=null)
             {
                 var guard=naga.GetComponent<NagaEnvironmentSafety>();

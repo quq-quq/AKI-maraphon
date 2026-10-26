@@ -31,20 +31,20 @@ namespace AKI.Rhythm
         [Min(0.01f)] public float fovReleaseSeconds = 0.3f;
 
         [Header("Pulse along the top edge, from the centre out to the sides")]
-        [ColorUsage(false, true)] public Color edgeColour = new Color(0.55f, 0.9f, 1f, 1f);
+        [ColorUsage(false, true)] public Color edgeColour = new Color(1f, 0.78f, 0.28f, 1f);   // warm gold
         [Tooltip("Brightness of the pulse right at the top edge on a beat. 0 = off.")]
-        [Range(0f, 2f)] public float edgeIntensity = 0.06f;
+        [Range(0f, 2f)] public float edgeIntensity = 0.75f;
         [Tooltip("How far the pulse reaches down from the top edge, share of the screen height.")]
-        [Range(0.02f, 0.5f)] public float edgeWidth = 0.07f;
+        [Range(0.02f, 0.5f)] public float edgeWidth = 0.12f;
         [Tooltip("While it fades the pulse reaches this much further down (share of Edge Width).")]
         [Range(0f, 2f)] public float edgeTravel = 0.2f;
         [Tooltip("Length of the soft trail behind the pulse's front, share of the half screen width (it spreads from " +
                  "the centre to each side edge over the whole pulse).")]
-        [Range(0.05f, 1f)] public float edgeTrail = 0.45f;
+        [Range(0.05f, 1f)] public float edgeTrail = 0.3f;
         [Tooltip("Seconds the glow takes to rise.")]
         [Min(0f)] public float edgeAttackSeconds = 0.07f;
         [Tooltip("Seconds the glow takes to fade.")]
-        [Min(0.01f)] public float edgeReleaseSeconds = 0.32f;
+        [Min(0.01f)] public float edgeReleaseSeconds = 0.4f;
 
         Camera cam;
         float appliedFov;                  // what was added to the field of view this frame, to take it off again
