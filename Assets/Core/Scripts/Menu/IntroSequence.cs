@@ -84,6 +84,24 @@ namespace AKI.Menu
             [Min(8)] public int fontSize = 44;
             public Color textColour = new Color(1f, 0.93f, 0.75f, 1f);
 
+            [Header("Controls (after the legend, on the same black)")]
+            [Tooltip("Off = the game goes on right after the legend.")]
+            public bool showControls = true;
+            [Tooltip("Keyboard and mouse with arrows and captions (Resources path without extension).")]
+            public string controlsLabelled = "Intro/controls_full";
+            [Tooltip("The same drawing without arrows and captions: it stays when they fade away.")]
+            public string controlsPlain = "Intro/controls_clean";
+            [Tooltip("Share of the screen height the drawing takes.")]
+            [Range(0.3f, 1f)] public float controlsHeight = 0.7f;
+            [Tooltip("Seconds the drawing takes to fade in and out.")]
+            [Min(0f)] public float controlsFadeSeconds = 1.2f;
+            [Tooltip("Seconds the arrows and captions stay.")]
+            [Min(0f)] public float controlsLabelSeconds = 4f;
+            [Tooltip("Seconds the arrows and captions take to go.")]
+            [Min(0f)] public float controlsLabelFadeSeconds = 1f;
+            [Tooltip("Seconds the bare keyboard and mouse hang on the black.")]
+            [Min(0f)] public float controlsPlainSeconds = 5f;
+
             [Header("Timing (seconds)")]
             [Tooltip("Silence on the black, before the legend and after it.")]
             [Min(0f)] public float blackSeconds = 0.8f;
@@ -104,6 +122,8 @@ namespace AKI.Menu
         Texture2D[] slideTextures;
         Text line;
         CanvasGroup words;
+        CanvasGroup controlsPlain;
+        CanvasGroup controlsLabelled;
         AudioSource voice;
         AudioSource ambient;
         readonly List<AudioSource> heldSources = new List<AudioSource>();
@@ -187,10 +207,41 @@ namespace AKI.Menu
             line.lineSpacing = 1.15f;
             line.gameObject.AddComponent<Shadow>().effectDistance = new Vector2(2f, -2f);
 
+            if (settings.showControls) BuildControls();
+
             voice = Source(false);
             voice.volume = settings.voiceVolume;
             ambient = Source(true);
             ambient.volume = 0f;
+        }
+
+        // The drawing sits in the middle of the screen, the plain one under the labelled one: when the labelled one
+        // fades away, the bare keyboard and mouse are what is left.
+        void BuildControls()
+        {
+            controlsPlain = ControlsImage("Controls plain", settings.controlsPlain);
+            controlsLabelled = ControlsImage("Controls labelled", settings.controlsLabelled);
+        }
+
+        CanvasGroup ControlsImage(string name, string path)
+        {
+            var texture = Resources.Load<Texture2D>(path);
+            if (texture == null)
+            {
+                Debug.LogWarning("IntroSequence: no picture '" + path + "' in Resources.", this);
+                return null;
+            }
+            float margin = (1f - settings.controlsHeight) * 0.5f;
+            RectTransform area = Panel(name, transform, new Vector2(0.1f, margin), new Vector2(0.9f, 1f - margin));
+            var image = area.gameObject.AddComponent<RawImage>();
+            image.texture = texture;
+            image.raycastTarget = false;
+            var fit = area.gameObject.AddComponent<AspectRatioFitter>();
+            fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+            fit.aspectRatio = texture.width / Mathf.Max(1f, (float)texture.height);
+            var group = area.gameObject.AddComponent<CanvasGroup>();
+            group.alpha = 0f;
+            return group;
         }
 
         AudioSource Source(bool loop)
@@ -266,6 +317,7 @@ namespace AKI.Menu
             Freeze();
             yield return new WaitForSecondsRealtime(settings.blackSeconds);
             yield return Legend();
+            if (settings.showControls) yield return Controls();
             yield return FadeAmbient(1f);
             yield return new WaitForSecondsRealtime(settings.blackSeconds);
 
@@ -316,6 +368,41 @@ namespace AKI.Menu
                 if (slideGroups[i] != null) slideGroups[i].alpha = 0f;
             words.alpha = 0f;
             voice.Stop();
+        }
+
+        // Keyboard and mouse come out of the dark with their arrows and captions, which then go and leave the bare
+        // keyboard and mouse hanging for a few seconds before they too fade away.
+        IEnumerator Controls()
+        {
+            // the labelled drawing comes first; the plain one takes its place (the keyboard and mouse stay put)
+            CanvasGroup first = controlsLabelled != null ? controlsLabelled : controlsPlain;
+            yield return Fade(k =>
+            {
+                if (first != null) first.alpha = k;
+            }, settings.controlsFadeSeconds);
+            if (settings.controlsLabelSeconds > 0f) yield return new WaitForSecondsRealtime(settings.controlsLabelSeconds);
+            yield return Fade(k =>
+            {
+                if (first != null) first.alpha = 1f - k;
+                if (controlsPlain != null && controlsPlain != first) controlsPlain.alpha = k;
+            }, settings.controlsLabelFadeSeconds);
+            if (controlsPlain != null) controlsPlain.alpha = 1f;
+            if (settings.controlsPlainSeconds > 0f) yield return new WaitForSecondsRealtime(settings.controlsPlainSeconds);
+            yield return Fade(k =>
+            {
+                if (controlsPlain != null) controlsPlain.alpha = 1f - k;
+            }, settings.controlsFadeSeconds);
+        }
+
+        // calls step with 0 -> 1 (eased) over the seconds
+        static IEnumerator Fade(Action<float> step, float seconds)
+        {
+            for (float t = 0f; t < seconds; t += Time.unscaledDeltaTime)
+            {
+                step(Ramp(t, seconds));
+                yield return null;
+            }
+            step(1f);
         }
 
         IEnumerator FadeAmbient(float seconds)
