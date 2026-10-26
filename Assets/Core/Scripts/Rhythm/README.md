@@ -32,6 +32,7 @@ Select **Rhythm Gameplay** and edit `RhythmGameFlow`.
 | Successful boss hit | `Boss Hit Colour`, `Intensity`, `Fade Seconds` and `Vignette Inner` configure a short yellow light vignette. Only a distinct authorized physical Naga hit triggers it; off-beat/repeated hits cannot. It uses the existing lens pass. |
 | Finale | `Final Charge Seconds` sets the lunge duration. `Cut To Black Distance` cuts the view before the mouth reaches the camera head point, or when motion reports arrival. |
 | Music | `SoundConfig` volumes and underwater bypass values take priority. The flow's music fields are fallbacks. |
+| Hint | `Shoot Hint` is the line under the beat pulse at the top of the screen (empty = off). It appears with the first beat of the fishing music and goes after `Shoot Hint Hits` shots on the beat or `Shoot Hint Seconds`, once per run of the game. |
 | Events | Fishing, golden appearance, boss start/hit, charge and ending events are available for additional presentation. |
 
 The flow overwrites the Naga component's orbit radius, angular speed and charge duration at boss spawn. Tune those three settings on **Rhythm Gameplay**. Tune the remaining motion settings on `Assets/Core/Prefabs/Rhythm/Naga_Rhythm.prefab`.
