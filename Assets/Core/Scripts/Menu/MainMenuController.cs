@@ -202,10 +202,10 @@ namespace AKI.Menu
             if (hint != null) hintFade = 0f;
         }
 
-        // any key, a click of any mouse button or a gamepad button
+        // any key (but Backspace, the game reset's), a click of any mouse button or a gamepad button
         static bool AnyPress()
         {
-            return (Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame)
+            return (Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame && !Keyboard.current.backspaceKey.wasPressedThisFrame)
                 || (Mouse.current != null && (Mouse.current.leftButton.wasPressedThisFrame
                     || Mouse.current.rightButton.wasPressedThisFrame || Mouse.current.middleButton.wasPressedThisFrame))
                 || (Gamepad.current != null && (Gamepad.current.buttonSouth.wasPressedThisFrame

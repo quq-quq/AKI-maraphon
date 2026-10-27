@@ -108,8 +108,25 @@ namespace AKI.Water
         float readbackLatency = 0.05f;
         int probeKernel = -1;
         Shader propertyCacheShader;
-        string[] floatProps = new string[0];
-        string[] vectorProps = new string[0];
+        int[] floatProps = new int[0];
+        int[] vectorProps = new int[0];
+
+        static readonly int[] OceanDispIds = { Shader.PropertyToID("_OceanDisp0"), Shader.PropertyToID("_OceanDisp1"), Shader.PropertyToID("_OceanDisp2") };
+        static readonly int[] OceanDerivIds = { Shader.PropertyToID("_OceanDeriv0"), Shader.PropertyToID("_OceanDeriv1"), Shader.PropertyToID("_OceanDeriv2") };
+        static readonly int OceanLengthScalesId = Shader.PropertyToID("_OceanLengthScales");
+        static readonly int ProbeCountId = Shader.PropertyToID("_ProbeCount");
+        static readonly int ProbeTimeId = Shader.PropertyToID("_ProbeTime");
+        static readonly int ProbeWaterLevelId = Shader.PropertyToID("_ProbeWaterLevel");
+        static readonly int ProbePointsId = Shader.PropertyToID("_ProbePoints");
+        static readonly int ProbeResultsId = Shader.PropertyToID("_ProbeResults");
+        static readonly int CamPlanePosId = Shader.PropertyToID("_CamPlanePos");
+        static readonly int CamPlaneTimeId = Shader.PropertyToID("_CamPlaneTime");
+        static readonly int CamPlaneExactId = Shader.PropertyToID("_CamPlaneExact");
+        static readonly int CamPlaneOutId = Shader.PropertyToID("_CamPlaneOut");
+        static readonly int TimeId = Shader.PropertyToID("_Time");
+        static readonly int MeshCellId = Shader.PropertyToID("_WaterMeshCell");
+        static readonly int MeshGrowthId = Shader.PropertyToID("_WaterMeshGrowth");
+        static readonly int MeshCenterId = Shader.PropertyToID("_WaterMeshCenter");
 
         internal static void RegisterProbe(WaterProbe probe)
         {
@@ -165,15 +182,15 @@ namespace AKI.Water
 
             CopyMaterialToCompute(src);
             probePoints.SetData(probePointData, 0, 0, inFlight.Count);
-            heightCompute.SetInt("_ProbeCount", inFlight.Count);
+            heightCompute.SetInt(ProbeCountId, inFlight.Count);
             // results arrive a few frames later: evaluate the waves at the time they will be used
-            heightCompute.SetFloat("_ProbeTime", Time.timeSinceLevelLoad + readbackLatency);
-            heightCompute.SetFloat("_ProbeWaterLevel", WaterLevel);
+            heightCompute.SetFloat(ProbeTimeId, Time.timeSinceLevelLoad + readbackLatency);
+            heightCompute.SetFloat(ProbeWaterLevelId, WaterLevel);
             PublishMeshCell(heightCompute);
             // the FFT textures hold the sea of this frame, the Gerstner maths is evaluated ahead by the latency
             inFlightTime = Time.time + (SetupProbeWaves(src) ? 0f : readbackLatency);
-            heightCompute.SetBuffer(probeKernel, "_ProbePoints", probePoints);
-            heightCompute.SetBuffer(probeKernel, "_ProbeResults", probeResults);
+            heightCompute.SetBuffer(probeKernel, ProbePointsId, probePoints);
+            heightCompute.SetBuffer(probeKernel, ProbeResultsId, probeResults);
             heightCompute.Dispatch(probeKernel, (inFlight.Count + 63) / 64, 1, 1);
 
             readbackPending = true;
@@ -194,10 +211,10 @@ namespace AKI.Water
 
             for (int i = 0; i < 3; i++)
             {
-                heightCompute.SetTexture(kernel, "_OceanDisp" + i, ocean.GetDisplacement(i));
-                heightCompute.SetTexture(kernel, "_OceanDeriv" + i, ocean.GetDerivatives(i));
+                heightCompute.SetTexture(kernel, OceanDispIds[i], ocean.GetDisplacement(i));
+                heightCompute.SetTexture(kernel, OceanDerivIds[i], ocean.GetDerivatives(i));
             }
-            heightCompute.SetVector("_OceanLengthScales", ocean.LengthScales);
+            heightCompute.SetVector(OceanLengthScalesId, ocean.LengthScales);
             return true;
         }
 
@@ -233,13 +250,13 @@ namespace AKI.Water
             CopyMaterialToCompute(src);
             SetupComputeWaves(src, camPlaneKernel);
             PublishMeshCell(heightCompute);
-            heightCompute.SetFloat("_ProbeWaterLevel", WaterLevel);
-            heightCompute.SetVector("_CamPlanePos", p);
-            Vector4 time = Shader.GetGlobalVector("_Time");
-            heightCompute.SetFloat("_CamPlaneTime", time.y > 0f ? time.y : Time.timeSinceLevelLoad);
+            heightCompute.SetFloat(ProbeWaterLevelId, WaterLevel);
+            heightCompute.SetVector(CamPlanePosId, p);
+            Vector4 time = Shader.GetGlobalVector(TimeId);
+            heightCompute.SetFloat(CamPlaneTimeId, time.y > 0f ? time.y : Time.timeSinceLevelLoad);
             // the clipmap's cells by the camera are tiny: the exact waves; one coarse grid: its own triangle
-            heightCompute.SetFloat("_CamPlaneExact", clipmap != null ? 1f : 0f);
-            heightCompute.SetTexture(camPlaneKernel, "_CamPlaneOut", camPlane);
+            heightCompute.SetFloat(CamPlaneExactId, clipmap != null ? 1f : 0f);
+            heightCompute.SetTexture(camPlaneKernel, CamPlaneOutId, camPlane);
             heightCompute.Dispatch(camPlaneKernel, 1, 1, 1);
             Shader.SetGlobalTexture(CamPlaneId, camPlane);
         }
@@ -270,19 +287,19 @@ namespace AKI.Water
             if (propertyCacheShader != src.shader)
             {
                 propertyCacheShader = src.shader;
-                var floats = new List<string>();
-                var vectors = new List<string>();
+                var floats = new List<int>();
+                var vectors = new List<int>();
                 for (int i = 0; i < src.shader.GetPropertyCount(); i++)
                 {
                     var type = src.shader.GetPropertyType(i);
-                    if (type == ShaderPropertyType.Float || type == ShaderPropertyType.Range) floats.Add(src.shader.GetPropertyName(i));
-                    else if (type == ShaderPropertyType.Color || type == ShaderPropertyType.Vector) vectors.Add(src.shader.GetPropertyName(i));
+                    if (type == ShaderPropertyType.Float || type == ShaderPropertyType.Range) floats.Add(src.shader.GetPropertyNameId(i));
+                    else if (type == ShaderPropertyType.Color || type == ShaderPropertyType.Vector) vectors.Add(src.shader.GetPropertyNameId(i));
                 }
                 floatProps = floats.ToArray();
                 vectorProps = vectors.ToArray();
             }
-            foreach (string n in floatProps) heightCompute.SetFloat(n, src.GetFloat(n));
-            foreach (string n in vectorProps) heightCompute.SetVector(n, src.GetVector(n));
+            foreach (int id in floatProps) heightCompute.SetFloat(id, src.GetFloat(id));
+            foreach (int id in vectorProps) heightCompute.SetVector(id, src.GetVector(id));
         }
 
         void ReleaseProbeBuffers()
@@ -535,6 +552,9 @@ namespace AKI.Water
         /// <summary>The material currently used (the fallback on platforms without depth/opaque textures).</summary>
         public Material ActiveMaterial => UsingFallback ? fallbackMaterial : material;
 
+        /// <summary>The full-screen underwater effect (with its distance haze) is drawn for cameras under this water.</summary>
+        public bool UnderwaterEffectOn => underwaterRenderer != null && underwaterRenderer.enabled;
+
         void ApplyMaterial()
         {
             lastAsset = GraphicsSettings.currentRenderPipeline;
@@ -615,16 +635,16 @@ namespace AKI.Water
         // cannot represent instead of aliasing them into spikes.
         void PublishMeshCell()
         {
-            Shader.SetGlobalFloat("_WaterMeshCell", InnerCell);
-            Shader.SetGlobalFloat("_WaterMeshGrowth", MeshGrowth);
-            Shader.SetGlobalVector("_WaterMeshCenter", transform.position);
+            Shader.SetGlobalFloat(MeshCellId, InnerCell);
+            Shader.SetGlobalFloat(MeshGrowthId, MeshGrowth);
+            Shader.SetGlobalVector(MeshCenterId, transform.position);
         }
 
         void PublishMeshCell(ComputeShader cs)
         {
-            cs.SetFloat("_WaterMeshCell", InnerCell);
-            cs.SetFloat("_WaterMeshGrowth", MeshGrowth);
-            cs.SetVector("_WaterMeshCenter", transform.position);
+            cs.SetFloat(MeshCellId, InnerCell);
+            cs.SetFloat(MeshGrowthId, MeshGrowth);
+            cs.SetVector(MeshCenterId, transform.position);
         }
 
         // ------------------------------------------------------------------ underwater

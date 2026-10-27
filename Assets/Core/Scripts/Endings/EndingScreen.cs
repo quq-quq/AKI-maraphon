@@ -24,7 +24,7 @@ namespace AKI.Endings
         const float ArriveFadeSeconds = 1.5f;      // the black clears over the next scene
         const float BlackOverscan = 200f;          // the black reaches this far past every edge: no gap can show the game
         const string ContactQr = "Endings/contact_qr";               // Resources path without extension
-        const string ContactText = "Связаться с нами: https://t.me/quq1quq";
+        const string ContactText = "Связаться с командой PNG mafia: https://t.me/quq1quq";
         const float ContactSize = 0.34f;           // the QR code's share of the screen height
         const float ContactCentreY = 0.6f;         // a little above the middle
         const float ContactFeather = 0.12f;        // its edges melt into the black over this share of its size
@@ -54,6 +54,8 @@ namespace AKI.Endings
                 return;
             }
             if (current != null) return;
+            // only in a running game: made in the editor it would be saved into the scene and greet every start
+            if (!Application.isPlaying) return;
             var go = new GameObject("EndingScreen (" + ending.name + ")");
             current = go.AddComponent<EndingScreen>();
             current.ending = ending;
@@ -143,8 +145,8 @@ namespace AKI.Endings
 
             Text caption = Label("Contact line", area, new Vector2(-1f, 1f), new Vector2(2f, 1f), font,
                 Mathf.Max(8, Mathf.RoundToInt(ending.fontSize * 0.75f)), ending.textColor);
-            caption.rectTransform.offsetMin = new Vector2(0f, 12f);
-            caption.rectTransform.offsetMax = new Vector2(0f, 80f);
+            caption.rectTransform.offsetMin = new Vector2(0f, 28f);   // clear of the QR code's soft edge
+            caption.rectTransform.offsetMax = new Vector2(0f, 100f);
             caption.alignment = TextAnchor.LowerCenter;
             caption.text = ContactText;
         }
@@ -250,9 +252,10 @@ namespace AKI.Endings
             group.alpha = to;
         }
 
+        // Backspace is the game reset's (GameReset)
         static bool AnyKeyPressed()
         {
-            return (Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame)
+            return (Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame && !Keyboard.current.backspaceKey.wasPressedThisFrame)
                 || (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
                 || (Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame);
         }

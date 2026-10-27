@@ -68,6 +68,7 @@ namespace AKI.Menu
         float time;
         float diveTime;
         bool playing;
+        bool settled;   // the final pose has been worked out and nothing moves it any more
         Transform head;
         SkinnedMeshRenderer[] skins;
         Transform breathingSpine, breathingChest;
@@ -261,6 +262,7 @@ namespace AKI.Menu
             if (!enabled) return;
             playing = true;
             time = 0f;
+            settled = false;
         }
 
         public void SetActorVisible(bool visible)
@@ -299,6 +301,9 @@ namespace AKI.Menu
         void LateUpdate()
         {
             if (!graph.IsValid()) return;
+            // the dive is over and the breathing has faded out: the pose can't change any more, so it isn't worked
+            // out again every frame for the rest of the game
+            if (settled && playing && time >= Duration) return;
             ApplySeatedHeight(SeatWeight);
             breathingWeight = Mathf.MoveTowards(breathingWeight, seatedBreathing && !playing ? 1f : 0f,
                 Time.deltaTime / Mathf.Max(.05f, breathingBlendOutSeconds));
@@ -321,6 +326,7 @@ namespace AKI.Menu
             breathingPlayable.SetJobData(breathingJob);
             Sample(playing ? time : 0f);
             ApplySeatedHeight(SeatWeight);
+            settled = playing && time >= Duration && breathingWeight <= 0f;
         }
 
         // Seated first frame -> Sit_Stand -> SmoothStep blend into the run (no pose pop) with the run's time

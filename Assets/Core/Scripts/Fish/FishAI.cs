@@ -81,6 +81,15 @@ namespace AKI.Fish
         [Tooltip("Tail wags per second at full speed.")]
         [Min(0f)] public float wiggleFrequency = 2f;
 
+        [Header("Spurts")]
+        [Tooltip("Seconds between spurts, min and max: now and then the fish speeds up along its path for a moment " +
+                 "(its swimming animation and tail with it). Long, so the fish don't fidget.")]
+        public Vector2 spurtInterval = new Vector2(9f, 18f);
+        [Tooltip("Speed at the height of a spurt, as a multiple of Swim Speed.")]
+        [Range(1f, 3f)] public float spurtBoost = 1.7f;
+        [Tooltip("Seconds a spurt lasts: it picks up and eases off again.")]
+        [Min(0.2f)] public float spurtSeconds = 1.6f;
+
         [Header("Gizmos")]
         public bool drawGizmos = true;
         [Tooltip("Seconds of the path behind the fish to draw.")]
@@ -109,6 +118,8 @@ namespace AKI.Fish
         Vector3 approachDirection;     // coming in: along the parabola (flat)
         float touchAngle;              // coming in: where it joins the path, angle around the player
         Vector3 mergeOffset;           // gap to the path when it joined it, fading out
+        float untilSpurt;              // seconds of swimming until the next spurt
+        float spurtTime = -1f;         // seconds into the spurt under way (< 0: none)
 
         public bool IsStopped => state == State.Stopped;
 
@@ -162,6 +173,7 @@ namespace AKI.Fish
             phase = Random.Range(0f, 2f * Mathf.PI);
             verticalPhase = Random.Range(0f, 2f * Mathf.PI);
             direction = Random.value < 0.5f ? -1 : 1;
+            untilSpurt = NextSpurt();   // each fish on its own clock
         }
 
         void OnEnable()
@@ -356,10 +368,32 @@ namespace AKI.Fish
             float r = WaveRadius(a);
             float dr = waveAmplitude * waveCount * Mathf.Cos(waveCount * a + phase);
             float dy = verticalAmplitude * verticalWaveCount * Mathf.Cos(verticalWaveCount * a + verticalPhase);
-            float step = swimSpeed * dt / Mathf.Max(0.1f, Mathf.Sqrt(r * r + dr * dr + dy * dy));
+            float step = swimSpeed * Spurt(dt) * dt / Mathf.Max(0.1f, Mathf.Sqrt(r * r + dr * dr + dy * dy));
             angle += direction * step * Mathf.Rad2Deg;
             return PathPoint(angle) + mergeOffset;
         }
+
+        // How much faster than Swim Speed the fish goes now: 1, or more for a moment every spurtInterval seconds.
+        float Spurt(float dt)
+        {
+            if (spurtTime < 0f)
+            {
+                untilSpurt -= dt;
+                if (untilSpurt > 0f) return 1f;
+                spurtTime = 0f;
+            }
+            spurtTime += dt;
+            if (spurtTime >= spurtSeconds)
+            {
+                spurtTime = -1f;
+                untilSpurt = NextSpurt();
+                return 1f;
+            }
+            // picks up and eases off smoothly
+            return 1f + (spurtBoost - 1f) * Mathf.Sin(Mathf.PI * spurtTime / spurtSeconds);
+        }
+
+        float NextSpurt() => Random.Range(spurtInterval.x, Mathf.Max(spurtInterval.x, spurtInterval.y));
 
         float WaveRadius(float radians)
         {

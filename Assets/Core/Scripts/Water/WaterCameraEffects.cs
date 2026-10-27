@@ -64,6 +64,9 @@ namespace AKI.Water
             NewRun();
         }
 
+        /// <summary>The water swirls over the lens as right after diving (e.g. a bubble bursts on the camera).</summary>
+        public void Swirl() => enterTime = Now;
+
         // every soaking runs off the lens in its own way
         static void NewRun() => Shader.SetGlobalFloat(SeedId, Random.Range(0f, 100f));
 

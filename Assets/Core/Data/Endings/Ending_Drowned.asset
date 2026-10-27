@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Ending_Drowned
   m_EditorClassIdentifier: Assembly-CSharp::AKI.Endings.EndingData
   subtitles:
-  - text: "\u041A\u043E\u043D\u0446\u043E\u0432\u043A\u0430 2 \u0438\u0437 3\n: \u0432\u043E\u0437\u0434\u0443\u0445
+  - text: "\u041A\u043E\u043D\u0446\u043E\u0432\u043A\u0430 2 \u0438\u0437 3: \u0432\u043E\u0437\u0434\u0443\u0445
       \u043A\u043E\u043D\u0447\u0438\u043B\u0441\u044F \u0432 \u0431\u043E\u044E
       \u0441 \u041D\u0430\u0433\u043E\u0439."
     seconds: 4
@@ -28,7 +28,7 @@ MonoBehaviour:
   textColor: {r: 1, g: 0.85, b: 0.1, a: 1}
   fontStyle: 0
   font: {fileID: 0}
-  textWidth: 0.8
+  textWidth: 0.94
   fadeToBlackSeconds: 2
   textDelaySeconds: 1
   textFadeSeconds: 0.6

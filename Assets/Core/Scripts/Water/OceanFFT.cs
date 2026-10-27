@@ -101,6 +101,15 @@ namespace AKI.Water
         const int Count = 3;
         static readonly int[] DispWriteIds = { Shader.PropertyToID("_Displacement0"), Shader.PropertyToID("_Displacement1"), Shader.PropertyToID("_Displacement2") };
         static readonly int[] DerivWriteIds = { Shader.PropertyToID("_Derivatives0"), Shader.PropertyToID("_Derivatives1"), Shader.PropertyToID("_Derivatives2") };
+        static readonly int TimeId = Shader.PropertyToID("_Time");
+        static readonly int DeltaTimeId = Shader.PropertyToID("_DeltaTime");
+        static readonly int LambdaId = Shader.PropertyToID("_Lambda");
+        static readonly int FoamDecayId = Shader.PropertyToID("_FoamDecay");
+        static readonly int ResetId = Shader.PropertyToID("_Reset");
+        static readonly int WaveDataId = Shader.PropertyToID("_WaveData");
+        static readonly int H0Id = Shader.PropertyToID("_H0");
+        static readonly int SpecId = Shader.PropertyToID("_Spec");
+        static readonly int TwiddlesId = Shader.PropertyToID("_Twiddles");
 
         Cascade[] cascades;
         // shared by the cascades (a slice each): spectrum set-up and the half-transformed spectra
@@ -182,22 +191,22 @@ namespace AKI.Water
             if (cascades == null || fftCompute == null) return;
             if (spectrumDirty) InitSpectra();
 
-            fftCompute.SetFloat("_Time", SimulationTime);
-            fftCompute.SetFloat("_DeltaTime", dt);
-            fftCompute.SetFloat("_Lambda", choppiness);
-            fftCompute.SetFloat("_FoamDecay", foamDecay);
-            fftCompute.SetFloat("_Reset", resetFoam ? 1f : 0f);
+            fftCompute.SetFloat(TimeId, SimulationTime);
+            fftCompute.SetFloat(DeltaTimeId, dt);
+            fftCompute.SetFloat(LambdaId, choppiness);
+            fftCompute.SetFloat(FoamDecayId, foamDecay);
+            fftCompute.SetFloat(ResetId, resetFoam ? 1f : 0f);
             resetFoam = false;
 
             // every row of every cascade, then every column: two dispatches for the whole sea
-            fftCompute.SetTexture(kRows, "_WaveData", waveData);
-            fftCompute.SetTexture(kRows, "_H0", h0);
-            fftCompute.SetTexture(kRows, "_Spec", spec);
-            fftCompute.SetBuffer(kRows, "_Twiddles", twiddles);
+            fftCompute.SetTexture(kRows, WaveDataId, waveData);
+            fftCompute.SetTexture(kRows, H0Id, h0);
+            fftCompute.SetTexture(kRows, SpecId, spec);
+            fftCompute.SetBuffer(kRows, TwiddlesId, twiddles);
             fftCompute.Dispatch(kRows, Size, 1, Count);
 
-            fftCompute.SetTexture(kColumns, "_Spec", spec);
-            fftCompute.SetBuffer(kColumns, "_Twiddles", twiddles);
+            fftCompute.SetTexture(kColumns, SpecId, spec);
+            fftCompute.SetBuffer(kColumns, TwiddlesId, twiddles);
             for (int i = 0; i < Count; i++)
             {
                 fftCompute.SetTexture(kColumns, DispWriteIds[i], cascades[i].displacement);

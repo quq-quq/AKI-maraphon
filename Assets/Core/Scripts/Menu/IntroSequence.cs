@@ -117,7 +117,7 @@ namespace AKI.Menu
 
             [Header("Skipping (once the legend has been seen in this run of the game)")]
             [Tooltip("The line at the top right while the legend can be skipped.")]
-            public string skipText = "Зажмите любую кнопку, чтобы продолжить...";
+            public string skipText = "Зажмите любую кнопку, чтобы пропустить...";
             [Tooltip("Seconds a key has to be held to skip the legend and the controls.")]
             [Min(0.1f)] public float skipHoldSeconds = 1.5f;
             [Min(8)] public int skipFontSize = 30;
@@ -126,9 +126,10 @@ namespace AKI.Menu
         static IntroSequence current;
         static bool seen;   // the legend has played through once in this run of the game: it may be skipped now
 
+        /// <summary>Forgets that the legend has been seen (a new run of the game: <see cref="GameReset"/>).</summary>
         // statics outlive play mode in the editor when the domain isn't reloaded
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        static void ResetSession() => seen = false;
+        public static void ResetSession() => seen = false;
 
         public static bool IsRunning => current != null;
 
@@ -150,8 +151,7 @@ namespace AKI.Menu
         AudioSource ambient;
         readonly List<AudioSource> heldSources = new List<AudioSource>();
         readonly List<float> heldVolumes = new List<float>();
-        CanvasGroup skip;
-        Image skipRing;
+        HoldPrompt skip;
         float skipHeld;
         bool skipping;
         float timeScaleBefore = 1f;
@@ -250,70 +250,7 @@ namespace AKI.Menu
         }
 
         // Top right: the line, and a ring beside it that fills while a key is held.
-        void BuildSkip()
-        {
-            const float Ring = 46f, Margin = 48f;
-            RectTransform area = Panel("Skip", transform, Vector2.one, Vector2.one);
-            area.pivot = Vector2.one;
-            area.sizeDelta = new Vector2(1100f, Ring);
-            area.anchoredPosition = new Vector2(-Margin, -Margin);
-            skip = area.gameObject.AddComponent<CanvasGroup>();
-            skip.alpha = 0f;
-            skip.blocksRaycasts = false;
-
-            Sprite ringSprite = RingSprite();
-            RectTransform track = Panel("Ring track", area, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f));
-            track.pivot = new Vector2(1f, 0.5f);
-            track.sizeDelta = new Vector2(Ring, Ring);
-            Image trackImage = track.gameObject.AddComponent<Image>();
-            trackImage.sprite = ringSprite;
-            trackImage.color = new Color(settings.textColour.r, settings.textColour.g, settings.textColour.b, 0.25f);
-            trackImage.raycastTarget = false;
-
-            RectTransform fill = Panel("Ring", track, Vector2.zero, Vector2.one);
-            skipRing = fill.gameObject.AddComponent<Image>();
-            skipRing.sprite = ringSprite;
-            skipRing.color = settings.textColour;
-            skipRing.type = Image.Type.Filled;
-            skipRing.fillMethod = Image.FillMethod.Radial360;
-            skipRing.fillOrigin = (int)Image.Origin360.Top;
-            skipRing.fillClockwise = true;
-            skipRing.fillAmount = 0f;
-            skipRing.raycastTarget = false;
-
-            Text label = Label("Skip line", area, Vector2.zero, Vector2.one, GameFont.Get(), settings.skipFontSize,
-                settings.textColour);
-            label.rectTransform.offsetMax = new Vector2(-(Ring + 18f), 0f);
-            label.alignment = TextAnchor.MiddleRight;
-            label.horizontalOverflow = HorizontalWrapMode.Overflow;
-            label.text = settings.skipText;
-            label.gameObject.AddComponent<Shadow>().effectDistance = new Vector2(2f, -2f);
-        }
-
-        // a thin white ring with smooth edges, filled radially by the Image
-        static Sprite RingSprite()
-        {
-            const int Size = 128;
-            const float Outer = 0.5f, Inner = 0.4f;   // share of the size
-            var texture = new Texture2D(Size, Size, TextureFormat.RGBA32, false)
-            {
-                wrapMode = TextureWrapMode.Clamp,
-                filterMode = FilterMode.Bilinear,
-                hideFlags = HideFlags.HideAndDontSave
-            };
-            const float Pixel = 1f / Size;
-            for (int y = 0; y < Size; y++)
-                for (int x = 0; x < Size; x++)
-                {
-                    float r = Vector2.Distance(new Vector2((x + 0.5f) / Size, (y + 0.5f) / Size), new Vector2(0.5f, 0.5f));
-                    float a = Mathf.Clamp01((Outer - r) / Pixel) * Mathf.Clamp01((r - Inner) / Pixel);
-                    texture.SetPixel(x, y, new Color(1f, 1f, 1f, a));
-                }
-            texture.Apply(false, true);
-            Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, Size, Size), new Vector2(0.5f, 0.5f));
-            sprite.hideFlags = HideFlags.HideAndDontSave;
-            return sprite;
-        }
+        void BuildSkip() => skip = new HoldPrompt(transform, settings.skipText, settings.skipFontSize, settings.textColour);
 
         CanvasGroup ControlsImage(string name, string path)
         {
@@ -601,20 +538,24 @@ namespace AKI.Menu
         {
             if (skip == null || skipping) return;
             float dt = Time.unscaledDeltaTime;
-            skip.alpha = Mathf.MoveTowards(skip.alpha, frozen ? 1f : 0f, dt / 0.4f);
+            // the reset's line takes the same corner: this one makes way for it
+            float shown = frozen && !GameReset.IsShowing ? 1f : 0f;
+            skip.Group.alpha = Mathf.MoveTowards(skip.Group.alpha, shown, dt / 0.15f);
             if (!frozen)
             {
                 skipHeld = 0f;
-                skipRing.fillAmount = 0f;
+                skip.Fill = 0f;
                 return;
             }
             skipHeld = AnyKeyHeld() ? skipHeld + dt : Mathf.Max(0f, skipHeld - dt * 2f);
-            skipRing.fillAmount = Mathf.Clamp01(skipHeld / settings.skipHoldSeconds);
+            skip.Fill = skipHeld / settings.skipHoldSeconds;
             if (skipHeld >= settings.skipHoldSeconds) StartSkip();
         }
 
+        // Backspace is the game reset's (GameReset): holding it fills that ring, not this one
         static bool AnyKeyHeld()
         {
+            if (Keyboard.current != null && Keyboard.current.backspaceKey.isPressed) return false;
             return (Keyboard.current != null && Keyboard.current.anyKey.isPressed)
                 || (Mouse.current != null && (Mouse.current.leftButton.isPressed || Mouse.current.rightButton.isPressed
                     || Mouse.current.middleButton.isPressed));
@@ -631,7 +572,7 @@ namespace AKI.Menu
         // everything on the canvas fades away with the black; the game and its sound come back
         IEnumerator SkipOut()
         {
-            var groups = new List<CanvasGroup>(slideGroups) { words, controlsPlain, controlsLabelled, skip };
+            var groups = new List<CanvasGroup>(slideGroups) { words, controlsPlain, controlsLabelled, skip?.Group };
             groups.RemoveAll(g => g == null);
             var from = new List<float>();
             foreach (CanvasGroup g in groups) from.Add(g.alpha);

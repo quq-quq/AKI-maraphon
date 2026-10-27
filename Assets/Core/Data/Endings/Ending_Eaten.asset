@@ -27,7 +27,7 @@ MonoBehaviour:
   textColor: {r: 1, g: 0.85, b: 0.1, a: 1}
   fontStyle: 0
   font: {fileID: 0}
-  textWidth: 0.8
+  textWidth: 0.94
   fadeToBlackSeconds: 0
   textDelaySeconds: 1
   textFadeSeconds: 0.6

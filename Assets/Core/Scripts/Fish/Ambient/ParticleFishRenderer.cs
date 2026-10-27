@@ -112,6 +112,16 @@ namespace AKI.Fish
                 particles = new ParticleSystem.Particle[count];
                 ParticleSystem.MainModule main = system.main;
                 main.maxParticles = count;
+                // what never changes is written once: SetParticles copies the array, which keeps it for the next frame
+                for (int i = 0; i < count; i++)
+                {
+                    ref ParticleSystem.Particle p = ref particles[i];
+                    p.startColor = Color.white;
+                    p.startLifetime = 100000f;
+                    p.remainingLifetime = 100000f;
+                    p.velocity = Vector3.zero;
+                    p.angularVelocity3D = Vector3.zero;
+                }
             }
             for (int i = 0; i < count; i++)
             {
@@ -119,11 +129,6 @@ namespace AKI.Fish
                 p.position = positions[i];
                 p.rotation3D = (rotations[i] * meshToFish).eulerAngles;
                 p.startSize = lengths[i] / MeshLength;
-                p.startColor = Color.white;
-                p.startLifetime = 100000f;
-                p.remainingLifetime = 100000f;
-                p.velocity = Vector3.zero;
-                p.angularVelocity3D = Vector3.zero;
             }
             system.SetParticles(particles, count);
         }

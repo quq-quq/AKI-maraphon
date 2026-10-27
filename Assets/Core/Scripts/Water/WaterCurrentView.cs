@@ -164,15 +164,18 @@ namespace AKI.Water
             float tanX = tanY * cam.aspect;
             float far = viewDistance;
             float t = Time.time;
+            WaterCurrent.PrepareSamples();   // a thousand samples at one moment: the water is read once for all of them
 
             for (int i = 0; i < n; i++)
             {
                 ParticleSystem.Particle p = buffer[i];
                 Vector3 world = camPos + p.position;
                 Vector3 local = toCam * p.position;
+                Vector3 flow = Vector3.zero;
+                // the under-water test and the water's velocity there in one look-up
                 if (p.remainingLifetime < 0.1f || local.z < nearDistance * 0.5f || local.z > far * 1.05f
                     || Mathf.Abs(local.x) > local.z * tanX + 0.1f || Mathf.Abs(local.y) > local.z * tanY + 0.1f
-                    || !WaterSurface.IsPointUnderwater(world))
+                    || !WaterCurrent.TrySamplePrepared(world, out flow))
                 {
                     Respawn(ref p);
                     buffer[i] = p;
@@ -184,7 +187,7 @@ namespace AKI.Water
                 Vector3 drift = new Vector3(Mathf.Sin(t * 0.7f + phase * 6.1f),
                                             0.6f * Mathf.Sin(t * 0.9f + phase * 3.7f),
                                             Mathf.Cos(t * 0.8f + phase * 5.3f)) * wobble;
-                p.velocity = WaterCurrent.At(world) * flowSpeed + drift - camVelocity;
+                p.velocity = flow * flowSpeed + drift - camVelocity;
 
                 // fade in when born, out at the end of life, near the lens and towards the far end of the view
                 float age = p.startLifetime - p.remainingLifetime;
@@ -195,7 +198,7 @@ namespace AKI.Water
                 Color c = Color.Lerp(colorA, colorB, (seed % 97u) / 96f);
                 c.a *= alpha;
                 p.startColor = c;
-                p.startSize = BaseSize(seed);
+                // the size stays what Respawn gave it (it only depends on the seed)
                 buffer[i] = p;
             }
             system.SetParticles(buffer, n);

@@ -50,6 +50,9 @@ namespace AKI.Rhythm
         [Min(0f)] public float bossWaveClearanceMetres = 6.5f;
         [Min(.2f)] public float finalChargeSeconds = 1.2f;
         [Range(.05f,1f)] public float cutToBlackDistance = .45f;
+        [Tooltip("Burst at the camera as the Naga comes (VFX_HarpoonBubbles): a bubble popping on the lens, under which every " +
+                 "fish is gone. Empty = only the punch on the lens.")]
+        public AKI.VFX.HarpoonBubbles bossPopBubbles;
         [Header("Successful boss hit: light vignette")]
         public Color bossHitColour = new Color(1f, .055f, .42f, 1f);
         [Range(0f,1f)] public float bossHitIntensity = .58f;
@@ -109,6 +112,7 @@ namespace AKI.Rhythm
         double phaseStarted;
         GameObject gold;
         NagaRhythmMotion naga;
+        NagaEnvironmentSafety nagaSafety;   // the live Naga's, looked up once when it appears
         RhythmShotGate gate;
         Transform headPoint;
         Camera cameraView;
@@ -193,7 +197,7 @@ namespace AKI.Rhythm
             if (IntroSequence.IsHoldingGame) { phaseStarted += Time.unscaledDeltaTime; return; }
             if(naga!=null)
             {
-                var guard=naga.GetComponent<NagaEnvironmentSafety>();
+                var guard=nagaSafety;
                 if(guard!=null&&guard.EnvironmentUnavailable)
                 { swimmer.SurfaceBlocked=false;breath.SurfaceRefillBlocked=false;RestartGame();return; }
             }
@@ -261,9 +265,15 @@ namespace AKI.Rhythm
         {
             if (!initialized || (phase != GamePhase.GoldenFish && phase != GamePhase.Fishing)) return;
             if (gold != null) Destroy(gold); gold = null;
-            fishSpawner?.StopSpawning();
+            // every spawner of the scene, not only the fishing one: none may put a tuna back during the fight
+            foreach (var spawner in FindObjectsByType<FishSpawner>(FindObjectsSortMode.None))
+                if (spawner.gameObject.scene == gameObject.scene) spawner.StopSpawning();
             foreach (var fish in FindObjectsByType<FishAI>(FindObjectsSortMode.None))
                 if (fish.gameObject.scene == gameObject.scene) Destroy(fish.gameObject);
+            // a bubble bursts on the camera and, under its flash, the reef fish are gone too: the sea empties for the Naga
+            foreach (var shoal in FindObjectsByType<AmbientFish>(FindObjectsSortMode.None))
+                if (shoal.gameObject.scene == gameObject.scene) shoal.gameObject.SetActive(false);
+            BubblePop();
             if (!StartTrack(nagaTrack, false, soundConfig != null ? soundConfig.NagaGamelan : null)) { RestartGame(); return; }
             SetPhase(GamePhase.BossFight); rewardedBeats.Clear(); SuccessfulBossHits = 0;
             swimmer.SurfaceBlocked = true; breath.SurfaceRefillBlocked = true;
@@ -285,7 +295,7 @@ namespace AKI.Rhythm
                 naga.SetMouthOffset(head.InverseTransformPoint(mouthWorld));
             }
             naga.OrbitRadius = nagaOrbitRadius; naga.AngularSpeed = nagaAngularSpeed; naga.ChargeDuration = finalChargeSeconds;
-            var safety = monster.GetComponent<NagaEnvironmentSafety>();
+            var safety = nagaSafety = monster.GetComponent<NagaEnvironmentSafety>();
             if (safety != null) safety.Configure(oceanTerrain, gameObject.scene);
             var bossTarget = monster.AddComponent<RhythmSpecialTarget>(); bossTarget.game = this;
             if (skin != null)
@@ -420,6 +430,22 @@ namespace AKI.Rhythm
             breath.passOutWhenOutOfAir = false; playerWeapon.enabled = false;
             EndingScreen.Show(ending);
             onEnded.Invoke();
+        }
+        void BubblePop()
+        {
+            var fx = cameraView.GetComponentInChildren<GameplayCameraFX>();
+            if (fx != null) fx.BubblePop();
+            if (bossPopBubbles == null) return;
+            // right in front of the lens and around it, bursting towards it
+            Transform view = cameraView.transform;
+            Vector3[] spots = { new Vector3(0f, 0f, .6f), new Vector3(-.45f, .2f, .9f), new Vector3(.45f, -.15f, .85f) };
+            foreach (Vector3 spot in spots)
+            {
+                Vector3 at = view.TransformPoint(spot);
+                var burst = Instantiate(bossPopBubbles, at, Quaternion.LookRotation(view.position - at));
+                burst.Fire();
+                burst.StopAndDetach();   // no streak behind it; it goes when its bubbles are gone
+            }
         }
         [ContextMenu("Restart game")]
         public void RestartGame()

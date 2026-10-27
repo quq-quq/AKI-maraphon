@@ -152,6 +152,10 @@ namespace AKI.Fish
         float[] lengths = new float[0];
         System.Random random;
         Terrain[] terrains;   // the sea floor
+        Vector3[] terrainOrigins, terrainSizes;   // where each of them lies: they don't move, asked once
+        float[][] terrainHeights;                 // their heightmaps (0..1, row by row), read once
+        int[] terrainResolutions;
+        float pitchSlope;     // tan(maxPitch), this frame
         Rect area;            // where the loners and schools may go (XZ)
         Vector2 richCentre;
         float richDistance;
@@ -171,6 +175,24 @@ namespace AKI.Fish
             }
             if (!SetUpSpecies()) return;
             terrains = Terrain.activeTerrains;   // a new array on every call: once
+            terrainOrigins = new Vector3[terrains.Length];
+            terrainSizes = new Vector3[terrains.Length];
+            terrainHeights = new float[terrains.Length][];
+            terrainResolutions = new int[terrains.Length];
+            for (int i = 0; i < terrains.Length; i++)
+            {
+                TerrainData data = terrains[i].terrainData;
+                terrainOrigins[i] = terrains[i].transform.position;
+                terrainSizes[i] = data.size;
+                int res = data.heightmapResolution;
+                float[,] grid = data.GetHeights(0, 0, res, res);
+                var flat = new float[res * res];
+                for (int z = 0; z < res; z++)
+                for (int x = 0; x < res; x++)
+                    flat[z * res + x] = grid[z, x];
+                terrainHeights[i] = flat;
+                terrainResolutions[i] = res;
+            }
             waterLevel = WaterLevel();
             area = Area();
             richCentre = centre != null ? new Vector2(centre.position.x, centre.position.z) : area.center;
@@ -324,6 +346,7 @@ namespace AKI.Fish
 
             Vector3 camera = Camera.main != null ? Camera.main.transform.position : transform.position;
             float far = simulateDistance * simulateDistance;
+            pitchSlope = Mathf.Tan(maxPitch * Mathf.Deg2Rad);
             foreach (Reef reef in reefs) reef.active = (reef.centre - camera).sqrMagnitude < far;
             foreach (School school in schoolList)
             {
@@ -436,7 +459,7 @@ namespace AKI.Fish
             float flat = new Vector2(v.x, v.z).magnitude;
             if (flat > 1e-3f)
             {
-                float limit = Mathf.Tan(maxPitch * Mathf.Deg2Rad) * flat;
+                float limit = pitchSlope * flat;
                 v.y = Mathf.Clamp(v.y, -limit, limit);
                 fish.rotation = Quaternion.Slerp(fish.rotation, Quaternion.LookRotation(v), 1f - Mathf.Exp(-turnSharpness * dt));
             }
@@ -458,7 +481,10 @@ namespace AKI.Fish
                 {
                     Agent fish = list[i];
                     positions[i] = fish.position;
-                    rotations[i] = fish.rotation * Quaternion.Euler(0f, Mathf.Sin(fish.phase) * wiggleDegrees, 0f);
+                    // the tail wag: a turn about the fish's own up axis (Quaternion.Euler(0, angle, 0), without the
+                    // engine call)
+                    float half = Mathf.Sin(fish.phase) * wiggleDegrees * (0.5f * Mathf.Deg2Rad);
+                    rotations[i] = fish.rotation * new Quaternion(0f, Mathf.Sin(half), 0f, Mathf.Cos(half));
                     lengths[i] = fish.length;
                 }
                 renderers[s].Write(positions, rotations, lengths, list.Count);
@@ -536,21 +562,40 @@ namespace AKI.Fish
 
         float SeabedHeight(Vector3 p)
         {
-            Terrain terrain = TerrainAt(p);
-            if (terrain != null) return terrain.SampleHeight(p) + terrain.transform.position.y;
+            int i = TerrainAt(p);
+            if (i >= 0) return TerrainHeight(i, p) + terrainOrigins[i].y;
             if (Physics.Raycast(new Vector3(p.x, waterLevel, p.z), Vector3.down, out RaycastHit hit, 200f, ~((1 << 2) | (1 << 4)), QueryTriggerInteraction.Ignore))
                 return hit.point.y;
             return waterLevel - 30f;
         }
 
-        Terrain TerrainAt(Vector3 p)
+        // Terrain.SampleHeight from the heightmap read at the start, without asking the engine a thousand times a frame:
+        // the height on the triangle of the heightmap grid p is in (each cell split along its (0,0)-(1,1) diagonal),
+        // which is how the terrain itself answers (the same to a tenth of a millimetre).
+        float TerrainHeight(int i, Vector3 p)
         {
-            foreach (Terrain t in terrains)
+            int res = terrainResolutions[i];
+            Vector3 o = terrainOrigins[i], s = terrainSizes[i];
+            float fx = (p.x - o.x) / s.x * (res - 1), fz = (p.z - o.z) / s.z * (res - 1);
+            int x0 = Mathf.Clamp((int)fx, 0, res - 2), z0 = Mathf.Clamp((int)fz, 0, res - 2);
+            float u = fx - x0, v = fz - z0;
+            float[] h = terrainHeights[i];
+            int row = z0 * res + x0;
+            float h00 = h[row], h10 = h[row + 1], h01 = h[row + res], h11 = h[row + res + 1];
+            float height = u > v ? h00 + (h10 - h00) * u + (h11 - h10) * v
+                                 : h00 + (h01 - h00) * v + (h11 - h01) * u;
+            return height * s.y;
+        }
+
+        // index of the terrain under p, or -1
+        int TerrainAt(Vector3 p)
+        {
+            for (int i = 0; i < terrainOrigins.Length; i++)
             {
-                Vector3 o = t.transform.position, s = t.terrainData.size;
-                if (p.x >= o.x && p.x <= o.x + s.x && p.z >= o.z && p.z <= o.z + s.z) return t;
+                Vector3 o = terrainOrigins[i], s = terrainSizes[i];
+                if (p.x >= o.x && p.x <= o.x + s.x && p.z >= o.z && p.z <= o.z + s.z) return i;
             }
-            return null;
+            return -1;
         }
 
         Rect Area()

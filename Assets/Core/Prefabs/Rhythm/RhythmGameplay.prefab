@@ -187,6 +187,7 @@ MonoBehaviour:
   bossWaveClearanceMetres: 6.5
   finalChargeSeconds: 1.2
   cutToBlackDistance: 0.45
+  bossPopBubbles: {fileID: 4545580171369712205, guid: 0164da10f1ff543839f23bdf89e7f4ab, type: 3}
   bossHitColour: {r: 1, g: 0.055, b: 0.42, a: 1}
   bossHitIntensity: 0.58
   bossHitFadeSeconds: 0.55
@@ -203,6 +204,9 @@ MonoBehaviour:
   goldenIgnoredEnding: {fileID: 11400000, guid: 5699539e1fca4737a879a4910baf87d7, type: 2}
   drownedEnding: {fileID: 11400000, guid: a9d29be8a27f4b8097230cb09285e718, type: 2}
   eatenEnding: {fileID: 11400000, guid: 0ccacbdb3f0a48319ef12afceb3ea2d2, type: 2}
+  shootHint: "\u0421\u0442\u0440\u0435\u043B\u044F\u0439\u0442\u0435 \u0432 \u0440\u0438\u0442\u043C"
+  shootHintHits: 2
+  shootHintSeconds: 20
   onFishingStarted:
     m_PersistentCalls:
       m_Calls: []

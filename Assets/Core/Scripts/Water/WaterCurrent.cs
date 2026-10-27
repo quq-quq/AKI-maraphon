@@ -58,6 +58,16 @@ namespace AKI.Water
         readonly List<Rigidbody> bodies = new List<Rigidbody>();
         float nextBodyScan;
 
+        // What a sample needs that doesn't depend on the point (gusts and the ocean's waves), worked out once instead of
+        // for every speck and body asking: again when the time step or the waves change.
+        float cachedTime = float.NaN;
+        float gustNow, tvNow;
+        OceanFFT cachedOcean;
+        Vector4 cachedSea = new Vector4(float.NaN, 0f, 0f, 0f);
+        bool swellOn;
+        Vector2 swellDir1, swellDir2;
+        float swellOmega1, swellOmega2, swellK1, swellK2, swellScale;
+
         /// <summary>The scene's current, or null.</summary>
         public static WaterCurrent Active => active;
 
@@ -76,21 +86,129 @@ namespace AKI.Water
 
         public Vector3 Sample(Vector3 p)
         {
-            if (!TryDepth(p, out float depth)) return Vector3.zero;
+            return TryDepth(p, out float depth) ? SampleAtDepth(p, depth) : Vector3.zero;
+        }
+
+        /// <summary>
+        /// Velocity of the water at <paramref name="worldPoint"/>, and whether the point is under water at all (the
+        /// same test <see cref="WaterSurface.IsPointUnderwater"/> makes), in one go.
+        /// </summary>
+        public static bool TrySample(Vector3 worldPoint, out Vector3 velocity)
+        {
+            velocity = Vector3.zero;
+            if (!TryDepth(worldPoint, out float depth)) return false;
+            if (active != null) velocity = active.SampleAtDepth(worldPoint, depth);
+            return true;
+        }
+
+        Vector3 SampleAtDepth(Vector3 p, float depth)
+        {
+            Step();
+            return AtDepth(p, depth, Heading);
+        }
+
+        float Heading => Wind.Active != null ? Wind.Active.heading : direction;
+
+        // the parts of a sample that don't depend on the point, for the time it is now
+        void Step()
+        {
             float t = Time.time;
-            float gust = 1f + gusts * (Mathf.PerlinNoise(t / gustPeriod, 7.3f) * 2f - 1f);
-            return (Drift(p, depth, t) + Swell(p, depth, t)) * Mathf.Max(0f, gust);
+            if (t != cachedTime)
+            {
+                cachedTime = t;
+                gustNow = Mathf.Max(0f, 1f + gusts * (Mathf.PerlinNoise(t / gustPeriod, 7.3f) * 2f - 1f));
+                tvNow = t * variationSpeed;
+            }
+            OceanFFT ocean = OceanFFT.Active;
+            Vector4 sea = ocean != null ? new Vector4(ocean.windSpeed, ocean.fetchKm, ocean.windDirection, ocean.waveScale)
+                                        : new Vector4(-1f, fallbackWavePeriod, fallbackWaveDirection, surge);
+            // exact comparison (Vector4's == forgives small differences)
+            if (!ReferenceEquals(ocean, cachedOcean) || !sea.Equals(cachedSea) || swellOn != surge > 0f) CacheSwell(ocean, sea);
+        }
+
+        Vector3 AtDepth(Vector3 p, float depth, float heading)
+        {
+            return (Drift(p, depth, heading) + Swell(p, depth, cachedTime)) * gustNow;
+        }
+
+        // ---- many samples at one moment (the specks of WaterCurrentView): the waters, the time, the wind and the
+        // waves are read once for the lot instead of for every sample. Nothing moves in between, so every answer is the
+        // one TrySample would give.
+        struct Area { public float x, z, half, level; }
+        static Area[] areas = new Area[2];
+        static int areaCount;
+        static WaterCurrent prepared;
+        static float preparedHeading;
+
+        /// <summary>Reads the waters and the current once, for a batch of <see cref="TrySamplePrepared"/> calls made right after.</summary>
+        public static void PrepareSamples()
+        {
+            IReadOnlyList<WaterSurface> waters = WaterSurface.Instances;
+            if (areas.Length < waters.Count) areas = new Area[waters.Count];
+            areaCount = waters.Count;
+            for (int i = 0; i < areaCount; i++)
+            {
+                Vector3 c = waters[i].transform.position;
+                areas[i] = new Area { x = c.x, z = c.z, half = waters[i].size * 0.5f, level = c.y };
+            }
+            prepared = active != null ? active : null;
+            if (prepared is null) return;
+            prepared.Step();
+            preparedHeading = prepared.Heading;
+        }
+
+        /// <summary><see cref="TrySample"/> for a batch read by <see cref="PrepareSamples"/>.</summary>
+        public static bool TrySamplePrepared(Vector3 worldPoint, out Vector3 velocity)
+        {
+            velocity = Vector3.zero;
+            for (int i = 0; i < areaCount; i++)
+            {
+                Area a = areas[i];
+                // WaterSurface.ContainsPoint: inside the square and below the mean level
+                if (Mathf.Abs(worldPoint.x - a.x) > a.half || Mathf.Abs(worldPoint.z - a.z) > a.half || worldPoint.y >= a.level) continue;
+                if (!(prepared is null)) velocity = prepared.AtDepth(worldPoint, a.level - worldPoint.y, preparedHeading);
+                return true;
+            }
+            return false;
+        }
+
+        void CacheSwell(OceanFFT ocean, Vector4 sea)
+        {
+            cachedOcean = ocean;
+            cachedSea = sea;
+            swellOn = surge > 0f;
+            if (!swellOn) return;
+            float omega;
+            Vector2 dir;
+            if (ocean != null)
+            {
+                omega = ocean.PeakOmega;
+                dir = ocean.WaveDirection;
+                swellScale = ocean.waveScale;
+            }
+            else
+            {
+                omega = 2f * Mathf.PI / fallbackWavePeriod;
+                float a = fallbackWaveDirection * Mathf.Deg2Rad;
+                dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+                swellScale = 1f;
+            }
+            swellDir1 = dir;
+            swellOmega1 = omega;
+            swellK1 = omega * omega / G;   // deep water dispersion
+            swellDir2 = Rotate(dir, 25f * Mathf.Deg2Rad);
+            swellOmega2 = omega * 1.6f;
+            swellK2 = swellOmega2 * swellOmega2 / G;
         }
 
         // steady flow, wandering a little in direction and strength across the sea
-        Vector3 Drift(Vector3 p, float depth, float t)
+        Vector3 Drift(Vector3 p, float depth, float heading)
         {
             if (speed <= 0f) return Vector3.zero;
-            float tv = t * variationSpeed;
+            float tv = tvNow;
             float u = p.x / variationScale, v = p.z / variationScale;
             float swing = Mathf.PerlinNoise(u + tv, v - 0.7f * tv) * 2f - 1f;
             float surgeNoise = Mathf.PerlinNoise(v + 37.1f - 0.5f * tv, u + 11.3f + 0.3f * tv);
-            float heading = Wind.Active != null ? Wind.Active.heading : direction;
             float angle = (heading + swing * directionVariation) * Mathf.Deg2Rad;
             float strength = speed * (0.6f + 0.8f * surgeNoise) * Mathf.Lerp(deepShare, 1f, Mathf.Exp(-depth / depthFalloff));
             return new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle)) * strength;
@@ -101,33 +219,14 @@ namespace AKI.Water
         // turned second wave keeps the rhythm from being perfectly regular.
         Vector3 Swell(Vector3 p, float depth, float t)
         {
-            if (surge <= 0f) return Vector3.zero;
-            OceanFFT ocean = OceanFFT.Active;
-            float omega, scale;
-            Vector2 dir;
-            if (ocean != null)
-            {
-                omega = ocean.PeakOmega;
-                dir = ocean.WaveDirection;
-                scale = ocean.waveScale;
-            }
-            else
-            {
-                omega = 2f * Mathf.PI / fallbackWavePeriod;
-                float a = fallbackWaveDirection * Mathf.Deg2Rad;
-                dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
-                scale = 1f;
-            }
-
-            Vector3 v = Orbit(p, depth, t, dir, omega, 1f, 0f);
-            Vector2 dir2 = Rotate(dir, 25f * Mathf.Deg2Rad);
-            v += Orbit(p, depth, t, dir2, omega * 1.6f, 0.45f, 1.7f);
-            return v * (surge * scale);
+            if (!swellOn) return Vector3.zero;
+            Vector3 v = Orbit(p, depth, t, swellDir1, swellOmega1, swellK1, 1f, 0f);
+            v += Orbit(p, depth, t, swellDir2, swellOmega2, swellK2, 0.45f, 1.7f);
+            return v * (surge * swellScale);
         }
 
-        Vector3 Orbit(Vector3 p, float depth, float t, Vector2 dir, float omega, float amplitude, float phase0)
+        Vector3 Orbit(Vector3 p, float depth, float t, Vector2 dir, float omega, float k, float amplitude, float phase0)
         {
-            float k = omega * omega / G;   // deep water dispersion
             float phase = k * (p.x * dir.x + p.z * dir.y) - omega * t + phase0;
             float decay = Mathf.Exp(-k * depth) * amplitude;
             float c = Mathf.Cos(phase), s = Mathf.Sin(phase);
